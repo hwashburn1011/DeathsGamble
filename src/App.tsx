@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useGameStore } from './state/gameStore';
 import { useSettingsStore } from './state/settingsStore';
 import { AudioManager } from './engine/audio/AudioManager';
+import { MUSIC_BY_SCENE, BOSS_MUSIC } from './engine/audio/musicMap';
 import { TitleScene } from './scenes/TitleScene';
 import { ModeSelectScene } from './scenes/ModeSelectScene';
 import { BuildPickerScene } from './scenes/BuildPickerScene';
@@ -41,6 +42,7 @@ function transitionFor(from: SceneName, to: SceneName): number {
 
 export function App() {
   const target = useGameStore((s) => s.scene);
+  const isBossRaid = useGameStore((s) => s.isBossRaid)();
   const brightness = useSettingsStore((s) => s.brightness);
   const motion = useSettingsStore((s) => s.motionIntensity);
   const [active, setActive] = useState<SceneName>(target);
@@ -60,6 +62,15 @@ export function App() {
   useEffect(() => {
     AudioManager.setVolumes(volumeMaster, volumeSfx, volumeMusic);
   }, [volumeMaster, volumeSfx, volumeMusic]);
+
+  // Switch background music whenever the visible scene changes.
+  // Use `active` (the post-transition scene), not `target`, so the
+  // crossfade aligns with the visual fade.
+  useEffect(() => {
+    const url =
+      active === 'dungeon' && isBossRaid ? BOSS_MUSIC : MUSIC_BY_SCENE[active] ?? null;
+    AudioManager.playMusic(url);
+  }, [active, isBossRaid]);
 
   // Drive crossfade: when target diverges from active, start an out-fade,
   // swap, then fade back in. Skip the fade entirely on motion=off so

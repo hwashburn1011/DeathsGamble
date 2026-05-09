@@ -49,6 +49,56 @@ export const CREDITS: AssetCredit[] = [
     shipped: true,
   },
 
+  // ===== Music =====
+  {
+    name: 'Castle Lost',
+    author: 'Eric Matyas (soundimage.org)',
+    license: 'CC-BY 4.0',
+    url: 'https://soundimage.org',
+    category: 'audio',
+    shipped: true,
+  },
+  {
+    name: 'Dark Fantasy Open',
+    author: 'Eric Matyas (soundimage.org)',
+    license: 'CC-BY 4.0',
+    url: 'https://soundimage.org',
+    category: 'audio',
+    shipped: true,
+  },
+  {
+    name: 'Ghostly Enchantment',
+    author: 'Eric Matyas (soundimage.org)',
+    license: 'CC-BY 4.0',
+    url: 'https://soundimage.org',
+    category: 'audio',
+    shipped: true,
+  },
+  {
+    name: 'The Attic of Secrets',
+    author: 'Eric Matyas (soundimage.org)',
+    license: 'CC-BY 4.0',
+    url: 'https://soundimage.org',
+    category: 'audio',
+    shipped: true,
+  },
+  {
+    name: 'Secret Spells',
+    author: 'Eric Matyas (soundimage.org)',
+    license: 'CC-BY 4.0',
+    url: 'https://soundimage.org',
+    category: 'audio',
+    shipped: true,
+  },
+  {
+    name: 'Chilly Whispers',
+    author: 'Eric Matyas (soundimage.org)',
+    license: 'CC-BY 4.0',
+    url: 'https://soundimage.org',
+    category: 'audio',
+    shipped: true,
+  },
+
   // ===== Fonts =====
   {
     name: 'Cinzel (display)',

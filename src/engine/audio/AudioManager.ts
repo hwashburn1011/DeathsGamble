@@ -64,15 +64,21 @@ class AudioManagerImpl {
   private volSfx = 0.7;
   private volMusic = 0.5;
 
-  // Music
+  // Music — supports crossfade between tracks
   private music: HTMLAudioElement | null = null;
+  private musicFading: HTMLAudioElement | null = null;
   private musicId: string | null = null;
+  private fadeRafId: number | null = null;
 
   setVolumes(master: number, sfx: number, music: number): void {
     this.volMaster = master;
     this.volSfx = sfx;
     this.volMusic = music;
-    if (this.music) this.music.volume = this.volMaster * this.volMusic;
+    if (this.music) this.music.volume = this.musicTargetVol();
+  }
+
+  private musicTargetVol(): number {
+    return this.volMaster * this.volMusic;
   }
 
   play(id: SfxId, opts: PlayOpts = {}): void {
@@ -96,22 +102,64 @@ class AudioManagerImpl {
     });
   }
 
-  /** Begin (or change) the looping music track. URL = full path. */
-  playMusic(url: string | null): void {
+  /**
+   * Switch the looping music track with a 1.2s crossfade.
+   * Pass null to fade out to silence.
+   */
+  playMusic(url: string | null, fadeMs = 1200): void {
     if (this.musicId === url) return;
-    if (this.music) {
-      this.music.pause();
-      this.music = null;
-    }
     this.musicId = url;
-    if (!url) return;
-    const a = new Audio(url);
-    a.loop = true;
-    a.volume = this.volMaster * this.volMusic;
-    a.play().catch(() => {
-      /* autoplay blocked — will start on first user gesture */
-    });
-    this.music = a;
+
+    // Cancel any in-flight fade animation
+    if (this.fadeRafId != null) {
+      cancelAnimationFrame(this.fadeRafId);
+      this.fadeRafId = null;
+    }
+    // Park the previous fading track if there's one — it'll get destroyed
+    // immediately so we don't end up with three tracks on chained switches.
+    if (this.musicFading) {
+      this.musicFading.pause();
+      this.musicFading = null;
+    }
+    this.musicFading = this.music;
+    this.music = null;
+
+    if (url) {
+      const a = new Audio(url);
+      a.loop = true;
+      a.volume = 0;
+      a.play().catch(() => {
+        /* autoplay blocked — first user gesture will succeed */
+      });
+      this.music = a;
+    }
+
+    // Animate volumes
+    const start = performance.now();
+    const fadingFrom = this.musicFading?.volume ?? 0;
+    const target = this.musicTargetVol();
+    const step = () => {
+      const elapsed = performance.now() - start;
+      const t = Math.min(1, elapsed / fadeMs);
+      // Fade out old
+      if (this.musicFading) {
+        this.musicFading.volume = fadingFrom * (1 - t);
+      }
+      // Fade in new
+      if (this.music) {
+        this.music.volume = target * t;
+      }
+      if (t < 1) {
+        this.fadeRafId = requestAnimationFrame(step);
+      } else {
+        this.fadeRafId = null;
+        if (this.musicFading) {
+          this.musicFading.pause();
+          this.musicFading = null;
+        }
+      }
+    };
+    this.fadeRafId = requestAnimationFrame(step);
   }
 }
 
