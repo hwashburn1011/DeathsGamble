@@ -12,10 +12,7 @@ import {
 } from 'pixi.js';
 import type { BuildDef, EnemyTypeDef, PlayerStats, WeaponDef } from '../../types';
 import { ENEMY_TYPES } from '../../data/enemies';
-import { SPELLS_BY_ID } from '../../data/spells';
-import { DIFFICULTY } from '../../data/difficulty';
 import { PLAYER_SPRITE_BY_BUILD, ENEMY_SPRITE_BY_TYPE } from '../pixi/manifest';
-import type { Difficulty } from '../../types';
 
 interface PlayerEntity {
   x: number;
@@ -71,8 +68,7 @@ interface HitText {
 export interface DungeonGameOptions {
   build: BuildDef;
   weapon: WeaponDef;
-  spells: string[];
-  difficulty: Difficulty;
+  stats: PlayerStats;   // already-computed (build + spells + difficulty + wheel results)
   onStatsChange: (s: { hp: number; hpMax: number; level: number; xp: number; xpNext: number; kills: number; cashThisRun: number; time: number }) => void;
   onGameOver: (stats: { time: number; kills: number; level: number; cash: number }) => void;
 }
@@ -110,7 +106,8 @@ export class DungeonGame {
   constructor(app: Application, opts: DungeonGameOptions) {
     this.app = app;
     this.opts = opts;
-    this.stats = computeStats(opts.build, opts.weapon, opts.spells, opts.difficulty);
+    // Clone so wheel-applied buffs aren't mutated mid-run
+    this.stats = { ...opts.stats };
 
     app.stage.addChild(this.worldLayer);
     app.stage.addChild(this.projectileLayer);
@@ -537,54 +534,3 @@ export class DungeonGame {
   }
 }
 
-// ---------- Stats compute ----------
-function computeStats(
-  build: BuildDef,
-  weapon: WeaponDef,
-  spells: string[],
-  difficulty: Difficulty
-): PlayerStats {
-  const s: PlayerStats = {
-    hp: build.baseHp,
-    hpMax: build.baseHp,
-    dmg: 0,
-    def: build.baseDef,
-    spd: build.baseSpd,
-    atkspd: weapon.atkspd,
-    range: weapon.range,
-    crit: 0.05,
-    luck: build.baseLuck || 0,
-    pickup: 60,
-    enemyHpMult: 1.0,
-    enemySpdMult: 1.0,
-    enemySpawnMult: 1.0,
-    enemyDmgBonus: 0,
-    dmgMult: 1.0,
-    atkspdMult: 1.0,
-    rangeBonus: 0,
-    lifesteal: 0,
-    pierce: 0,
-    aoe: weapon.aoe || 0,
-  };
-  for (const id of spells) {
-    const sp = SPELLS_BY_ID[id];
-    if (!sp) continue;
-    const e = sp.effect;
-    if (e.dmgMult) s.dmgMult *= e.dmgMult;
-    if (e.atkspdMult) s.atkspdMult *= e.atkspdMult;
-    if (e.rangeBonus) s.rangeBonus += e.rangeBonus;
-    if (e.hpBonus) {
-      s.hp += e.hpBonus;
-      s.hpMax += e.hpBonus;
-    }
-    if (e.critBonus) s.crit = Math.min(1, s.crit + e.critBonus);
-    if (e.lifesteal) s.lifesteal += e.lifesteal;
-    if (e.pierce) s.pierce += e.pierce;
-  }
-  const d = DIFFICULTY[difficulty];
-  s.enemyHpMult *= d.enemyHpMult;
-  s.enemySpdMult *= d.enemySpdMult;
-  s.enemySpawnMult *= d.enemySpawnMult;
-  s.enemyDmgBonus += (d.enemyDmgMult - 1) * 5;
-  return s;
-}

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { Application } from 'pixi.js';
 import { GlassPanel } from '../ui/GlassPanel';
 import { useGameStore } from '../state/gameStore';
-import { useSettingsStore } from '../state/settingsStore';
 import { DungeonGame } from '../engine/dungeon/DungeonGame';
 import './dungeon.css';
 
@@ -20,13 +19,13 @@ interface HudStats {
 export function DungeonScene() {
   const containerRef = useRef<HTMLDivElement>(null);
   const run = useGameStore((s) => s.run);
+  const stats = useGameStore((s) => s.stats);
   const showScene = useGameStore((s) => s.showScene);
   const addCashEarned = useGameStore((s) => s.addCashEarned);
   const addKills = useGameStore((s) => s.addKills);
-  const difficulty = useSettingsStore((s) => s.difficulty);
   const [hud, setHud] = useState<HudStats>({
-    hp: run.build?.baseHp ?? 100,
-    hpMax: run.build?.baseHp ?? 100,
+    hp: stats?.hp ?? run.build?.baseHp ?? 100,
+    hpMax: stats?.hpMax ?? run.build?.baseHp ?? 100,
     level: 1,
     xp: 0,
     xpNext: 8,
@@ -39,7 +38,7 @@ export function DungeonScene() {
 
   useEffect(() => {
     const container = containerRef.current;
-    if (!container || !run.build || !run.weapon) return;
+    if (!container || !run.build || !run.weapon || !stats) return;
 
     let game: DungeonGame | null = null;
     let app: Application | null = null;
@@ -64,16 +63,15 @@ export function DungeonScene() {
         game = new DungeonGame(app, {
           build: run.build!,
           weapon: run.weapon!,
-          spells: run.spells,
-          difficulty,
+          stats: stats!,
           onStatsChange: (s) => {
             if (cancelled) return;
             setHud(s);
           },
-          onGameOver: (stats) => {
+          onGameOver: (gs) => {
             if (cancelled) return;
-            addCashEarned(stats.cash);
-            addKills(stats.kills);
+            addCashEarned(gs.cash);
+            addKills(gs.kills);
             showScene('gameover');
           },
         });
@@ -101,7 +99,7 @@ export function DungeonScene() {
       // Clear container in case canvas didn't get removed
       while (container.firstChild) container.removeChild(container.firstChild);
     };
-  }, [run.build, run.weapon, run.spells, difficulty, addCashEarned, addKills, showScene]);
+  }, [run.build, run.weapon, stats, addCashEarned, addKills, showScene]);
 
   const hpPct = Math.max(0, hud.hp / hud.hpMax) * 100;
   const xpPct = (hud.xp / hud.xpNext) * 100;

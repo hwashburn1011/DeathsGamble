@@ -1,0 +1,160 @@
+.wheels-scene {
+  position: fixed;
+  inset: 0;
+  background: var(--shadow);
+  overflow: hidden;
+}
+
+.wheels-canvas-wrap {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.wheels-canvas-wrap canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* Top center label */
+.wheels-header {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  font-family: var(--font-display);
+  font-size: 18px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  text-shadow: 0 0 12px rgba(0, 0, 0, 0.6);
+}
+
+/* Loadout panel — top left */
+.wheels-loadout {
+  position: absolute;
+  top: 60px;
+  left: 18px;
+  z-index: 10;
+  min-width: 220px;
+  font-family: var(--font-body);
+  font-size: 13px;
+}
+
+.wheels-stats {
+  position: absolute;
+  top: 60px;
+  right: 70px;
+  z-index: 10;
+  min-width: 200px;
+  font-family: var(--font-body);
+  font-size: 13px;
+}
+
+.wheels-h3 {
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+  margin-bottom: 10px;
+  border-bottom: 1px solid var(--glass-border);
+  padding-bottom: 8px;
+}
+
+.wheels-load-row,
+.wheels-stat-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 4px 0;
+  align-items: baseline;
+}
+
+.wheels-load-row .lbl,
+.wheels-stat-row .lbl {
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.wheels-load-row .val,
+.wheels-stat-row .val {
+  color: var(--ink);
+  font-weight: 600;
+  text-align: right;
+}
+
+.wheels-stat-row .val--gold {
+  color: var(--gold-bright);
+  text-shadow: 0 0 6px rgba(201, 162, 39, 0.4);
+}
+
+.wheels-load-divider {
+  height: 1px;
+  background: var(--glass-border);
+  margin: 8px 0 4px;
+}
+
+/* Wheel button groups — positioned below each wheel */
+.wheel-button-group {
+  position: absolute;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  top: calc(60vh + 22vh);  /* below the wheels (drawn around 60vh + r=20vh) */
+  transform: translateX(-50%);
+}
+
+.wheel-button-group--buff  { left: calc(50% - 14% * 1.95); }
+.wheel-button-group--curse { left: calc(50% + 14% * 1.95); }
+
+.wheel-label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.wheel-label--buff  { color: var(--moss-bright); }
+.wheel-label--curse { color: var(--blood-bright); }
+
+.wheel-result {
+  font-family: var(--font-body);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  min-height: 18px;
+  margin-top: 4px;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity var(--m-smooth), transform var(--m-smooth);
+}
+
+.wheel-result.shown {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.wheel-result--good { color: var(--moss-bright); }
+.wheel-result--bad  { color: var(--blood-bright); }
+
+/* Enter Dungeon — bottom right */
+.wheels-enter {
+  position: absolute;
+  bottom: 30px;
+  right: 30px;
+  z-index: 10;
+}
+
+.wheels-back {
+  position: absolute;
+  bottom: 30px;
+  left: 30px;
+  z-index: 10;
+}
