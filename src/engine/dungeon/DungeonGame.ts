@@ -13,8 +13,10 @@ import {
   TextStyle,
 } from 'pixi.js';
 import type { BuildDef, EnemyTypeDef, PlayerStats, WeaponDef } from '../../types';
-import { ENEMY_TYPES } from '../../data/enemies';
+import { ENEMY_TYPES, FINAL_BOSS } from '../../data/enemies';
 import { PLAYER_SPRITE_BY_BUILD, ENEMY_SPRITE_BY_TYPE } from '../pixi/manifest';
+
+const ROUND_DURATION_S = 60;
 
 interface PlayerEntity {
   x: number;
@@ -30,6 +32,7 @@ interface EnemyEntity {
   x: number;
   y: number;
   hp: number;
+  hpMax: number;
   spd: number;
   dmg: number;
   r: number;
@@ -37,6 +40,7 @@ interface EnemyEntity {
   sprite: Sprite;
   flashTimer: number;
   proto: EnemyTypeDef;
+  isBoss: boolean;
 }
 
 interface ProjectileEntity {
@@ -82,12 +86,34 @@ interface Particle {
   vrot: number;
 }
 
+export interface DungeonRunSummary {
+  time: number;
+  kills: number;
+  level: number;
+  cash: number;
+}
+
 export interface DungeonGameOptions {
   build: BuildDef;
   weapon: WeaponDef;
   stats: PlayerStats;
-  onStatsChange: (s: { hp: number; hpMax: number; level: number; xp: number; xpNext: number; kills: number; cashThisRun: number; time: number }) => void;
-  onGameOver: (stats: { time: number; kills: number; level: number; cash: number }) => void;
+  isBossRaid: boolean;
+  onStatsChange: (s: {
+    hp: number;
+    hpMax: number;
+    level: number;
+    xp: number;
+    xpNext: number;
+    kills: number;
+    cashThisRun: number;
+    time: number;
+    timeRemaining: number;
+    bossHp: number | null;
+    bossHpMax: number | null;
+  }) => void;
+  onGameOver: (stats: DungeonRunSummary) => void;
+  onRoundComplete: (stats: DungeonRunSummary) => void; // round timer ran out (non-boss)
+  onBossDefeated: (stats: DungeonRunSummary) => void;  // boss kill in boss raid
 }
 
 const HIT_STYLE_NORMAL = new TextStyle({
@@ -167,6 +193,10 @@ export class DungeonGame {
   private xpNext = 8;
   private cashThisRun = 0;
   private gameOver = false;
+  private finished = false;        // round complete OR boss defeated
+  private deathPlaying = false;    // player death animation in progress
+  private deathT = 0;
+  private boss: EnemyEntity | null = null;
 
   private tickerCb: (() => void) | null = null;
 
@@ -191,6 +221,9 @@ export class DungeonGame {
   async start(): Promise<void> {
     await this.preload();
     this.spawnPlayer();
+    if (this.opts.isBossRaid) {
+      this.spawnBoss();
+    }
     this.startTime = performance.now();
     this.attachInput();
     this.tickerCb = () => this.tick(this.app.ticker.deltaMS / 1000);
@@ -265,14 +298,24 @@ export class DungeonGame {
 
   // ---------- Loop ----------
   private tick(dt: number): void {
-    if (this.gameOver) return;
+    if (this.gameOver || this.finished) {
+      // After death/finish, only animate screen fx + camera so the
+      // closing flourish reads.
+      if (this.deathPlaying) this.tickDeathAnim(dt);
+      this.updateScreenFx(dt);
+      this.updateCamera(dt);
+      return;
+    }
 
     const now = performance.now();
     const elapsedS = (now - this.startTime) / 1000;
+    const remaining = this.opts.isBossRaid ? Number.POSITIVE_INFINITY : Math.max(0, ROUND_DURATION_S - elapsedS);
 
     this.updatePlayer(dt);
     this.maybeShoot(now);
-    this.maybeSpawn(now, elapsedS);
+    if (!this.opts.isBossRaid) {
+      this.maybeSpawn(now, elapsedS);
+    }
     this.updateEnemies(dt);
     this.updateProjectiles(dt);
     this.cullDeadEnemies();
@@ -291,12 +334,74 @@ export class DungeonGame {
       kills: this.kills,
       cashThisRun: this.cashThisRun,
       time: Math.floor(elapsedS),
+      timeRemaining: this.opts.isBossRaid ? -1 : Math.ceil(remaining),
+      bossHp: this.boss?.hp ?? null,
+      bossHpMax: this.boss?.hpMax ?? null,
     });
 
-    if (this.player.hp <= 0) {
+    // Player death takes priority
+    if (this.player.hp <= 0 && !this.deathPlaying) {
+      this.beginDeathAnim();
+      return;
+    }
+
+    // Boss defeated
+    if (this.opts.isBossRaid && this.boss && this.boss.hp <= 0) {
+      this.boss = null;
+      this.finished = true;
+      // Brief celebratory shake + zoom
+      this.applyShake(10, 0.5);
+      this.applyZoomPulse(1.1, 0.5);
+      this.levelGlowAlpha = 0.8;
+      this.spawnHit(this.player.x, this.player.y - 30, 'DEATH FALLS', 'heal');
+      setTimeout(() => {
+        this.opts.onBossDefeated({
+          time: Math.floor(elapsedS),
+          kills: this.kills,
+          level: this.level,
+          cash: this.cashThisRun,
+        });
+      }, 1400);
+      return;
+    }
+
+    // Non-boss round timer ran out
+    if (!this.opts.isBossRaid && elapsedS >= ROUND_DURATION_S) {
+      this.finished = true;
+      this.spawnHit(this.player.x, this.player.y - 30, 'ROUND CLEAR', 'heal');
+      setTimeout(() => {
+        this.opts.onRoundComplete({
+          time: Math.floor(elapsedS),
+          kills: this.kills,
+          level: this.level,
+          cash: this.cashThisRun,
+        });
+      }, 900);
+    }
+  }
+
+  // ---------- Death animation ----------
+  private beginDeathAnim(): void {
+    this.deathPlaying = true;
+    this.deathT = 0;
+    // Strong feedback cluster
+    this.applyShake(8, 0.6);
+    this.applyScreenFlash(0.9);
+    this.applyZoomPulse(1.08, 0.7);
+    this.spawnHit(this.player.x, this.player.y - 24, 'DEATH COLLECTS', 'player-damage');
+  }
+
+  private tickDeathAnim(dt: number): void {
+    this.deathT += dt;
+    // Slow decay player sprite alpha + tint to red
+    const t = Math.min(1, this.deathT / 1.8);
+    this.player.sprite.alpha = 1 - t;
+    this.player.sprite.tint = 0xff5050;
+    // Fade in the screen overlay (handled by screenLayer alpha)
+    if (this.deathT >= 1.8 && !this.gameOver) {
       this.gameOver = true;
       this.opts.onGameOver({
-        time: Math.floor(elapsedS),
+        time: Math.floor((performance.now() - this.startTime) / 1000),
         kills: this.kills,
         level: this.level,
         cash: this.cashThisRun,
@@ -429,10 +534,12 @@ export class DungeonGame {
     sprite.scale.set(proto.size / 22);
     this.worldLayer.addChild(sprite);
 
+    const hp = proto.hp * this.stats.enemyHpMult * (1 + elapsedS * 0.05);
     this.enemies.push({
       x: px,
       y: py,
-      hp: proto.hp * this.stats.enemyHpMult * (1 + elapsedS * 0.05),
+      hp,
+      hpMax: hp,
       spd: proto.spd * this.stats.enemySpdMult,
       dmg: proto.dmg + this.stats.enemyDmgBonus,
       r: proto.size,
@@ -440,7 +547,56 @@ export class DungeonGame {
       sprite,
       flashTimer: 0,
       proto,
+      isBoss: false,
     });
+  }
+
+  private spawnBoss(): void {
+    const w = this.app.screen.width;
+    const h = this.app.screen.height;
+    const dist = Math.max(w, h) * 0.5;
+    // Spawn directly above the player so the player sees the boss enter
+    const px = this.player.x;
+    const py = this.player.y - dist;
+
+    const url = ENEMY_SPRITE_BY_TYPE['boss'];
+    const tex = Texture.from(url);
+    const sprite = new Sprite(tex);
+    sprite.anchor.set(0.5);
+    sprite.scale.set(FINAL_BOSS.size / 18);
+    this.worldLayer.addChild(sprite);
+
+    const hp = FINAL_BOSS.hp * this.stats.enemyHpMult;
+    const boss: EnemyEntity = {
+      x: px,
+      y: py,
+      hp,
+      hpMax: hp,
+      spd: FINAL_BOSS.spd * this.stats.enemySpdMult,
+      dmg: FINAL_BOSS.dmg + this.stats.enemyDmgBonus,
+      r: FINAL_BOSS.size,
+      cash: 200,
+      sprite,
+      flashTimer: 0,
+      // Synthesize a fake proto for type compatibility — only `tier` and `sprite` get read elsewhere
+      proto: {
+        id: 'death',
+        hp: FINAL_BOSS.hp,
+        spd: FINAL_BOSS.spd,
+        dmg: FINAL_BOSS.dmg,
+        color: FINAL_BOSS.color,
+        size: FINAL_BOSS.size,
+        tier: 5,
+        sprite: 'boss',
+      },
+      isBoss: true,
+    };
+    this.boss = boss;
+    this.enemies.push(boss);
+
+    // Cinematic intro flourish — bg pulse + camera shake
+    this.applyShake(8, 0.6);
+    this.applyZoomPulse(1.06, 0.4);
   }
 
   private updateEnemies(dt: number): void {

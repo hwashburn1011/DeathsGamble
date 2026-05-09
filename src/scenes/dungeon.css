@@ -150,3 +150,90 @@
   letter-spacing: 0.18em;
   text-transform: uppercase;
 }
+
+/* Round timer (top center) */
+.dungeon-timer {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  background: var(--glass-dark);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  border: 1px solid var(--glass-border);
+  border-radius: 8px;
+  padding: 8px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 200px;
+  transition: border-color var(--m-swift);
+}
+.dungeon-timer-bar {
+  width: 180px;
+  height: 5px;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.dungeon-timer-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold-bright), var(--gold));
+  transition: width 200ms linear;
+}
+.dungeon-timer-text {
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  color: var(--ink-muted);
+}
+.dungeon-timer--urgent {
+  border-color: var(--blood-bright);
+  animation: timerUrgent 600ms ease-in-out infinite;
+}
+.dungeon-timer--urgent .dungeon-timer-fill {
+  background: linear-gradient(90deg, var(--blood-bright), #ff7050);
+}
+.dungeon-timer--urgent .dungeon-timer-text {
+  color: var(--blood-bright);
+}
+@keyframes timerUrgent {
+  0%, 100% { transform: translateX(-50%) scale(1); }
+  50%      { transform: translateX(-50%) scale(1.04); }
+}
+
+/* Boss HP bar (bottom center) */
+.dungeon-boss-hp {
+  position: absolute;
+  bottom: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.dungeon-boss-name {
+  font-size: 14px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--blood-bright);
+  text-shadow: 0 0 12px rgba(224, 72, 72, 0.55);
+}
+.dungeon-boss-bar {
+  width: 380px;
+  height: 14px;
+  background: rgba(0, 0, 0, 0.65);
+  border: 1px solid var(--blood);
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 0 18px rgba(224, 72, 72, 0.35);
+}
+.dungeon-boss-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--blood-bright), #b03030);
+  transition: width 200ms ease-out;
+}

@@ -14,6 +14,9 @@ interface HudStats {
   kills: number;
   cashThisRun: number;
   time: number;
+  timeRemaining: number;
+  bossHp: number | null;
+  bossHpMax: number | null;
 }
 
 export function DungeonScene() {
@@ -23,6 +26,11 @@ export function DungeonScene() {
   const showScene = useGameStore((s) => s.showScene);
   const addCashEarned = useGameStore((s) => s.addCashEarned);
   const addKills = useGameStore((s) => s.addKills);
+  const isBossRaidFn = useGameStore((s) => s.isBossRaid);
+  const nextRound = useGameStore((s) => s.nextRound);
+  const triggerWin = useGameStore((s) => s.triggerWin);
+  const isBossRaid = isBossRaidFn();
+
   const [hud, setHud] = useState<HudStats>({
     hp: stats?.hp ?? run.build?.baseHp ?? 100,
     hpMax: stats?.hpMax ?? run.build?.baseHp ?? 100,
@@ -32,6 +40,9 @@ export function DungeonScene() {
     kills: 0,
     cashThisRun: 0,
     time: 0,
+    timeRemaining: 60,
+    bossHp: null,
+    bossHpMax: null,
   });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -64,6 +75,7 @@ export function DungeonScene() {
           build: run.build!,
           weapon: run.weapon!,
           stats: stats!,
+          isBossRaid,
           onStatsChange: (s) => {
             if (cancelled) return;
             setHud(s);
@@ -73,6 +85,18 @@ export function DungeonScene() {
             addCashEarned(gs.cash);
             addKills(gs.kills);
             showScene('gameover');
+          },
+          onRoundComplete: (gs) => {
+            if (cancelled) return;
+            addCashEarned(gs.cash);
+            addKills(gs.kills);
+            nextRound();
+          },
+          onBossDefeated: (gs) => {
+            if (cancelled) return;
+            addCashEarned(gs.cash);
+            addKills(gs.kills);
+            triggerWin();
           },
         });
         await game.start();
@@ -96,13 +120,17 @@ export function DungeonScene() {
       } catch {
         /* swallow */
       }
-      // Clear container in case canvas didn't get removed
       while (container.firstChild) container.removeChild(container.firstChild);
     };
-  }, [run.build, run.weapon, stats, addCashEarned, addKills, showScene]);
+  }, [run.build, run.weapon, run.raid, run.endlessRound, stats, isBossRaid, addCashEarned, addKills, showScene, nextRound, triggerWin]);
 
   const hpPct = Math.max(0, hud.hp / hud.hpMax) * 100;
   const xpPct = (hud.xp / hud.xpNext) * 100;
+  const bossPct =
+    hud.bossHp != null && hud.bossHpMax != null
+      ? Math.max(0, (hud.bossHp / hud.bossHpMax) * 100)
+      : 0;
+  const timeUrgent = hud.timeRemaining > 0 && hud.timeRemaining <= 10;
 
   return (
     <div className="dungeon-scene">
@@ -110,7 +138,9 @@ export function DungeonScene() {
 
       {loading && !loadError && (
         <div className="dungeon-loading">
-          <span className="display">Death is preparing…</span>
+          <span className="display">
+            {isBossRaid ? 'Death approaches…' : 'Death is preparing…'}
+          </span>
         </div>
       )}
 
@@ -127,8 +157,44 @@ export function DungeonScene() {
         <span className="info-pair"><span className="info-l">TIME</span><span className="info-v">{hud.time}s</span></span>
         <span className="info-pair"><span className="info-l">KILLS</span><span className="info-v">{hud.kills}</span></span>
         <span className="info-pair"><span className="info-l">LVL</span><span className="info-v">{hud.level}</span></span>
+        <span className="info-pair">
+          <span className="info-l">{run.mode === 'story' ? 'RAID' : 'ROUND'}</span>
+          <span className="info-v">
+            {run.mode === 'story'
+              ? isBossRaid
+                ? 'Boss'
+                : `${run.raid} / ${run.totalRaids - 1}`
+              : `${(run.endlessRound ?? 0) + 1}`}
+          </span>
+        </span>
         <span className="info-pair"><span className="info-l">$</span><span className="info-v">{hud.cashThisRun}</span></span>
       </div>
+
+      {/* Round timer (hidden during boss raids) */}
+      {!isBossRaid && hud.timeRemaining >= 0 && (
+        <div className={`dungeon-timer ${timeUrgent ? 'dungeon-timer--urgent' : ''}`}>
+          <div className="dungeon-timer-bar">
+            <div
+              className="dungeon-timer-fill"
+              style={{ width: `${(hud.timeRemaining / 60) * 100}%` }}
+            />
+          </div>
+          <span className="dungeon-timer-text">
+            {Math.floor(hud.timeRemaining / 60)}:
+            {String(hud.timeRemaining % 60).padStart(2, '0')}
+          </span>
+        </div>
+      )}
+
+      {/* Boss HP bar */}
+      {isBossRaid && hud.bossHp != null && hud.bossHp > 0 && (
+        <div className="dungeon-boss-hp">
+          <div className="dungeon-boss-name display">Death Itself</div>
+          <div className="dungeon-boss-bar">
+            <div className="dungeon-boss-fill" style={{ width: `${bossPct}%` }} />
+          </div>
+        </div>
+      )}
 
       <GlassPanel padding="md" className="dungeon-hud" variant="mid">
         <h3 className="hud-title">Stats</h3>

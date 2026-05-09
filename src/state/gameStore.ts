@@ -27,6 +27,11 @@ interface GameActions {
   // Stats / wheel flow
   initStatsForRaid(): void;
   applyWheelSegment(side: 'buff' | 'curse', segment: WheelSegment): number;
+
+  // Round/raid progression
+  isBossRaid(): boolean;
+  nextRound(): void;             // story: next raid OR boss; infinite: next round
+  triggerWin(): void;
 }
 
 interface GameStoreState {
@@ -123,5 +128,28 @@ export const useGameStore = create<GameStoreState & GameActions>((set, get) => (
     segment.apply(next, m);
     set({ stats: next });
     return m;
+  },
+
+  isBossRaid() {
+    const r = get().run;
+    return r.mode === 'story' && r.raid >= r.totalRaids;
+  },
+
+  nextRound() {
+    const { run } = get();
+    if (run.mode === 'story') {
+      // Advance to next raid (clamped at totalRaids — that's the boss)
+      const nextRaid = Math.min(run.totalRaids, run.raid + 1);
+      set({ run: { ...run, raid: nextRaid } });
+    } else {
+      set({ run: { ...run, endlessRound: run.endlessRound + 1 } });
+    }
+    // Reset stats for the next bargain
+    get().initStatsForRaid();
+    set({ scene: 'wheels' });
+  },
+
+  triggerWin() {
+    set({ scene: 'win' });
   },
 }));

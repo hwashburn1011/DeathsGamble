@@ -7,6 +7,7 @@ import { BuildPickerScene } from './scenes/BuildPickerScene';
 import { WheelsScene } from './scenes/WheelsScene';
 import { DungeonScene } from './scenes/DungeonScene';
 import { GameoverScene } from './scenes/GameoverScene';
+import { WinScene } from './scenes/WinScene';
 import { CreditsScene } from './scenes/CreditsScene';
 import { SettingsButton } from './ui/SettingsButton';
 import type { SceneName } from './types';
@@ -18,10 +19,10 @@ const SCENES: Record<SceneName, () => JSX.Element> = {
   wheels: WheelsScene,
   dungeon: DungeonScene,
   gameover: GameoverScene,
+  win: WinScene,
   credits: CreditsScene,
-  // Still placeholders bridging to legacy/v0.5.html
+  // Still bridging to legacy/v0.5.html (shop coming with crafting/upgrades)
   shop: WheelsScene,
-  win: WheelsScene,
 };
 
 export function App() {
