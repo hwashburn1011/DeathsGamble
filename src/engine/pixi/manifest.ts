@@ -94,7 +94,7 @@ export const THEMES: Record<ThemeKey, ThemeDef> = {
     floor: `${DC}/dc-dngn/floor/grey_dirt0.png`,
     decorations: [
       `${DC}/dc-dngn/crumbled_column.png`,
-      `${DC}/dc-dngn/granite_statue.png`,
+      `${DC}/dc-dngn/dngn_granite_statue.png`,
       `${DC}/dc-dngn/granite_stump.png`,
       `${DC}/dc-dngn/dngn_dry_fountain.png`,
       `${DC}/dc-dngn/elephant_statue.png`,
@@ -108,7 +108,7 @@ export const THEMES: Record<ThemeKey, ThemeDef> = {
       `${DC}/dc-dngn/granite_stump.png`,
       `${DC}/dc-dngn/dngn_blue_fountain.png`,
       `${DC}/dc-dngn/crumbled_column.png`,
-      `${DC}/dc-dngn/granite_statue.png`,
+      `${DC}/dc-dngn/dngn_granite_statue.png`,
       `${DC}/dc-dngn/dngn_orcish_idol.png`,
     ],
     floorTint: 0x9090a0,
