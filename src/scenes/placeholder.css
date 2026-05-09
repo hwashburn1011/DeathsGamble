@@ -1,0 +1,44 @@
+.placeholder-scene {
+  padding: 30px;
+}
+
+.placeholder-card {
+  max-width: 540px;
+  text-align: center;
+}
+
+.placeholder-heading {
+  font-size: clamp(28px, 4vw, 44px);
+  color: var(--gold);
+  margin-bottom: 18px;
+}
+
+.placeholder-text {
+  color: var(--ink-muted);
+  margin-bottom: 14px;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.placeholder-text strong {
+  color: var(--gold-bright);
+  font-style: normal;
+  font-weight: 600;
+}
+
+.placeholder-actions {
+  margin-top: 22px;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.placeholder-link {
+  display: inline-block;
+  text-decoration: none;
+}
+.placeholder-link:hover {
+  text-decoration: none;
+}

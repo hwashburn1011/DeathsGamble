@@ -1,0 +1,89 @@
+/* ===== Liquid Glass — dark gothic adaptation ===== */
+
+.glass {
+  position: relative;
+  background: var(--glass-dark);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border-radius: 12px;
+  color: var(--ink);
+  isolation: isolate;
+  overflow: hidden;
+  transition:
+    border-color var(--m-swift),
+    background var(--m-swift),
+    transform var(--m-swift),
+    box-shadow var(--m-smooth);
+}
+
+.glass--mid {
+  background: var(--glass-mid);
+}
+
+.glass--light {
+  background: var(--glass-light);
+}
+
+.glass--bordered {
+  border: 1px solid var(--glass-border);
+}
+
+/* Inner top highlight — what gives the glass its 'wet' look */
+.glass--bordered::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--glass-highlight) 35%,
+    var(--glass-highlight) 65%,
+    transparent 100%
+  );
+  opacity: 0.6;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Padding modifiers */
+.glass--p-none { padding: 0; }
+.glass--p-sm   { padding: 10px 14px; }
+.glass--p-md   { padding: 16px 22px; }
+.glass--p-lg   { padding: 24px 32px; }
+
+/* Hover / interactive */
+.glass--interactive { cursor: pointer; }
+
+.glass--hoverable:hover,
+.glass--interactive:hover {
+  border-color: var(--glass-border-hi);
+  background: var(--glass-mid);
+  transform: translateY(-2px);
+}
+
+.glass--hoverable:active,
+.glass--interactive:active {
+  transform: translateY(0);
+}
+
+/* Glow modifier */
+.glass--glow {
+  box-shadow:
+    0 0 16px rgba(201, 162, 39, 0.25),
+    0 0 36px rgba(201, 162, 39, 0.12);
+  animation: glassPulse 2s ease-in-out infinite;
+}
+
+@keyframes glassPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 14px rgba(201, 162, 39, 0.18),
+      0 0 30px rgba(201, 162, 39, 0.08);
+  }
+  50% {
+    box-shadow:
+      0 0 22px rgba(240, 200, 74, 0.4),
+      0 0 50px rgba(201, 162, 39, 0.2);
+  }
+}

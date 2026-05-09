@@ -1,0 +1,62 @@
+.modeselect-scene {
+  gap: 12px;
+}
+
+.modeselect-heading {
+  font-size: clamp(28px, 4.5vw, 56px);
+  margin-bottom: 4px;
+  text-shadow: 0 0 18px rgba(201, 162, 39, 0.2);
+}
+
+.modeselect-sub {
+  margin-bottom: 24px;
+  letter-spacing: 0.06em;
+}
+
+.modeselect-sub strong {
+  color: var(--gold);
+  font-style: normal;
+  letter-spacing: 0.18em;
+}
+
+.mode-options {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 700px;
+}
+
+.mode-card {
+  width: 280px;
+  text-align: center;
+}
+
+.mode-emblem {
+  font-size: 48px;
+  margin-bottom: 10px;
+  text-shadow: 0 0 18px currentColor;
+  opacity: 0.85;
+}
+
+.mode-emblem--story    { color: var(--gold-bright); }
+.mode-emblem--infinite { color: var(--arcane-bright); }
+
+.mode-title {
+  font-family: var(--font-display);
+  font-size: 20px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 10px;
+}
+
+.mode-desc {
+  color: var(--ink-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.modeselect-actions {
+  margin-top: 28px;
+}

@@ -1,0 +1,109 @@
+.buildpicker-scene {
+  gap: 8px;
+  padding: 30px 0;
+}
+
+.buildpicker-heading {
+  font-size: clamp(24px, 4vw, 42px);
+}
+
+.buildpicker-sub {
+  margin-bottom: 22px;
+}
+
+.build-options {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 900px;
+  padding: 0 18px;
+}
+
+.build-card {
+  width: 240px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+}
+
+.build-portrait {
+  height: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.build-portrait canvas {
+  display: block;
+}
+
+.build-name {
+  font-family: var(--font-display);
+  font-size: 16px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 8px;
+}
+
+.build-desc {
+  font-style: italic;
+  font-size: 12px;
+  color: var(--ink-dim);
+  margin-bottom: 14px;
+  min-height: 36px;
+  line-height: 1.4;
+}
+
+.build-stats {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.build-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.build-stat-label {
+  font-family: var(--font-display);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  color: var(--ink-dim);
+}
+
+.build-stat-value {
+  font-family: var(--font-display);
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.build-stat-value--gold {
+  color: var(--gold-bright);
+  text-shadow: 0 0 6px rgba(201, 162, 39, 0.4);
+}
+
+.build-loadout {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.weapon-row {
+  color: var(--gold-bright);
+}
+
+.spell-row {
+  color: var(--arcane-bright);
+}
+
+.buildpicker-actions {
+  margin-top: 22px;
+}
