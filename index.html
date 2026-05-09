@@ -16,7 +16,7 @@
     --danger-bright: #e04848;
     --good: #4d8a52;
     --good-bright: #69b070;
-    --hood: #0d0d12;
+    --magic: #5a8af0;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -32,7 +32,16 @@
     user-select: none;
   }
 
-  #app { position: relative; width: 100vw; height: 100vh; }
+  #app {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+  }
+
+  /* brightness applied as filter on the app */
+  #app.brightness-filter {
+    filter: brightness(var(--brightness, 1));
+  }
 
   /* ---------- Screens ---------- */
   .screen {
@@ -77,16 +86,15 @@
   }
   .btn:hover:not(:disabled) { background: var(--accent); color: var(--bg); }
   .btn:active:not(:disabled) { transform: translateY(1px); }
-  .btn:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
-    transform: none;
-  }
+  .btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
   .btn.large { padding: 16px 42px; font-size: 20px; }
+  .btn.small { padding: 6px 14px; font-size: 12px; }
   .btn.good { border-color: var(--good); color: var(--good); }
   .btn.good:hover:not(:disabled) { background: var(--good); color: #fff; }
   .btn.danger { border-color: var(--danger); color: var(--danger); }
   .btn.danger:hover:not(:disabled) { background: var(--danger); color: #fff; }
+  .btn.magic { border-color: var(--magic); color: var(--magic); }
+  .btn.magic:hover:not(:disabled) { background: var(--magic); color: #fff; }
   .btn.glow {
     box-shadow: 0 0 12px var(--accent), 0 0 28px rgba(201, 162, 39, 0.4);
     animation: pulse 1.6s ease-in-out infinite;
@@ -96,7 +104,236 @@
     50%      { box-shadow: 0 0 18px var(--accent-bright), 0 0 40px rgba(201,162,39,0.6); }
   }
 
-  /* ---------- Wheels scene ---------- */
+  /* ---------- Settings gear (top-right of every screen) ---------- */
+  #settings-btn {
+    position: fixed;
+    top: 14px;
+    right: 14px;
+    z-index: 100;
+    width: 38px;
+    height: 38px;
+    border: 1px solid #2a2a32;
+    background: rgba(7, 7, 10, 0.7);
+    color: var(--ink-dim);
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.15s, border-color 0.15s, transform 0.3s;
+  }
+  #settings-btn:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+    transform: rotate(60deg);
+  }
+
+  /* ---------- Modal ---------- */
+  .modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    z-index: 200;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(3px);
+  }
+  .modal.active { display: flex; }
+  .modal-content {
+    background: var(--bg2);
+    border: 1px solid #2a2a32;
+    border-radius: 6px;
+    padding: 28px 36px;
+    min-width: 340px;
+    max-width: 520px;
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+  .modal-content h2 {
+    font-size: 20px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 18px;
+    color: var(--accent);
+  }
+  .modal-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 12px 0;
+    font-size: 14px;
+  }
+  .modal-row .label {
+    color: var(--ink-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 12px;
+  }
+  .modal-row .control { display: flex; align-items: center; gap: 8px; }
+  .modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+  }
+
+  /* slider */
+  input[type=range] {
+    width: 140px;
+    accent-color: var(--accent);
+  }
+
+  /* segmented selector */
+  .seg {
+    display: inline-flex;
+    border: 1px solid #2a2a32;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .seg button {
+    background: transparent;
+    border: none;
+    color: var(--ink-dim);
+    padding: 5px 12px;
+    font-family: inherit;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .seg button.active {
+    background: var(--accent);
+    color: var(--bg);
+  }
+  .seg button:hover:not(.active) { color: var(--ink); }
+
+  /* checkbox toggle */
+  .toggle {
+    position: relative;
+    width: 38px;
+    height: 20px;
+    background: #2a2a32;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    background: var(--ink-dim);
+    border-radius: 50%;
+    transition: left 0.15s, background 0.15s;
+  }
+  .toggle.on { background: var(--accent); }
+  .toggle.on::after { left: 20px; background: #fff; }
+
+  /* ---------- Mode select ---------- */
+  #modeselect-screen { gap: 18px; }
+  #modeselect-screen h2 {
+    font-size: clamp(28px, 5vw, 56px);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  #modeselect-screen .mode-options {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .mode-card {
+    border: 1px solid #2a2a32;
+    border-radius: 6px;
+    padding: 24px;
+    width: 240px;
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.1s, background 0.15s;
+    background: rgba(7,7,10,0.5);
+  }
+  .mode-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-3px);
+    background: rgba(15,15,22,0.7);
+  }
+  .mode-card h3 {
+    color: var(--accent);
+    font-size: 18px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .mode-card p {
+    color: var(--ink-dim);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  /* ---------- Build picker ---------- */
+  #buildpicker-screen { gap: 18px; }
+  #buildpicker-screen h2 {
+    font-size: clamp(24px, 4vw, 42px);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  #buildpicker-screen .subtitle {
+    color: var(--ink-dim);
+    font-style: italic;
+    margin-bottom: 22px;
+  }
+  .build-options {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .build-card {
+    border: 1px solid #2a2a32;
+    border-radius: 6px;
+    padding: 16px;
+    width: 220px;
+    cursor: pointer;
+    transition: border-color 0.15s, transform 0.1s;
+    background: rgba(7,7,10,0.6);
+    text-align: center;
+  }
+  .build-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-3px);
+  }
+  .build-card .portrait {
+    height: 120px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .build-card .portrait canvas { display: block; }
+  .build-card h3 {
+    color: var(--accent);
+    font-size: 16px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .build-card .stats {
+    font-size: 12px;
+    color: var(--ink-dim);
+    line-height: 1.5;
+    text-align: left;
+  }
+  .build-card .stats .name { color: var(--ink-dim); }
+  .build-card .stats .val  { color: var(--ink); float: right; }
+  .build-card .weapon-row { color: var(--accent-bright); margin-top: 6px; }
+  .build-card .spell-row  { color: var(--magic); }
+
+  /* ---------- Wheels scene (existing) ---------- */
   #wheels-screen { padding: 0; }
   #wheels-stage {
     position: relative;
@@ -144,8 +381,6 @@
     letter-spacing: 0.05em;
     min-height: 18px;
   }
-  #buff-group { left: 27%; }
-  #curse-group { left: 73%; }
   #buff-group .label  { color: var(--good-bright); }
   #curse-group .label { color: var(--danger-bright); }
   #buff-group .result.shown  { color: var(--good-bright); }
@@ -160,7 +395,7 @@
     border-radius: 4px;
     font-size: 13px;
     line-height: 1.7;
-    min-width: 170px;
+    min-width: 200px;
   }
   #stats-preview h3 {
     font-size: 11px;
@@ -177,6 +412,27 @@
   #stats-preview .row .val.down { color: var(--danger-bright); }
   #stats-preview .row .val.neutral { color: var(--ink); }
 
+  #wheels-loadout {
+    position: absolute;
+    top: 60px; right: 60px;
+    background: rgba(7,7,10,0.7);
+    border: 1px solid #2a2a32;
+    padding: 12px 16px;
+    border-radius: 4px;
+    font-size: 13px;
+    min-width: 180px;
+  }
+  #wheels-loadout h3 {
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-bottom: 8px;
+  }
+  #wheels-loadout .lbl { color: var(--ink-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; }
+  #wheels-loadout .val { color: var(--accent-bright); }
+  #wheels-loadout .raid-info { font-size: 11px; color: var(--ink-dim); margin-top: 8px; padding-top: 8px; border-top: 1px solid #2a2a32; }
+
   #enter-dungeon-btn {
     position: absolute;
     bottom: 30px; right: 30px;
@@ -189,17 +445,16 @@
     width: 100%; height: 100%;
     display: block;
     background: #060609;
-    cursor: crosshair;
   }
   #dungeon-hud {
     position: absolute;
-    top: 14px; right: 14px;
+    top: 14px; right: 60px;
     background: rgba(7, 7, 10, 0.78);
     border: 1px solid #2a2a32;
     padding: 12px 16px;
     border-radius: 4px;
     font-size: 13px;
-    min-width: 200px;
+    min-width: 220px;
   }
   #dungeon-hud h3 {
     font-size: 11px;
@@ -251,6 +506,19 @@
   }
   #dungeon-info .v { color: var(--ink); margin-left: 6px; }
 
+  #weapon-display {
+    position: absolute;
+    bottom: 14px; left: 14px;
+    background: rgba(7,7,10,0.78);
+    border: 1px solid #2a2a32;
+    padding: 8px 14px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: var(--ink-dim);
+  }
+  #weapon-display .icon { font-size: 16px; margin-right: 6px; }
+  #weapon-display .wname { color: var(--accent-bright); margin-right: 8px; }
+
   #control-hint {
     position: absolute;
     bottom: 14px; left: 50%;
@@ -261,27 +529,86 @@
     text-transform: uppercase;
   }
 
-  /* ---------- Game over ---------- */
-  #gameover-screen h2 {
+  /* ---------- Shop ---------- */
+  #shop-screen { gap: 14px; padding: 30px 0; }
+  #shop-screen h2 {
+    font-size: clamp(28px, 4vw, 48px);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  #shop-screen .subtitle {
+    color: var(--ink-dim);
+    font-style: italic;
+    margin-bottom: 14px;
+  }
+  .shop-cash {
+    font-size: 18px;
+    color: var(--accent-bright);
+    margin-bottom: 12px;
+  }
+  .shop-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 14px;
+    max-width: 720px;
+    width: 90vw;
+  }
+  .shop-item {
+    border: 1px solid #2a2a32;
+    border-radius: 5px;
+    padding: 12px;
+    background: rgba(7,7,10,0.5);
+  }
+  .shop-item h4 { color: var(--accent); font-size: 14px; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 4px; }
+  .shop-item .desc { font-size: 12px; color: var(--ink-dim); margin-bottom: 10px; min-height: 32px; }
+  .shop-item .row { display: flex; justify-content: space-between; align-items: center; }
+  .shop-item .level { font-size: 11px; color: var(--ink-dim); }
+  .shop-actions { display: flex; gap: 12px; margin-top: 12px; }
+
+  /* ---------- Crafting ---------- */
+  #craft-screen { gap: 14px; padding: 30px 0; }
+  #craft-screen h2 {
+    font-size: clamp(28px, 4vw, 48px);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--magic);
+  }
+  .craft-parts {
+    color: var(--magic);
+    font-size: 16px;
+    margin-bottom: 12px;
+  }
+
+  /* ---------- Game over / win ---------- */
+  #gameover-screen h2,
+  #win-screen h2 {
     font-size: clamp(40px, 7vw, 84px);
     letter-spacing: 0.12em;
-    color: var(--danger);
     margin-bottom: 10px;
     text-transform: uppercase;
   }
-  #gameover-screen .epitaph {
+  #gameover-screen h2 { color: var(--danger); }
+  #win-screen h2     { color: var(--accent-bright); text-shadow: 0 0 30px var(--accent); }
+  #gameover-screen .epitaph,
+  #win-screen .epitaph {
     color: var(--ink-dim);
     font-style: italic;
     margin-bottom: 28px;
     font-size: 16px;
+    max-width: 640px;
+    text-align: center;
+    padding: 0 20px;
   }
-  #gameover-stats {
+  #gameover-stats, #win-stats {
     display: flex;
     gap: 36px;
     margin-bottom: 36px;
+    flex-wrap: wrap;
+    justify-content: center;
   }
-  #gameover-stats .stat { text-align: center; }
-  #gameover-stats .stat .label {
+  #gameover-stats .stat, #win-stats .stat { text-align: center; }
+  #gameover-stats .stat .label, #win-stats .stat .label {
     color: var(--ink-dim);
     font-size: 12px;
     text-transform: uppercase;
@@ -289,11 +616,12 @@
     display: block;
     margin-bottom: 6px;
   }
-  #gameover-stats .stat .value {
+  #gameover-stats .stat .value, #win-stats .stat .value {
     font-size: 36px;
     font-weight: bold;
     color: var(--accent);
   }
+  .end-actions { display: flex; gap: 12px; }
 </style>
 </head>
 <body>
@@ -304,6 +632,30 @@
     <h1>Death's Gamble</h1>
     <p class="subtitle">Spin both wheels. Survive the dungeon.</p>
     <button class="btn large" id="start-btn">Start Game</button>
+  </div>
+
+  <!-- MODE SELECT -->
+  <div id="modeselect-screen" class="screen">
+    <h2>Choose Your Path</h2>
+    <div class="mode-options">
+      <div class="mode-card" data-mode="story">
+        <h3>Story</h3>
+        <p>3 raids against the dead. Survive each, gather cash & parts, and face Death himself at the end.</p>
+      </div>
+      <div class="mode-card" data-mode="infinite">
+        <h3>Infinite</h3>
+        <p>Endless waves. No final boss, no escape. See how long you last.</p>
+      </div>
+    </div>
+    <button class="btn small" id="modeselect-back">Back</button>
+  </div>
+
+  <!-- BUILD PICKER -->
+  <div id="buildpicker-screen" class="screen">
+    <h2>Choose Your Build</h2>
+    <p class="subtitle">Death has dealt three. Pick one.</p>
+    <div class="build-options" id="build-options"></div>
+    <button class="btn small" id="buildpicker-reroll">Reroll (costs 1 Part)</button>
   </div>
 
   <!-- WHEELS -->
@@ -322,6 +674,14 @@
           <div class="row"><span class="name">ATK SPD</span> <span class="val neutral" id="prev-atkspd">1.0</span></div>
           <div class="row"><span class="name">RANGE</span>   <span class="val neutral" id="prev-range">240</span></div>
           <div class="row"><span class="name">CRIT</span>    <span class="val neutral" id="prev-crit">5%</span></div>
+        </div>
+
+        <div id="wheels-loadout">
+          <h3>Equipped</h3>
+          <div><span class="lbl">Build:</span> <span class="val" id="wl-build">—</span></div>
+          <div><span class="lbl">Weapon:</span> <span class="val" id="wl-weapon">—</span></div>
+          <div><span class="lbl">Spells:</span> <span class="val" id="wl-spells">—</span></div>
+          <div class="raid-info" id="wl-raid">Raid 1 of 3</div>
         </div>
 
         <div class="wheel-button-group" id="buff-group">
@@ -348,6 +708,8 @@
       <span>TIME</span><span class="v" id="d-time">0</span>
       <span style="margin-left:18px">KILLS</span><span class="v" id="d-kills">0</span>
       <span style="margin-left:18px">LVL</span><span class="v" id="d-lvl">1</span>
+      <span style="margin-left:18px" id="d-wavewrap">WAVE</span><span class="v" id="d-wave">1</span>
+      <span style="margin-left:18px">$</span><span class="v" id="d-cash">0</span>
     </div>
     <div id="dungeon-hud">
       <h3>Stats</h3>
@@ -361,7 +723,34 @@
       <div class="row"><span class="name">CRIT</span>    <span id="hud-crit">5%</span></div>
       <div id="xp-bar"><div id="xp-bar-fill" style="width:0%"></div></div>
     </div>
+    <div id="weapon-display">
+      <span class="icon" id="wd-icon">✊</span><span class="wname" id="wd-name">Fists</span>
+      <span id="wd-spells"></span>
+    </div>
     <div id="control-hint">WASD / Arrow keys to move — auto-attacks fire</div>
+  </div>
+
+  <!-- SHOP -->
+  <div id="shop-screen" class="screen">
+    <h2>The Shop</h2>
+    <p class="subtitle">Spend what you've earned. Death will take it eventually.</p>
+    <div class="shop-cash">$ <span id="shop-cash-value">0</span></div>
+    <div class="shop-grid" id="shop-grid"></div>
+    <div class="shop-actions">
+      <button class="btn" id="shop-craft-btn">Craft Weapons</button>
+      <button class="btn good large" id="shop-continue">Next Raid</button>
+    </div>
+  </div>
+
+  <!-- CRAFT -->
+  <div id="craft-screen" class="screen">
+    <h2>Crafting</h2>
+    <p class="subtitle">Forge weapons from the bones of the fallen.</p>
+    <div class="craft-parts">Parts: <span id="craft-parts-value">0</span></div>
+    <div class="shop-grid" id="craft-grid"></div>
+    <div class="shop-actions">
+      <button class="btn" id="craft-back">Back to Shop</button>
+    </div>
   </div>
 
   <!-- GAME OVER -->
@@ -369,11 +758,89 @@
     <h2>You Lost the Bet</h2>
     <p class="epitaph" id="epitaph">Death always collects.</p>
     <div id="gameover-stats">
-      <div class="stat"><span class="label">Time Survived</span><span class="value" id="final-time">0</span></div>
+      <div class="stat"><span class="label">Time</span><span class="value" id="final-time">0</span></div>
       <div class="stat"><span class="label">Kills</span><span class="value" id="final-kills">0</span></div>
       <div class="stat"><span class="label">Level</span><span class="value" id="final-lvl">1</span></div>
+      <div class="stat"><span class="label">Earned</span><span class="value" id="final-cash">0</span></div>
     </div>
-    <button class="btn large" id="retry-btn">Gamble Again</button>
+    <div class="end-actions">
+      <button class="btn large" id="retry-btn">Gamble Again</button>
+      <button class="btn" id="title-btn">Title Screen</button>
+    </div>
+  </div>
+
+  <!-- WIN -->
+  <div id="win-screen" class="screen">
+    <h2>You Cheated Death</h2>
+    <p class="epitaph" id="win-epitaph">For a moment. Death never forgets a debt.</p>
+    <div id="win-stats">
+      <div class="stat"><span class="label">Time</span><span class="value" id="win-time">0</span></div>
+      <div class="stat"><span class="label">Kills</span><span class="value" id="win-kills">0</span></div>
+      <div class="stat"><span class="label">Level</span><span class="value" id="win-lvl">1</span></div>
+      <div class="stat"><span class="label">Earned</span><span class="value" id="win-cash">0</span></div>
+    </div>
+    <div class="end-actions">
+      <button class="btn large" id="win-again-btn">Gamble Again</button>
+      <button class="btn" id="win-title-btn">Title Screen</button>
+    </div>
+  </div>
+
+  <!-- SETTINGS BUTTON (always visible) -->
+  <button id="settings-btn" title="Settings">⚙</button>
+
+  <!-- SETTINGS MODAL -->
+  <div class="modal" id="settings-modal">
+    <div class="modal-content">
+      <h2>Settings</h2>
+      <div class="modal-row">
+        <span class="label">Brightness</span>
+        <div class="control">
+          <input type="range" id="set-brightness" min="0.5" max="1.5" step="0.05" value="1">
+          <span id="set-brightness-val">100%</span>
+        </div>
+      </div>
+      <div class="modal-row">
+        <span class="label">Difficulty</span>
+        <div class="seg" id="set-difficulty">
+          <button data-v="easy">Easy</button>
+          <button data-v="normal" class="active">Normal</button>
+          <button data-v="hard">Hard</button>
+        </div>
+      </div>
+      <div class="modal-row">
+        <span class="label">Wheel Style</span>
+        <div class="seg" id="set-wheelmode">
+          <button data-v="wheel" class="active">Wheel</button>
+          <button data-v="slot">Slot</button>
+        </div>
+      </div>
+      <div class="modal-row">
+        <span class="label">Blood / Gore</span>
+        <div class="toggle on" id="set-blood"></div>
+      </div>
+      <div class="modal-row">
+        <span class="label">Pet</span>
+        <div class="seg" id="set-pet">
+          <button data-v="none" class="active">None</button>
+          <button data-v="skull">Skull</button>
+          <button data-v="crow">Crow</button>
+          <button data-v="imp">Imp</button>
+        </div>
+      </div>
+      <div class="modal-row">
+        <span class="label">Accessory</span>
+        <div class="seg" id="set-accessory">
+          <button data-v="none" class="active">None</button>
+          <button data-v="tophat">Hat</button>
+          <button data-v="crown">Crown</button>
+          <button data-v="horns">Horns</button>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn small" id="settings-reset">Reset Save</button>
+        <button class="btn" id="settings-close">Close</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -381,78 +848,253 @@
 'use strict';
 
 /* =====================================================================
- *  DEATH'S GAMBLE — v0.2
- *  Two wheels (boon + curse) → dungeon survival run
+ *  DEATH'S GAMBLE — v0.3
  * ===================================================================== */
 
-// ---------- Base stats ----------
-const BASE_STATS = {
-  hp: 100,
-  dmg: 10,
-  def: 0,
-  spd: 3.0,        // pixels per frame at 60fps
-  atkspd: 1.0,     // attacks per second
-  range: 240,      // auto-attack acquisition range
-  crit: 0.05,      // crit chance (0-1)
-  pickup: 60,      // xp gem pickup radius
-  // World modifiers (curse-driven)
-  enemyHpMult: 1.0,
-  enemySpdMult: 1.0,
-  enemySpawnMult: 1.0,
-  enemyDmgBonus: 0,
-};
+// ============== Catalogues ==============
+const WEAPONS = [
+  { id:'fists',    name:'Fists',          type:'melee',  dmg:6,  atkspd:2.0, range:60,  projectiles:1, color:'#dcd4ba', icon:'✊' },
+  { id:'club',     name:'Club',           type:'melee',  dmg:14, atkspd:1.0, range:75,  projectiles:1, color:'#8a5a30', icon:'🦴' },
+  { id:'sword',    name:'Sword',          type:'melee',  dmg:18, atkspd:1.4, range:85,  projectiles:1, color:'#c0c0d0', icon:'⚔' },
+  { id:'axe',      name:'Axe',            type:'melee',  dmg:26, atkspd:0.8, range:80,  projectiles:1, color:'#80b0a0', icon:'🪓' },
+  { id:'spear',    name:'Spear',          type:'melee',  dmg:16, atkspd:1.2, range:130, projectiles:1, color:'#b09060', icon:'🗡' },
+  { id:'pistol',   name:'Pistol',         type:'ranged', dmg:11, atkspd:2.0, range:300, projectiles:1, color:'#f0c84a', icon:'🔫' },
+  { id:'shotgun',  name:'Shotgun',        type:'ranged', dmg:5,  atkspd:0.8, range:200, projectiles:5, spread:0.5, color:'#e08030', icon:'💥' },
+  { id:'smg',      name:'SMG',            type:'ranged', dmg:3,  atkspd:5.0, range:240, projectiles:1, color:'#f06070', icon:'🔫' },
+  { id:'sniper',   name:'Sniper',         type:'ranged', dmg:45, atkspd:0.5, range:600, projectiles:1, color:'#80c0f0', icon:'🎯' },
+  { id:'rifle',    name:'Rifle',          type:'ranged', dmg:9,  atkspd:3.0, range:340, projectiles:1, color:'#a08050', icon:'🔫' },
+  { id:'staff',    name:'Staff',          type:'magic',  dmg:14, atkspd:1.5, range:320, projectiles:1, color:'#5a8af0', icon:'✨' },
+  { id:'wand',     name:'Wand',           type:'magic',  dmg:6,  atkspd:4.0, range:260, projectiles:1, color:'#d050ff', icon:'✨' },
+  { id:'orb',      name:'Crystal Orb',    type:'magic',  dmg:18, atkspd:1.2, range:280, projectiles:3, spread:0.5, color:'#80ffff', icon:'🔮' },
+  { id:'bow',      name:'Bow',            type:'ranged', dmg:18, atkspd:1.5, range:380, projectiles:1, color:'#a0d080', icon:'🏹' },
+  { id:'crossbow', name:'Crossbow',       type:'ranged', dmg:24, atkspd:1.0, range:420, projectiles:1, color:'#806040', icon:'🏹' },
+  { id:'knives',   name:'Throwing Knives',type:'ranged', dmg:7,  atkspd:3.5, range:260, projectiles:1, color:'#b0b0b0', icon:'🗡' },
+  { id:'flamer',   name:'Flamethrower',   type:'ranged', dmg:4,  atkspd:6.0, range:160, projectiles:1, color:'#ff8030', icon:'🔥' },
+  { id:'minigun',  name:'Minigun',        type:'ranged', dmg:2,  atkspd:8.0, range:300, projectiles:1, color:'#a0a0a0', icon:'🔫' },
+  { id:'rocket',   name:'Rocket',         type:'ranged', dmg:55, atkspd:0.4, range:380, projectiles:1, color:'#c08040', icon:'🚀', aoe:60 },
+  { id:'scythe',   name:"Death's Scythe", type:'melee',  dmg:30, atkspd:1.5, range:110, projectiles:1, color:'#e0d8c0', icon:'☠' },
+];
+const WEAPONS_BY_ID = Object.fromEntries(WEAPONS.map(w => [w.id, w]));
 
-// ---------- Wheel definitions ----------
-// Each segment: { label, apply(stats), color }
+const SPELLS = [
+  { id:'overkill',  name:'Overkill',  desc:'+50% weapon damage',          effect:{ dmgMult:1.5 } },
+  { id:'lifesteal', name:'Lifesteal', desc:'Heal 8% of damage dealt',     effect:{ lifesteal:0.08 } },
+  { id:'tank',      name:'Tank',      desc:'+40 Max HP',                  effect:{ hpBonus:40 } },
+  { id:'crit',      name:'Critical',  desc:'+20% crit chance',            effect:{ critBonus:0.20 } },
+  { id:'pierce',    name:'Pierce',    desc:'Projectiles hit 2 extra foes',effect:{ pierce:2 } },
+  { id:'haste',     name:'Haste',     desc:'+30% attack speed',           effect:{ atkspdMult:1.3 } },
+  { id:'reach',     name:'Far Reach', desc:'+50 weapon range',            effect:{ rangeBonus:50 } },
+];
+const SPELLS_BY_ID = Object.fromEntries(SPELLS.map(s => [s.id, s]));
+
+const BUILDS = [
+  { id:'gambler',  name:'The Gambler',  weapon:'pistol', spells:['overkill'],  baseHp:90,  baseSpd:3.2, baseDef:0,
+    look:{ robe:'#3a2a10', accent:'#c9a227' }, desc:'Risk-taker. High roll, high stakes.' },
+  { id:'duelist',  name:'The Duelist',  weapon:'sword',  spells:['crit'],      baseHp:110, baseSpd:3.5, baseDef:1,
+    look:{ robe:'#4a1818', accent:'#e04848' }, desc:'Honor. Steel. A blade for every breath.' },
+  { id:'brute',    name:'The Brute',    weapon:'club',   spells:['tank'],      baseHp:180, baseSpd:2.5, baseDef:4,
+    look:{ robe:'#3a3030', accent:'#a08080' }, desc:'Unmoving. Unkillable. Slow.' },
+  { id:'arcanist', name:'The Arcanist', weapon:'staff',  spells:['pierce'],    baseHp:75,  baseSpd:3.0, baseDef:0,
+    look:{ robe:'#1a2a4a', accent:'#5a8af0' }, desc:'Knowledge bends physics. Bones less so.' },
+  { id:'rogue',    name:'The Rogue',    weapon:'knives', spells:['lifesteal'], baseHp:85,  baseSpd:4.0, baseDef:0,
+    look:{ robe:'#1a1a1a', accent:'#909090' }, desc:'Fast. Quiet. Never on the books.' },
+  { id:'huntsman', name:'The Huntsman', weapon:'bow',    spells:['reach'],     baseHp:100, baseSpd:3.3, baseDef:1,
+    look:{ robe:'#3a4030', accent:'#a0c080' }, desc:'A patient eye. A long arm.' },
+  { id:'witch',    name:'The Witch',    weapon:'wand',   spells:['haste'],     baseHp:80,  baseSpd:3.5, baseDef:0,
+    look:{ robe:'#2a1030', accent:'#c060ff' }, desc:'Fingers crackle with the unkind kind of magic.' },
+  { id:'soldier',  name:'The Soldier',  weapon:'rifle',  spells:[],            baseHp:120, baseSpd:3.0, baseDef:2,
+    look:{ robe:'#2a3a2a', accent:'#a0b0a0' }, desc:'Trained. Equipped. Tired.' },
+];
+
+const ENEMY_TYPES = [
+  { id:'zombie',   hp:8,  spd:1.0, dmg:6,  color:'#7a3030', size:14, tier:1, sprite:'zombie' },
+  { id:'bat',      hp:4,  spd:2.2, dmg:3,  color:'#5a3a5a', size:10, tier:1, sprite:'bat' },
+  { id:'skeleton', hp:12, spd:1.3, dmg:8,  color:'#c0b8a0', size:14, tier:1, sprite:'skeleton' },
+  { id:'ghoul',    hp:18, spd:1.5, dmg:10, color:'#5a7a4a', size:16, tier:2, sprite:'ghoul' },
+  { id:'wraith',   hp:10, spd:2.5, dmg:7,  color:'#809ac0', size:13, tier:2, sprite:'wraith' },
+  { id:'tank',     hp:50, spd:0.6, dmg:14, color:'#5a3a8a', size:22, tier:3, sprite:'tank' },
+  { id:'imp',      hp:6,  spd:3.0, dmg:4,  color:'#e04848', size:11, tier:1, sprite:'imp' },
+  { id:'reaper',   hp:80, spd:1.0, dmg:18, color:'#1a1a1a', size:24, tier:4, sprite:'reaper' },
+];
+
+const FINAL_BOSS = { id:'death', name:"Death Itself", hp:1200, spd:0.8, dmg:30, color:'#000000', size:55, sprite:'boss' };
+
+const SHOP_UPGRADES = [
+  { id:'hp',   name:'Vigor',     desc:'+20 Max HP',                cost:50, costMult:1.5, max:10 },
+  { id:'dmg',  name:'Strength',  desc:'+5 Damage',                 cost:50, costMult:1.5, max:10 },
+  { id:'spd',  name:'Swiftness', desc:'+0.4 Speed',                cost:60, costMult:1.6, max:5 },
+  { id:'def',  name:'Hardiness', desc:'+2 Defense',                cost:70, costMult:1.7, max:5 },
+  { id:'crit', name:'Fortune',   desc:'+5% Crit chance',           cost:80, costMult:1.8, max:5 },
+  { id:'cash', name:'Greed',     desc:'+25% cash from raids',      cost:120,costMult:2.0, max:5 },
+];
+const SHOP_BY_ID = Object.fromEntries(SHOP_UPGRADES.map(u => [u.id, u]));
+
 const BUFF_SEGMENTS = [
-  { label: '+25 HP',     color: '#4d8a52', apply: s => { s.hp += 25; } },
-  { label: '+5 DMG',     color: '#69b070', apply: s => { s.dmg += 5; } },
-  { label: '+3 DEF',     color: '#4d8a52', apply: s => { s.def += 3; } },
-  { label: '+1 SPD',     color: '#69b070', apply: s => { s.spd += 1; } },
-  { label: '+0.3 ATKSPD',color: '#4d8a52', apply: s => { s.atkspd += 0.3; } },
-  { label: '+50 RANGE',  color: '#69b070', apply: s => { s.range += 50; } },
-  { label: '+15% CRIT',  color: '#4d8a52', apply: s => { s.crit = Math.min(1, s.crit + 0.15); } },
-  { label: '+30 PICKUP', color: '#69b070', apply: s => { s.pickup += 30; } },
-  { label: '+25 HP',     color: '#4d8a52', apply: s => { s.hp += 25; } },
-  { label: '+5 DMG',     color: '#69b070', apply: s => { s.dmg += 5; } },
-  { label: '+1 SPD',     color: '#4d8a52', apply: s => { s.spd += 1; } },
-  { label: 'JACKPOT',    color: '#e6c34a', apply: s => { s.dmg += 10; s.hp += 25; s.atkspd += 0.3; } },
+  { label:'+25 HP',      color:'#4d8a52', apply: s => { s.hp += 25; s.hpMax += 25; } },
+  { label:'+5 DMG',      color:'#69b070', apply: s => { s.dmg += 5; } },
+  { label:'+3 DEF',      color:'#4d8a52', apply: s => { s.def += 3; } },
+  { label:'+1 SPD',      color:'#69b070', apply: s => { s.spd += 1; } },
+  { label:'+0.3 ATKSPD', color:'#4d8a52', apply: s => { s.atkspd += 0.3; } },
+  { label:'+50 RANGE',   color:'#69b070', apply: s => { s.range += 50; } },
+  { label:'+15% CRIT',   color:'#4d8a52', apply: s => { s.crit = Math.min(1, s.crit + 0.15); } },
+  { label:'+30 PICKUP',  color:'#69b070', apply: s => { s.pickup += 30; } },
+  { label:'+25 HP',      color:'#4d8a52', apply: s => { s.hp += 25; s.hpMax += 25; } },
+  { label:'+5 DMG',      color:'#69b070', apply: s => { s.dmg += 5; } },
+  { label:'+1 SPD',      color:'#4d8a52', apply: s => { s.spd += 1; } },
+  { label:'JACKPOT',     color:'#e6c34a', apply: s => { s.dmg += 10; s.hp += 25; s.hpMax += 25; s.atkspd += 0.3; } },
 ];
-
 const CURSE_SEGMENTS = [
-  { label: '-15 HP',         color: '#7a3030', apply: s => { s.hp = Math.max(20, s.hp - 15); } },
-  { label: '-3 DMG',         color: '#9a3030', apply: s => { s.dmg = Math.max(1, s.dmg - 3); } },
-  { label: '-1 SPD',         color: '#7a3030', apply: s => { s.spd = Math.max(1, s.spd - 1); } },
-  { label: '-0.2 ATKSPD',    color: '#9a3030', apply: s => { s.atkspd = Math.max(0.3, s.atkspd - 0.2); } },
-  { label: 'ENEMY +20% HP',  color: '#7a3030', apply: s => { s.enemyHpMult *= 1.2; } },
-  { label: 'ENEMY +25% SPD', color: '#9a3030', apply: s => { s.enemySpdMult *= 1.25; } },
-  { label: '+30% SPAWNS',    color: '#7a3030', apply: s => { s.enemySpawnMult *= 1.3; } },
-  { label: '-40 RANGE',      color: '#9a3030', apply: s => { s.range = Math.max(100, s.range - 40); } },
-  { label: '-3 DEF',         color: '#7a3030', apply: s => { s.def -= 3; } },
-  { label: '+2 ENEMY DMG',   color: '#9a3030', apply: s => { s.enemyDmgBonus += 2; } },
-  { label: '-10% CRIT',      color: '#7a3030', apply: s => { s.crit = Math.max(0, s.crit - 0.10); } },
-  { label: 'CURSE',          color: '#1a0a0a', apply: s => { s.enemyHpMult *= 1.3; s.enemySpawnMult *= 1.2; s.hp = Math.max(20, s.hp - 10); } },
+  { label:'-15 HP',         color:'#7a3030', apply: s => { s.hp = Math.max(20, s.hp - 15); s.hpMax = Math.max(20, s.hpMax - 15); } },
+  { label:'-3 DMG',         color:'#9a3030', apply: s => { s.dmg = Math.max(1, s.dmg - 3); } },
+  { label:'-1 SPD',         color:'#7a3030', apply: s => { s.spd = Math.max(1, s.spd - 1); } },
+  { label:'-0.2 ATKSPD',    color:'#9a3030', apply: s => { s.atkspd = Math.max(0.3, s.atkspd - 0.2); } },
+  { label:'ENEMY +20% HP',  color:'#7a3030', apply: s => { s.enemyHpMult *= 1.2; } },
+  { label:'ENEMY +25% SPD', color:'#9a3030', apply: s => { s.enemySpdMult *= 1.25; } },
+  { label:'+30% SPAWNS',    color:'#7a3030', apply: s => { s.enemySpawnMult *= 1.3; } },
+  { label:'-40 RANGE',      color:'#9a3030', apply: s => { s.range = Math.max(80, s.range - 40); } },
+  { label:'-3 DEF',         color:'#7a3030', apply: s => { s.def -= 3; } },
+  { label:'+2 ENEMY DMG',   color:'#9a3030', apply: s => { s.enemyDmgBonus += 2; } },
+  { label:'-10% CRIT',      color:'#7a3030', apply: s => { s.crit = Math.max(0, s.crit - 0.10); } },
+  { label:'CURSE',          color:'#1a0a0a', apply: s => { s.enemyHpMult *= 1.3; s.enemySpawnMult *= 1.2; s.hp = Math.max(20, s.hp - 10); } },
 ];
-
 const SEG_COUNT = 12;
 const SEG_ANGLE = (Math.PI * 2) / SEG_COUNT;
 
-// ---------- Game state ----------
-let scene = 'title';            // title | wheels | dungeon | gameover
-let stats = null;               // current player stats (mutated by wheels)
+// Difficulty multipliers
+const DIFFICULTY = {
+  easy:   { curseMult: 0.5, enemyHpMult: 0.7, enemySpdMult: 0.9, enemySpawnMult: 0.7, enemyDmgMult: 0.7, cashMult: 1.5 },
+  normal: { curseMult: 1.0, enemyHpMult: 1.0, enemySpdMult: 1.0, enemySpawnMult: 1.0, enemyDmgMult: 1.0, cashMult: 1.0 },
+  hard:   { curseMult: 1.4, enemyHpMult: 1.4, enemySpdMult: 1.15, enemySpawnMult: 1.4, enemyDmgMult: 1.3, cashMult: 0.7 },
+};
+
+// ============== Persistent state (localStorage) ==============
+const SAVE_KEY = 'deathsgamble_save_v3';
+const persistent = {
+  cash: 0,
+  parts: 0,
+  upgrades: { hp:0, dmg:0, spd:0, def:0, crit:0, cash:0 },
+  unlockedWeapons: ['fists', 'pistol', 'club'],  // start with a few
+};
+const settings = {
+  brightness: 1.0,
+  difficulty: 'normal',
+  wheelMode: 'wheel',
+  blood: true,
+  pet: 'none',
+  accessory: 'none',
+};
+
+function loadSave() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (data.persistent) Object.assign(persistent, data.persistent);
+    if (data.settings)   Object.assign(settings, data.settings);
+    if (data.persistent && data.persistent.upgrades) {
+      Object.assign(persistent.upgrades, data.persistent.upgrades);
+    }
+  } catch (e) {
+    console.warn('save load failed', e);
+  }
+}
+function saveSave() {
+  try {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ persistent, settings }));
+  } catch (e) { /* ignore */ }
+}
+function resetSave() {
+  localStorage.removeItem(SAVE_KEY);
+  persistent.cash = 0;
+  persistent.parts = 0;
+  persistent.upgrades = { hp:0, dmg:0, spd:0, def:0, crit:0, cash:0 };
+  persistent.unlockedWeapons = ['fists', 'pistol', 'club'];
+}
+
+// ============== Per-run state ==============
+const run = {
+  mode: 'story',     // 'story' | 'infinite'
+  raid: 1,
+  totalRaids: 3,
+  build: null,       // chosen build
+  weapon: null,      // current weapon
+  spells: [],        // active spells on weapon
+  cashEarned: 0,
+  partsEarned: 0,
+  killsTotal: 0,
+};
+
+let stats = null; // current player stats (rebuilt each raid)
+
+// Helper: build base stats from build + persistent upgrades + spells
+function computeBaseStats(build, weapon, spells) {
+  const u = persistent.upgrades;
+  const s = {
+    hp: build.baseHp + u.hp * 20,
+    hpMax: build.baseHp + u.hp * 20,
+    dmg: u.dmg * 5,                // weapon dmg added on top in dungeon math
+    def: build.baseDef + u.def * 2,
+    spd: build.baseSpd + u.spd * 0.4,
+    atkspd: weapon.atkspd,         // base from weapon
+    range:  weapon.range,
+    crit: 0.05 + u.crit * 0.05,
+    pickup: 60,
+    enemyHpMult: 1.0,
+    enemySpdMult: 1.0,
+    enemySpawnMult: 1.0,
+    enemyDmgBonus: 0,
+    // spell-driven extras
+    dmgMult: 1.0,
+    atkspdMult: 1.0,
+    rangeBonus: 0,
+    lifesteal: 0,
+    pierce: 0,
+    aoe: weapon.aoe || 0,
+  };
+  // Apply spells
+  for (const spId of spells) {
+    const sp = SPELLS_BY_ID[spId];
+    if (!sp) continue;
+    const e = sp.effect;
+    if (e.dmgMult)     s.dmgMult *= e.dmgMult;
+    if (e.atkspdMult)  s.atkspdMult *= e.atkspdMult;
+    if (e.rangeBonus)  s.rangeBonus += e.rangeBonus;
+    if (e.hpBonus)   { s.hp += e.hpBonus; s.hpMax += e.hpBonus; }
+    if (e.critBonus)   s.crit = Math.min(1, s.crit + e.critBonus);
+    if (e.lifesteal)   s.lifesteal += e.lifesteal;
+    if (e.pierce)      s.pierce += e.pierce;
+  }
+  // Apply difficulty
+  const d = DIFFICULTY[settings.difficulty];
+  s.enemyHpMult *= d.enemyHpMult;
+  s.enemySpdMult *= d.enemySpdMult;
+  s.enemySpawnMult *= d.enemySpawnMult;
+  s.enemyDmgBonus += (d.enemyDmgMult - 1) * 5;  // rough conversion
+  return s;
+}
+
+// Effective values used during combat (weapon + spell + buff)
+function effectiveDmg()    { return (WEAPONS_BY_ID[run.weapon.id].dmg + stats.dmg) * stats.dmgMult; }
+function effectiveAtkspd() { return stats.atkspd * stats.atkspdMult; }
+function effectiveRange()  { return stats.range + stats.rangeBonus; }
 
 const wheels = {
   buff:  { angle: 0, spinning: false, spun: false, spinStart: 0, spinTarget: 0, t0: 0, dur: 0, resultIdx: -1 },
   curse: { angle: 0, spinning: false, spun: false, spinStart: 0, spinTarget: 0, t0: 0, dur: 0, resultIdx: -1 },
 };
 
-// ---------- DOM ----------
+// ============== DOM ==============
 const $ = id => document.getElementById(id);
 const screens = {
-  title:    $('title-screen'),
-  wheels:   $('wheels-screen'),
-  dungeon:  $('dungeon-screen'),
-  gameover: $('gameover-screen'),
+  title:        $('title-screen'),
+  modeselect:   $('modeselect-screen'),
+  buildpicker:  $('buildpicker-screen'),
+  wheels:       $('wheels-screen'),
+  dungeon:      $('dungeon-screen'),
+  shop:         $('shop-screen'),
+  craft:        $('craft-screen'),
+  gameover:     $('gameover-screen'),
+  win:          $('win-screen'),
 };
 
 const wheelsCanvas = $('wheels-canvas');
@@ -460,12 +1102,15 @@ const wctx = wheelsCanvas.getContext('2d');
 const dungeonCanvas = $('dungeon-canvas');
 const dctx = dungeonCanvas.getContext('2d');
 
-// ---------- Scene management ----------
+let scene = 'title';
+
 function showScene(name) {
   scene = name;
   Object.values(screens).forEach(s => s.classList.remove('active'));
   screens[name].classList.add('active');
-  // Resize after layout settles
+  // Hide control hint outside dungeon
+  $('control-hint').style.display = name === 'dungeon' ? '' : 'none';
+  // Resize canvases on scene change
   requestAnimationFrame(() => {
     resizeCanvas(wheelsCanvas, wctx);
     resizeCanvas(dungeonCanvas, dctx);
@@ -486,56 +1131,100 @@ window.addEventListener('resize', () => {
 });
 
 /* =====================================================================
- *  WHEELS SCENE
+ *  SETTINGS
  * ===================================================================== */
 
-function wheelGeometry() {
-  const w = wheelsCanvas.clientWidth;
-  const h = wheelsCanvas.clientHeight;
-  // Smaller wheels + wider spacing so Death's reach reads,
-  // and so the hood has headroom above the wheels.
-  const wheelR = Math.min(w * 0.14, h * 0.20);
-  const cy = h * 0.6;
-  const offset = wheelR * 1.95;
-  return {
-    w, h,
-    cy,
-    wheelR,
-    buffCx:  w / 2 - offset,
-    curseCx: w / 2 + offset,
-    deathCx: w / 2,
-  };
+function applySettings() {
+  document.documentElement.style.setProperty('--brightness', settings.brightness);
+  $('app').classList.add('brightness-filter');
+  // Update modal UI to reflect state
+  $('set-brightness').value = settings.brightness;
+  $('set-brightness-val').textContent = Math.round(settings.brightness * 100) + '%';
+  for (const seg of ['set-difficulty', 'set-wheelmode', 'set-pet', 'set-accessory']) {
+    const key = { 'set-difficulty':'difficulty', 'set-wheelmode':'wheelMode', 'set-pet':'pet', 'set-accessory':'accessory' }[seg];
+    const buttons = $(seg).querySelectorAll('button');
+    buttons.forEach(b => b.classList.toggle('active', b.dataset.v === settings[key]));
+  }
+  $('set-blood').classList.toggle('on', settings.blood);
 }
+
+function openSettings()  { $('settings-modal').classList.add('active'); applySettings(); }
+function closeSettings() { $('settings-modal').classList.remove('active'); }
+
+$('settings-btn').addEventListener('click', openSettings);
+$('settings-close').addEventListener('click', closeSettings);
+$('settings-reset').addEventListener('click', () => {
+  if (confirm('Reset all save data (cash, upgrades, unlocks)?')) {
+    resetSave();
+    saveSave();
+    applySettings();
+  }
+});
+$('set-brightness').addEventListener('input', e => {
+  settings.brightness = parseFloat(e.target.value);
+  applySettings();
+  saveSave();
+});
+function bindSeg(segId, key) {
+  $(segId).querySelectorAll('button').forEach(b => {
+    b.addEventListener('click', () => {
+      settings[key] = b.dataset.v;
+      applySettings();
+      saveSave();
+    });
+  });
+}
+bindSeg('set-difficulty', 'difficulty');
+bindSeg('set-wheelmode', 'wheelMode');
+bindSeg('set-pet', 'pet');
+bindSeg('set-accessory', 'accessory');
+$('set-blood').addEventListener('click', () => {
+  settings.blood = !settings.blood;
+  applySettings();
+  saveSave();
+});
+
+/* =====================================================================
+ *  WHEELS SCENE  (with slot-machine alt mode)
+ * ===================================================================== */
 
 function eyeGlowAlpha() {
   const t = performance.now() / 1000;
   return 0.7 + 0.3 * Math.sin(t * 2.4);
 }
 
+function wheelGeometry() {
+  const w = wheelsCanvas.clientWidth;
+  const h = wheelsCanvas.clientHeight;
+  const wheelR = Math.min(w * 0.14, h * 0.20);
+  const cy = h * 0.6;
+  const offset = wheelR * 1.95;
+  return {
+    w, h, cy, wheelR,
+    buffCx:  w / 2 - offset,
+    curseCx: w / 2 + offset,
+    deathCx: w / 2,
+  };
+}
+
 function drawDeathBack(g) {
-  // Everything BEHIND the wheels: cloak, hood, head, eyes.
   const { deathCx, cy, wheelR, h, w } = g;
   const ctx = wctx;
-
   const headTopY    = cy - wheelR * 2.35;
   const headCenterY = cy - wheelR * 1.65;
   const collarY     = cy - wheelR * 0.95;
   const shoulderY   = cy - wheelR * 0.65;
   const robeBottom  = h + 30;
 
-  // ---------- Floor ambient shadow under figure ----------
+  // Floor shadow
   ctx.save();
-  const floorShadow = ctx.createRadialGradient(
-    deathCx, h * 0.93, 0,
-    deathCx, h * 0.93, wheelR * 4.5
-  );
+  const floorShadow = ctx.createRadialGradient(deathCx, h * 0.93, 0, deathCx, h * 0.93, wheelR * 4.5);
   floorShadow.addColorStop(0, 'rgba(0,0,0,0.55)');
   floorShadow.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = floorShadow;
   ctx.fillRect(0, h * 0.82, w, h * 0.18);
   ctx.restore();
 
-  // ---------- Robe / cloak silhouette ----------
   const robeBottomHalf   = wheelR * 4.6;
   const robeMidHalf      = wheelR * 2.7;
   const robeShoulderHalf = wheelR * 2.1;
@@ -543,22 +1232,20 @@ function drawDeathBack(g) {
   const cloakPath = () => {
     ctx.beginPath();
     ctx.moveTo(deathCx, headTopY);
-    // Right hood edge → shoulder
     ctx.bezierCurveTo(
       deathCx + wheelR * 0.95, headTopY + wheelR * 0.25,
       deathCx + wheelR * 1.35, collarY - wheelR * 0.05,
       deathCx + robeShoulderHalf, shoulderY + wheelR * 0.1
     );
-    // Right side draping down
     ctx.bezierCurveTo(
-      deathCx + robeMidHalf,    cy + wheelR * 0.4,
+      deathCx + robeMidHalf, cy + wheelR * 0.4,
       deathCx + robeBottomHalf, cy + wheelR * 1.6,
       deathCx + robeBottomHalf, robeBottom
     );
     ctx.lineTo(deathCx - robeBottomHalf, robeBottom);
     ctx.bezierCurveTo(
       deathCx - robeBottomHalf, cy + wheelR * 1.6,
-      deathCx - robeMidHalf,    cy + wheelR * 0.4,
+      deathCx - robeMidHalf, cy + wheelR * 0.4,
       deathCx - robeShoulderHalf, shoulderY + wheelR * 0.1
     );
     ctx.bezierCurveTo(
@@ -569,39 +1256,26 @@ function drawDeathBack(g) {
     ctx.closePath();
   };
 
-  // Base cloak fill: dark vertical gradient
   const baseGrad = ctx.createLinearGradient(0, headTopY, 0, robeBottom);
-  baseGrad.addColorStop(0,    '#1a1a26');
+  baseGrad.addColorStop(0, '#1a1a26');
   baseGrad.addColorStop(0.45, '#10101a');
-  baseGrad.addColorStop(1,    '#040406');
+  baseGrad.addColorStop(1, '#040406');
   ctx.fillStyle = baseGrad;
-  cloakPath();
-  ctx.fill();
+  cloakPath(); ctx.fill();
 
-  // Side rim light (cool moonlight on left side)
-  const rimGrad = ctx.createLinearGradient(
-    deathCx - robeShoulderHalf - wheelR * 0.3, headTopY,
-    deathCx - wheelR * 0.2,                    headTopY
-  );
+  const rimGrad = ctx.createLinearGradient(deathCx - robeShoulderHalf - wheelR * 0.3, headTopY, deathCx - wheelR * 0.2, headTopY);
   rimGrad.addColorStop(0, 'rgba(140,160,210,0.18)');
   rimGrad.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = rimGrad;
-  cloakPath();
-  ctx.fill();
+  cloakPath(); ctx.fill();
 
-  // Center body shading (darker down the middle for fold)
-  const centerShade = ctx.createLinearGradient(
-    deathCx - wheelR * 0.6, 0,
-    deathCx + wheelR * 0.6, 0
-  );
-  centerShade.addColorStop(0,   'rgba(0,0,0,0)');
+  const centerShade = ctx.createLinearGradient(deathCx - wheelR * 0.6, 0, deathCx + wheelR * 0.6, 0);
+  centerShade.addColorStop(0, 'rgba(0,0,0,0)');
   centerShade.addColorStop(0.5, 'rgba(0,0,0,0.4)');
-  centerShade.addColorStop(1,   'rgba(0,0,0,0)');
+  centerShade.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = centerShade;
-  cloakPath();
-  ctx.fill();
+  cloakPath(); ctx.fill();
 
-  // ---------- Cloak fold lines ----------
   ctx.save();
   ctx.strokeStyle = 'rgba(255,255,255,0.045)';
   ctx.lineWidth = 1.2;
@@ -611,33 +1285,19 @@ function drawDeathBack(g) {
     const xB = deathCx + i * wheelR * 0.95;
     ctx.beginPath();
     ctx.moveTo(xT, shoulderY + wheelR * 0.4);
-    ctx.bezierCurveTo(
-      xT, cy + wheelR * 0.5,
-      xB, cy + wheelR * 1.4,
-      xB, robeBottom * 0.95
-    );
+    ctx.bezierCurveTo(xT, cy + wheelR * 0.5, xB, cy + wheelR * 1.4, xB, robeBottom * 0.95);
     ctx.stroke();
   }
   ctx.restore();
 
-  // ---------- Hood rim highlight ----------
   ctx.strokeStyle = 'rgba(220,220,230,0.10)';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(deathCx - wheelR * 1.35, collarY - wheelR * 0.05);
-  ctx.bezierCurveTo(
-    deathCx - wheelR * 0.95, headTopY + wheelR * 0.25,
-    deathCx - wheelR * 0.4,  headTopY - wheelR * 0.05,
-    deathCx, headTopY
-  );
-  ctx.bezierCurveTo(
-    deathCx + wheelR * 0.4,  headTopY - wheelR * 0.05,
-    deathCx + wheelR * 0.95, headTopY + wheelR * 0.25,
-    deathCx + wheelR * 1.35, collarY - wheelR * 0.05
-  );
+  ctx.bezierCurveTo(deathCx - wheelR * 0.95, headTopY + wheelR * 0.25, deathCx - wheelR * 0.4, headTopY - wheelR * 0.05, deathCx, headTopY);
+  ctx.bezierCurveTo(deathCx + wheelR * 0.4, headTopY - wheelR * 0.05, deathCx + wheelR * 0.95, headTopY + wheelR * 0.25, deathCx + wheelR * 1.35, collarY - wheelR * 0.05);
   ctx.stroke();
 
-  // ---------- Hood opening (face void) ----------
   const hoodOpenW = wheelR * 0.55;
   const hoodOpenH = wheelR * 0.8;
   ctx.fillStyle = '#000';
@@ -645,40 +1305,27 @@ function drawDeathBack(g) {
   ctx.ellipse(deathCx, headCenterY, hoodOpenW, hoodOpenH, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Warm interior glow in hood
-  const hoodGlow = ctx.createRadialGradient(
-    deathCx, headCenterY + hoodOpenH * 0.05, 0,
-    deathCx, headCenterY, hoodOpenW * 1.3
-  );
-  hoodGlow.addColorStop(0,   'rgba(150,90,40,0.5)');
+  const hoodGlow = ctx.createRadialGradient(deathCx, headCenterY + hoodOpenH * 0.05, 0, deathCx, headCenterY, hoodOpenW * 1.3);
+  hoodGlow.addColorStop(0, 'rgba(150,90,40,0.5)');
   hoodGlow.addColorStop(0.5, 'rgba(80,40,15,0.18)');
-  hoodGlow.addColorStop(1,   'rgba(0,0,0,0)');
+  hoodGlow.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = hoodGlow;
   ctx.beginPath();
   ctx.ellipse(deathCx, headCenterY, hoodOpenW * 1.3, hoodOpenH * 1.3, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // ---------- Faint skull silhouette inside the hood ----------
+  // Skull silhouette
   ctx.save();
   ctx.globalAlpha = 0.9;
   ctx.strokeStyle = 'rgba(190,180,160,0.35)';
   ctx.lineWidth = 1.1;
-  // Cranium top arc
   ctx.beginPath();
-  ctx.ellipse(deathCx, headCenterY - hoodOpenH * 0.05,
-              hoodOpenW * 0.55, hoodOpenH * 0.5,
-              0, Math.PI * 1.05, Math.PI * 1.95);
+  ctx.ellipse(deathCx, headCenterY - hoodOpenH * 0.05, hoodOpenW * 0.55, hoodOpenH * 0.5, 0, Math.PI * 1.05, Math.PI * 1.95);
   ctx.stroke();
-  // Jaw line
   ctx.beginPath();
   ctx.moveTo(deathCx - hoodOpenW * 0.40, headCenterY + hoodOpenH * 0.15);
-  ctx.bezierCurveTo(
-    deathCx - hoodOpenW * 0.32, headCenterY + hoodOpenH * 0.45,
-    deathCx + hoodOpenW * 0.32, headCenterY + hoodOpenH * 0.45,
-    deathCx + hoodOpenW * 0.40, headCenterY + hoodOpenH * 0.15
-  );
+  ctx.bezierCurveTo(deathCx - hoodOpenW * 0.32, headCenterY + hoodOpenH * 0.45, deathCx + hoodOpenW * 0.32, headCenterY + hoodOpenH * 0.45, deathCx + hoodOpenW * 0.40, headCenterY + hoodOpenH * 0.15);
   ctx.stroke();
-  // Nose triangle (dark)
   ctx.fillStyle = 'rgba(0,0,0,0.6)';
   ctx.beginPath();
   ctx.moveTo(deathCx, headCenterY + hoodOpenH * 0.10);
@@ -686,7 +1333,6 @@ function drawDeathBack(g) {
   ctx.lineTo(deathCx + hoodOpenW * 0.06, headCenterY + hoodOpenH * 0.22);
   ctx.closePath();
   ctx.fill();
-  // Tooth gap hint
   ctx.strokeStyle = 'rgba(140,130,110,0.25)';
   ctx.lineWidth = 0.6;
   ctx.beginPath();
@@ -698,28 +1344,24 @@ function drawDeathBack(g) {
   ctx.stroke();
   ctx.restore();
 
-  // ---------- Multi-layer glowing eyes ----------
+  // Eyes
   const ga = eyeGlowAlpha();
   const eyeY = headCenterY - hoodOpenH * 0.08;
   const eyeDx = hoodOpenW * 0.32;
   const eyeR  = hoodOpenW * 0.10;
-
-  // Outer aura (large soft glow)
   ctx.save();
   for (const lr of [-1, 1]) {
     const ex = deathCx + lr * eyeDx;
     const aura = ctx.createRadialGradient(ex, eyeY, 0, ex, eyeY, eyeR * 6);
-    aura.addColorStop(0,   `rgba(255,200,80,${0.55 * ga})`);
+    aura.addColorStop(0, `rgba(255,200,80,${0.55 * ga})`);
     aura.addColorStop(0.3, `rgba(255,160,60,${0.22 * ga})`);
-    aura.addColorStop(1,   'rgba(255,140,50,0)');
+    aura.addColorStop(1, 'rgba(255,140,50,0)');
     ctx.fillStyle = aura;
     ctx.beginPath();
     ctx.arc(ex, eyeY, eyeR * 6, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
-
-  // Bright eye core
   ctx.save();
   ctx.shadowColor = `rgba(255,200,80,${ga})`;
   ctx.shadowBlur  = 22 * ga;
@@ -732,122 +1374,55 @@ function drawDeathBack(g) {
 }
 
 function drawDeathFront(g) {
-  // Drawn AFTER the wheels — bone fingers fanning from the bottom-outer
-  // of each wheel, as if Death's hands grip from behind.
-  drawDeathFingers(g, -1);  // left wheel  (buff)  → fingers fan to bottom-LEFT
-  drawDeathFingers(g, +1);  // right wheel (curse) → fingers fan to bottom-RIGHT
+  drawDeathFingers(g, -1);
+  drawDeathFingers(g, +1);
 }
-
-function quadBez(p0, p1, p2, t) {
-  const u = 1 - t;
-  return u * u * p0 + 2 * u * t * p1 + t * t * p2;
-}
-
+function quadBez(p0, p1, p2, t) { const u = 1 - t; return u * u * p0 + 2 * u * t * p1 + t * t * p2; }
 function drawDeathFingers(g, sign) {
-  // sign = -1 → left wheel (g.buffCx),  fingers fan down-left
-  // sign = +1 → right wheel (g.curseCx), fingers fan down-right
   const { cy, wheelR } = g;
   const ctx = wctx;
-
   const wheelCx = sign < 0 ? g.buffCx : g.curseCx;
   const wheelCy = cy;
-
-  // Grip point on the bottom-outer rim (~7:30 on left wheel, ~4:30 on right).
-  // In canvas: angle 0=right, PI/2=down, PI=left. So:
-  //   left wheel grip angle  = PI*0.78  (between 6 and 9 o'clock — bottom-left)
-  //   right wheel grip angle = PI*0.22  (between 3 and 6 o'clock — bottom-right)
   const gripAngle = sign < 0 ? Math.PI * 0.78 : Math.PI * 0.22;
   const gripX = wheelCx + Math.cos(gripAngle) * (wheelR * 0.96);
   const gripY = wheelCy + Math.sin(gripAngle) * (wheelR * 0.96);
-
-  // Fingers fan outward from the grip point, away from the wheel center.
-  // Center of the fan points roughly along the radial direction (outward).
   const fanCenter = gripAngle;
-  const fanSpread = Math.PI * 0.55;  // ~100° total spread
+  const fanSpread = Math.PI * 0.55;
   const fingerCount = 5;
-  // Length scale per finger (thumb–pinky): middle longest
   const lengthScales = [0.75, 1.05, 1.25, 1.10, 0.80];
-
   ctx.save();
-
   for (let i = 0; i < fingerCount; i++) {
     const t = i / (fingerCount - 1);
     const fingerAngle = fanCenter - fanSpread / 2 + t * fanSpread;
     const len = wheelR * lengthScales[i];
     const tipX = gripX + Math.cos(fingerAngle) * len;
     const tipY = gripY + Math.sin(fingerAngle) * len;
-
-    // Slight curve: bend the finger gently, perpendicular to its direction
     const bendDir = sign < 0 ? -1 : 1;
     const perpX = Math.cos(fingerAngle + Math.PI / 2);
     const perpY = Math.sin(fingerAngle + Math.PI / 2);
     const ctrlX = (gripX + tipX) / 2 + perpX * len * 0.07 * bendDir;
     const ctrlY = (gripY + tipY) / 2 + perpY * len * 0.07 * bendDir;
-
-    // Drop shadow under the bone
     ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-    ctx.lineWidth = 5;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(gripX + 1, gripY + 2);
-    ctx.quadraticCurveTo(ctrlX + 1, ctrlY + 2, tipX + 1, tipY + 2);
-    ctx.stroke();
-
-    // Bone
-    ctx.strokeStyle = '#d4ccb2';
-    ctx.lineWidth = 3.5;
-    ctx.beginPath();
-    ctx.moveTo(gripX, gripY);
-    ctx.quadraticCurveTo(ctrlX, ctrlY, tipX, tipY);
-    ctx.stroke();
-
-    // Highlight along the upper edge of the bone
-    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-    ctx.lineWidth = 0.9;
-    ctx.beginPath();
-    ctx.moveTo(gripX, gripY - 1);
-    ctx.quadraticCurveTo(ctrlX, ctrlY - 1, tipX, tipY - 1);
-    ctx.stroke();
-
-    // Knuckle bump (mid-finger)
+    ctx.lineWidth = 5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(gripX + 1, gripY + 2); ctx.quadraticCurveTo(ctrlX + 1, ctrlY + 2, tipX + 1, tipY + 2); ctx.stroke();
+    ctx.strokeStyle = '#d4ccb2'; ctx.lineWidth = 3.5;
+    ctx.beginPath(); ctx.moveTo(gripX, gripY); ctx.quadraticCurveTo(ctrlX, ctrlY, tipX, tipY); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)'; ctx.lineWidth = 0.9;
+    ctx.beginPath(); ctx.moveTo(gripX, gripY - 1); ctx.quadraticCurveTo(ctrlX, ctrlY - 1, tipX, tipY - 1); ctx.stroke();
     const knuckleX = quadBez(gripX, ctrlX, tipX, 0.55);
     const knuckleY = quadBez(gripY, ctrlY, tipY, 0.55);
-    ctx.fillStyle = '#dcd4ba';
-    ctx.strokeStyle = '#7a7260';
-    ctx.lineWidth = 0.6;
-    ctx.beginPath();
-    ctx.arc(knuckleX, knuckleY, 2.3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // Pointed claw nail at the tip
+    ctx.fillStyle = '#dcd4ba'; ctx.strokeStyle = '#7a7260'; ctx.lineWidth = 0.6;
+    ctx.beginPath(); ctx.arc(knuckleX, knuckleY, 2.3, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.fillStyle = '#1a1a1f';
-    ctx.beginPath();
-    ctx.arc(tipX, tipY, 1.8, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.beginPath(); ctx.arc(tipX, tipY, 1.8, 0, Math.PI * 2); ctx.fill();
   }
-
-  // Wrist / palm joint at the grip point
-  ctx.fillStyle = '#dcd4ba';
-  ctx.strokeStyle = '#6d6450';
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  ctx.arc(gripX, gripY, wheelR * 0.085, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  // Subtle shading on the palm joint for roundness
-  const palmShade = ctx.createRadialGradient(
-    gripX - wheelR * 0.03, gripY - wheelR * 0.03, 0,
-    gripX, gripY, wheelR * 0.085
-  );
+  ctx.fillStyle = '#dcd4ba'; ctx.strokeStyle = '#6d6450'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(gripX, gripY, wheelR * 0.085, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  const palmShade = ctx.createRadialGradient(gripX - wheelR * 0.03, gripY - wheelR * 0.03, 0, gripX, gripY, wheelR * 0.085);
   palmShade.addColorStop(0, 'rgba(255,255,255,0.25)');
   palmShade.addColorStop(1, 'rgba(0,0,0,0.35)');
   ctx.fillStyle = palmShade;
-  ctx.beginPath();
-  ctx.arc(gripX, gripY, wheelR * 0.085, 0, Math.PI * 2);
-  ctx.fill();
-
+  ctx.beginPath(); ctx.arc(gripX, gripY, wheelR * 0.085, 0, Math.PI * 2); ctx.fill();
   ctx.restore();
 }
 
@@ -855,8 +1430,6 @@ function drawWheel(cx, cy, r, segments, angle, kind) {
   const ctx = wctx;
   ctx.save();
   ctx.translate(cx, cy);
-
-  // Backplate / shadow
   ctx.shadowColor = 'rgba(0,0,0,0.6)';
   ctx.shadowBlur = 24;
   ctx.beginPath();
@@ -864,22 +1437,16 @@ function drawWheel(cx, cy, r, segments, angle, kind) {
   ctx.fillStyle = '#0a0a10';
   ctx.fill();
   ctx.shadowBlur = 0;
-
-  // Outer ring
   ctx.beginPath();
   ctx.arc(0, 0, r * 1.04, 0, Math.PI * 2);
   ctx.strokeStyle = kind === 'buff' ? '#3a5a3a' : '#5a2a2a';
   ctx.lineWidth = 4;
   ctx.stroke();
-
   ctx.rotate(angle);
-
-  // Slices
   for (let i = 0; i < SEG_COUNT; i++) {
     const seg = segments[i];
     const start = i * SEG_ANGLE - SEG_ANGLE / 2;
     const end = start + SEG_ANGLE;
-
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.arc(0, 0, r, start, end);
@@ -889,8 +1456,6 @@ function drawWheel(cx, cy, r, segments, angle, kind) {
     ctx.strokeStyle = '#0a0a0c';
     ctx.lineWidth = 2;
     ctx.stroke();
-
-    // Label
     ctx.save();
     ctx.rotate(start + SEG_ANGLE / 2);
     ctx.translate(r * 0.62, 0);
@@ -901,8 +1466,6 @@ function drawWheel(cx, cy, r, segments, angle, kind) {
     ctx.fillText(seg.label, 0, 0);
     ctx.restore();
   }
-
-  // Hub
   ctx.beginPath();
   ctx.arc(0, 0, r * 0.10, 0, Math.PI * 2);
   ctx.fillStyle = '#0a0a0c';
@@ -910,10 +1473,9 @@ function drawWheel(cx, cy, r, segments, angle, kind) {
   ctx.strokeStyle = kind === 'buff' ? '#69b070' : '#e04848';
   ctx.lineWidth = 2;
   ctx.stroke();
-
   ctx.restore();
 
-  // Pointer at top
+  // Pointer
   ctx.save();
   ctx.fillStyle = kind === 'buff' ? '#69b070' : '#e04848';
   ctx.strokeStyle = '#0a0a0c';
@@ -931,38 +1493,101 @@ function drawWheel(cx, cy, r, segments, angle, kind) {
   ctx.restore();
 }
 
+// ----- Slot machine variant -----
+function drawSlotMachine(cx, cy, r, segments, angle, kind) {
+  const ctx = wctx;
+  const w = r * 1.8;
+  const h = r * 1.4;
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  // Frame
+  ctx.fillStyle = '#1a1a22';
+  ctx.strokeStyle = kind === 'buff' ? '#69b070' : '#e04848';
+  ctx.lineWidth = 4;
+  roundRect(ctx, -w / 2, -h / 2, w, h, 10);
+  ctx.fill(); ctx.stroke();
+
+  // Inner well
+  ctx.fillStyle = '#0a0a10';
+  roundRect(ctx, -w / 2 + 12, -h / 2 + 12, w - 24, h - 24, 6);
+  ctx.fill();
+
+  // Reel (showing 3 segments stacked, scrolling)
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(-w / 2 + 14, -h / 2 + 14, w - 28, h - 28);
+  ctx.clip();
+
+  // Convert wheel angle to scroll offset
+  const scrollOffset = (angle / (Math.PI * 2)) * (segments.length * 30);
+  const segH = (h - 28) / 3;
+  for (let i = -2; i < segments.length + 2; i++) {
+    const seg = segments[((i % segments.length) + segments.length) % segments.length];
+    const y = (i * segH) - (scrollOffset % (segments.length * segH)) - segH / 2;
+    if (y > h / 2 || y < -h / 2 - segH) continue;
+    ctx.fillStyle = seg.color;
+    ctx.fillRect(-w / 2 + 14, y, w - 28, segH - 2);
+    ctx.fillStyle = '#0a0a0c';
+    ctx.font = `bold ${Math.round(segH * 0.45)}px Georgia`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(seg.label, 0, y + segH / 2);
+  }
+  ctx.restore();
+
+  // Highlight box for "selected" middle row
+  ctx.strokeStyle = kind === 'buff' ? '#69b070' : '#e04848';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(-w / 2 + 12, -segH / 2, w - 24, segH);
+
+  ctx.restore();
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
 function renderWheelsScene() {
   const g = wheelGeometry();
   const ctx = wctx;
   ctx.clearRect(0, 0, g.w, g.h);
 
-  // Faint floor mist
+  // Mist
   const mist = ctx.createLinearGradient(0, g.h * 0.7, 0, g.h);
   mist.addColorStop(0, 'rgba(0,0,0,0)');
   mist.addColorStop(1, 'rgba(40,40,55,0.2)');
   ctx.fillStyle = mist;
   ctx.fillRect(0, g.h * 0.7, g.w, g.h * 0.3);
 
-  // Ground line
   ctx.fillStyle = '#0a0a0c';
   ctx.fillRect(0, g.h * 0.92, g.w, 3);
 
-  // Render order: Death (back) → wheels → Death (front, hands gripping rim)
   drawDeathBack(g);
-  drawWheel(g.buffCx,  g.cy, g.wheelR, BUFF_SEGMENTS,  wheels.buff.angle,  'buff');
-  drawWheel(g.curseCx, g.cy, g.wheelR, CURSE_SEGMENTS, wheels.curse.angle, 'curse');
-  drawDeathFront(g);
 
+  if (settings.wheelMode === 'slot') {
+    drawSlotMachine(g.buffCx,  g.cy, g.wheelR, BUFF_SEGMENTS,  wheels.buff.angle,  'buff');
+    drawSlotMachine(g.curseCx, g.cy, g.wheelR, CURSE_SEGMENTS, wheels.curse.angle, 'curse');
+  } else {
+    drawWheel(g.buffCx,  g.cy, g.wheelR, BUFF_SEGMENTS,  wheels.buff.angle,  'buff');
+    drawWheel(g.curseCx, g.cy, g.wheelR, CURSE_SEGMENTS, wheels.curse.angle, 'curse');
+  }
+
+  drawDeathFront(g);
   positionWheelButtons(g);
 }
 
 function positionWheelButtons(g) {
   const buffGroup = $('buff-group');
   const curseGroup = $('curse-group');
-  // Position the TOP of each button group just below its wheel,
-  // so the whole group (label → button → result) sits below the wheel.
   const yFromTop = g.cy + g.wheelR + 18;
-  buffGroup.style.top  = yFromTop + 'px';
+  buffGroup.style.top = yFromTop + 'px';
   curseGroup.style.top = yFromTop + 'px';
   buffGroup.style.bottom = 'auto';
   curseGroup.style.bottom = 'auto';
@@ -970,30 +1595,23 @@ function positionWheelButtons(g) {
   curseGroup.style.left = g.curseCx + 'px';
 }
 
-// --- Spin logic ---
 function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
 
 function startSpin(side) {
   const w = wheels[side];
   if (w.spinning || w.spun) return;
   w.spinning = true;
-
   const targetSeg = Math.floor(Math.random() * SEG_COUNT);
-  // Wheel angle so segment center sits at top pointer (-PI/2):
-  //   wheelAngle = -PI/2 - segIdx * SEG_ANGLE  (mod 2π)
   const baseTarget = -Math.PI / 2 - targetSeg * SEG_ANGLE;
   const fullRotations = 5 + Math.floor(Math.random() * 3);
   const jitter = (Math.random() - 0.5) * SEG_ANGLE * 0.6;
   let target = baseTarget + fullRotations * Math.PI * 2 + jitter;
   while (target < w.angle + Math.PI * 4) target += Math.PI * 2;
-
   w.spinStart = w.angle;
   w.spinTarget = target;
   w.t0 = performance.now();
   w.dur = 3800 + Math.random() * 600;
   w.resultIdx = targetSeg;
-
-  // Disable the spin button immediately
   const btn = side === 'buff' ? $('spin-buff-btn') : $('spin-curse-btn');
   btn.disabled = true;
 }
@@ -1019,14 +1637,21 @@ function onSpinComplete(side) {
   const segments = side === 'buff' ? BUFF_SEGMENTS : CURSE_SEGMENTS;
   const seg = segments[w.resultIdx];
   const before = { ...stats };
-  seg.apply(stats);
+  // Curse magnitude scaled by difficulty (only on curse wheel)
+  if (side === 'curse') {
+    const mult = DIFFICULTY[settings.difficulty].curseMult;
+    // Apply with magnitude reduction by skipping with probability (1-mult)
+    if (Math.random() < mult) seg.apply(stats);
+    else flashBanner('Curse weakened', 'good');
+  } else {
+    seg.apply(stats);
+  }
   updateStatPreview(before, stats);
 
   const resultEl = $(side === 'buff' ? 'buff-result' : 'curse-result');
   resultEl.textContent = seg.label;
   resultEl.classList.add('shown');
 
-  // Light up Enter Dungeon if both spun
   if (wheels.buff.spun && wheels.curse.spun) {
     const btn = $('enter-dungeon-btn');
     btn.disabled = false;
@@ -1034,7 +1659,6 @@ function onSpinComplete(side) {
   }
 }
 
-// --- Stat preview ---
 function updateStatPreview(before, after) {
   const map = [
     ['hp',     'prev-hp',     v => v],
@@ -1056,8 +1680,160 @@ function updateStatPreview(before, after) {
   }
 }
 
+function updateLoadoutDisplay() {
+  $('wl-build').textContent  = run.build ? run.build.name : '—';
+  $('wl-weapon').textContent = run.weapon ? run.weapon.name : '—';
+  $('wl-spells').textContent = run.spells.length ? run.spells.map(id => SPELLS_BY_ID[id].name).join(', ') : 'None';
+  if (run.mode === 'story') {
+    $('wl-raid').textContent = `Raid ${run.raid} of ${run.totalRaids}`;
+  } else {
+    $('wl-raid').textContent = 'Infinite mode';
+  }
+}
+
+const banner = document.createElement('div');
+banner.style.cssText = 'position:absolute;bottom:90px;left:50%;transform:translateX(-50%) translateY(20px);background:rgba(7,7,10,0.85);border:1px solid #2a2a32;padding:10px 22px;border-radius:4px;font-size:16px;letter-spacing:0.06em;opacity:0;transition:opacity 0.3s, transform 0.3s;pointer-events:none;z-index:5;text-align:center;min-width:220px;';
+$('wheels-stage').appendChild(banner);
+let bannerTimeout = null;
+function flashBanner(text, kind) {
+  banner.textContent = text;
+  const colors = { good: '#69b070', bad: '#e04848', gold: '#c9a227' };
+  banner.style.color = colors[kind] || '#e9e6df';
+  banner.style.borderColor = colors[kind] || '#2a2a32';
+  banner.style.opacity = '1';
+  banner.style.transform = 'translateX(-50%) translateY(0)';
+  clearTimeout(bannerTimeout);
+  bannerTimeout = setTimeout(() => {
+    banner.style.opacity = '0';
+    banner.style.transform = 'translateX(-50%) translateY(20px)';
+  }, 1400);
+}
+
 /* =====================================================================
- *  DUNGEON SCENE — Vampire-Survivors-lite
+ *  BUILD PICKER
+ * ===================================================================== */
+
+function rollBuilds() {
+  // Pick 3 random distinct builds
+  const pool = [...BUILDS];
+  const picks = [];
+  for (let i = 0; i < 3 && pool.length; i++) {
+    const idx = Math.floor(Math.random() * pool.length);
+    picks.push(pool.splice(idx, 1)[0]);
+  }
+  return picks;
+}
+
+function showBuildPicker() {
+  const builds = rollBuilds();
+  const container = $('build-options');
+  container.innerHTML = '';
+  for (const b of builds) {
+    const card = document.createElement('div');
+    card.className = 'build-card';
+    const w = WEAPONS_BY_ID[b.weapon];
+    const spellList = b.spells.map(id => SPELLS_BY_ID[id].name).join(', ') || 'None';
+    card.innerHTML = `
+      <div class="portrait"><canvas width="100" height="120"></canvas></div>
+      <h3>${b.name}</h3>
+      <div class="stats">
+        <div><span class="name">HP</span><span class="val">${b.baseHp}</span></div>
+        <div><span class="name">SPD</span><span class="val">${b.baseSpd.toFixed(1)}</span></div>
+        <div><span class="name">DEF</span><span class="val">${b.baseDef}</span></div>
+        <div class="weapon-row">${w.icon} ${w.name}</div>
+        <div class="spell-row">✦ ${spellList}</div>
+      </div>
+    `;
+    card.addEventListener('click', () => pickBuild(b));
+    container.appendChild(card);
+    // Draw portrait
+    const cv = card.querySelector('canvas');
+    const cctx = cv.getContext('2d');
+    drawCharacterPortrait(cctx, 50, 60, b.look, settings.accessory);
+  }
+}
+
+function pickBuild(b) {
+  run.build = b;
+  run.weapon = WEAPONS_BY_ID[b.weapon];
+  run.spells = [...b.spells];
+  beginRaid();
+}
+
+$('buildpicker-reroll').addEventListener('click', () => {
+  if (persistent.parts < 1) {
+    flashBanner('Not enough parts', 'bad');
+    return;
+  }
+  persistent.parts -= 1;
+  saveSave();
+  showBuildPicker();
+});
+
+function drawCharacterPortrait(ctx, x, y, look, accessory) {
+  // Mini hooded figure
+  ctx.fillStyle = look.robe;
+  ctx.beginPath();
+  ctx.moveTo(x - 30, y + 60);
+  ctx.bezierCurveTo(x - 42, y + 10, x - 28, y - 32, x, y - 38);
+  ctx.bezierCurveTo(x + 28, y - 32, x + 42, y + 10, x + 30, y + 60);
+  ctx.closePath();
+  ctx.fill();
+  // Hood face void
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.ellipse(x, y - 16, 13, 18, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Eyes
+  ctx.fillStyle = look.accent;
+  ctx.beginPath();
+  ctx.arc(x - 5, y - 16, 2, 0, Math.PI * 2);
+  ctx.arc(x + 5, y - 16, 2, 0, Math.PI * 2);
+  ctx.fill();
+  // Accessory
+  drawAccessory(ctx, x, y - 32, accessory, look.accent);
+}
+
+function drawAccessory(ctx, x, y, kind, accent) {
+  if (kind === 'tophat') {
+    ctx.fillStyle = '#1a1a22';
+    ctx.fillRect(x - 14, y, 28, 4);
+    ctx.fillRect(x - 9, y - 16, 18, 16);
+    ctx.fillStyle = accent;
+    ctx.fillRect(x - 9, y - 4, 18, 2);
+  } else if (kind === 'crown') {
+    ctx.fillStyle = '#c9a227';
+    ctx.beginPath();
+    ctx.moveTo(x - 12, y + 2);
+    ctx.lineTo(x - 12, y - 4);
+    ctx.lineTo(x - 8, y - 8);
+    ctx.lineTo(x - 4, y - 4);
+    ctx.lineTo(x, y - 10);
+    ctx.lineTo(x + 4, y - 4);
+    ctx.lineTo(x + 8, y - 8);
+    ctx.lineTo(x + 12, y - 4);
+    ctx.lineTo(x + 12, y + 2);
+    ctx.closePath();
+    ctx.fill();
+  } else if (kind === 'horns') {
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath();
+    ctx.moveTo(x - 8, y);
+    ctx.quadraticCurveTo(x - 14, y - 8, x - 11, y - 16);
+    ctx.lineTo(x - 6, y - 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x + 8, y);
+    ctx.quadraticCurveTo(x + 14, y - 8, x + 11, y - 16);
+    ctx.lineTo(x + 6, y - 4);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+/* =====================================================================
+ *  DUNGEON SCENE
  * ===================================================================== */
 
 const dungeon = {
@@ -1065,7 +1841,9 @@ const dungeon = {
   enemies: [],
   projectiles: [],
   gems: [],
-  hits: [],         // floating damage numbers
+  hits: [],
+  particles: [],   // blood / impact
+  pet: null,
   lastSpawn: 0,
   spawnInterval: 1100,
   startTime: 0,
@@ -1076,18 +1854,24 @@ const dungeon = {
   xpNext: 8,
   lastShot: 0,
   pulse: 0,
+  wave: 1,
+  waveProgress: 0,    // for infinite mode
+  bossSpawned: false,
+  bossKilled: false,
+  cashThisRun: 0,
 };
 
-function dungeonStart() {
-  dungeon.player = {
-    x: 0, y: 0,
-    hpMax: stats.hp,
-    hp: stats.hp,
-  };
+function dungeonStart(isBossFight = false) {
+  // Hide wave display in story mode (use raid instead)
+  $('d-wavewrap').style.display = run.mode === 'infinite' ? '' : 'none';
+  $('d-wave').style.display = run.mode === 'infinite' ? '' : 'none';
+
+  dungeon.player = { x: 0, y: 0, hpMax: stats.hpMax, hp: stats.hp };
   dungeon.enemies.length = 0;
   dungeon.projectiles.length = 0;
   dungeon.gems.length = 0;
   dungeon.hits.length = 0;
+  dungeon.particles.length = 0;
   dungeon.lastSpawn = 0;
   dungeon.spawnInterval = 1100 / stats.enemySpawnMult;
   dungeon.startTime = performance.now();
@@ -1096,6 +1880,23 @@ function dungeonStart() {
   dungeon.xp = 0;
   dungeon.xpNext = 8;
   dungeon.lastShot = 0;
+  dungeon.wave = 1;
+  dungeon.waveProgress = 0;
+  dungeon.bossSpawned = isBossFight;
+  dungeon.bossKilled = false;
+  dungeon.cashThisRun = 0;
+
+  // Pet
+  if (settings.pet !== 'none') {
+    dungeon.pet = { x: 30, y: -20, kind: settings.pet, t: 0 };
+  } else {
+    dungeon.pet = null;
+  }
+
+  if (isBossFight) {
+    spawnBoss();
+  }
+
   syncHUD();
 }
 
@@ -1103,47 +1904,70 @@ function syncHUD() {
   const p = dungeon.player;
   $('hp-bar-fill').style.width = (Math.max(0, p.hp) / p.hpMax * 100) + '%';
   $('hud-hp').textContent = Math.max(0, Math.ceil(p.hp)) + ' / ' + p.hpMax;
-  $('hud-dmg').textContent = stats.dmg;
+  $('hud-dmg').textContent = Math.round(effectiveDmg());
   $('hud-def').textContent = stats.def;
   $('hud-spd').textContent = stats.spd.toFixed(1);
-  $('hud-atkspd').textContent = stats.atkspd.toFixed(1);
-  $('hud-range').textContent = stats.range;
+  $('hud-atkspd').textContent = effectiveAtkspd().toFixed(1);
+  $('hud-range').textContent = effectiveRange();
   $('hud-crit').textContent = Math.round(stats.crit * 100) + '%';
   $('xp-bar-fill').style.width = (dungeon.xp / dungeon.xpNext * 100) + '%';
   $('d-lvl').textContent = dungeon.level;
   $('d-kills').textContent = dungeon.kills;
+  $('d-wave').textContent = dungeon.wave;
+  $('d-cash').textContent = dungeon.cashThisRun;
+  $('wd-icon').textContent = run.weapon.icon;
+  $('wd-name').textContent = run.weapon.name;
+  $('wd-spells').textContent = run.spells.length ? '✦ ' + run.spells.map(id => SPELLS_BY_ID[id].name).join(' / ') : '';
 }
 
 function spawnEnemy() {
+  const angle = Math.random() * Math.PI * 2;
   const w = dungeonCanvas.clientWidth;
   const h = dungeonCanvas.clientHeight;
-  const margin = Math.max(w, h) * 0.6;
-  // Spawn just outside view in a random direction
-  const angle = Math.random() * Math.PI * 2;
   const dist = Math.max(w, h) * 0.6 + Math.random() * 60;
   const px = dungeon.player.x + Math.cos(angle) * dist;
   const py = dungeon.player.y + Math.sin(angle) * dist;
 
-  // Difficulty ramp by elapsed time
   const t = (performance.now() - dungeon.startTime) / 1000;
-  const tier = Math.random();
-  let baseHp, baseSpd, baseDmg, color, size;
-  if (tier < 0.6) {
-    baseHp = 6 + t * 0.6; baseSpd = 1.2; baseDmg = 5; color = '#9a3a3a'; size = 14;
-  } else if (tier < 0.9) {
-    baseHp = 3 + t * 0.4; baseSpd = 2.0; baseDmg = 4; color = '#a06a3a'; size = 11;
-  } else {
-    baseHp = 25 + t * 1.5; baseSpd = 0.7; baseDmg = 12; color = '#5a2a5a'; size = 20;
-  }
+  // Pick enemy type by tier (later = harder)
+  let availTier = 1;
+  if (t > 30) availTier = 2;
+  if (t > 60) availTier = 3;
+  if (t > 120) availTier = 4;
+  const choices = ENEMY_TYPES.filter(e => e.tier <= availTier);
+  const proto = choices[Math.floor(Math.random() * choices.length)];
 
   dungeon.enemies.push({
     x: px, y: py,
-    hp: baseHp * stats.enemyHpMult,
-    spd: baseSpd * stats.enemySpdMult,
-    dmg: baseDmg + stats.enemyDmgBonus,
-    r: size,
-    color,
+    sprite: proto.sprite,
+    hp: proto.hp * stats.enemyHpMult * (1 + t * 0.04),
+    spd: proto.spd * stats.enemySpdMult,
+    dmg: proto.dmg + stats.enemyDmgBonus,
+    r: proto.size,
+    color: proto.color,
     flash: 0,
+    cash: 1 + Math.floor(proto.tier * 1.5),
+    partChance: 0.05 + proto.tier * 0.02,
+  });
+}
+
+function spawnBoss() {
+  const angle = -Math.PI / 2;
+  const dist = Math.max(dungeonCanvas.clientWidth, dungeonCanvas.clientHeight) * 0.55;
+  dungeon.enemies.push({
+    x: dungeon.player.x + Math.cos(angle) * dist,
+    y: dungeon.player.y + Math.sin(angle) * dist,
+    sprite: 'boss',
+    hp: FINAL_BOSS.hp * stats.enemyHpMult,
+    hpMax: FINAL_BOSS.hp * stats.enemyHpMult,
+    spd: FINAL_BOSS.spd * stats.enemySpdMult,
+    dmg: FINAL_BOSS.dmg + stats.enemyDmgBonus,
+    r: FINAL_BOSS.size,
+    color: FINAL_BOSS.color,
+    flash: 0,
+    cash: 100,
+    partChance: 1,
+    isBoss: true,
   });
 }
 
@@ -1161,16 +1985,29 @@ function findNearestEnemy(maxDist) {
 function fireProjectile(target) {
   const px = dungeon.player.x, py = dungeon.player.y;
   const dx = target.x - px, dy = target.y - py;
-  const d = Math.hypot(dx, dy) || 1;
-  const isCrit = Math.random() < stats.crit;
-  dungeon.projectiles.push({
-    x: px, y: py,
-    vx: (dx / d) * 8,
-    vy: (dy / d) * 8,
-    dmg: stats.dmg * (isCrit ? 2 : 1),
-    crit: isCrit,
-    life: 1.5,    // seconds
-  });
+  const baseAngle = Math.atan2(dy, dx);
+  const w = run.weapon;
+  const projCount = w.projectiles || 1;
+  const spread = w.spread || (projCount > 1 ? 0.3 : 0);
+  for (let i = 0; i < projCount; i++) {
+    const offset = projCount === 1 ? 0 : (i / (projCount - 1) - 0.5) * spread;
+    const angle = baseAngle + offset;
+    const isCrit = Math.random() < stats.crit;
+    const speed = w.type === 'magic' ? 6 : 9;
+    dungeon.projectiles.push({
+      x: px, y: py,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      dmg: effectiveDmg() * (isCrit ? 2 : 1),
+      crit: isCrit,
+      life: w.type === 'melee' ? 0.15 : 1.5,
+      pierce: stats.pierce || 0,
+      hit: new Set(),
+      color: w.color,
+      type: w.type,
+      aoe: stats.aoe || 0,
+    });
+  }
 }
 
 function tickDungeon(dt, now) {
@@ -1189,22 +2026,36 @@ function tickDungeon(dt, now) {
   }
 
   // Auto-attack
-  const shotInterval = 1000 / stats.atkspd;
+  const shotInterval = 1000 / effectiveAtkspd();
   if (now - dungeon.lastShot >= shotInterval) {
-    const target = findNearestEnemy(stats.range);
+    const target = findNearestEnemy(effectiveRange());
     if (target) {
       fireProjectile(target);
       dungeon.lastShot = now;
     }
   }
 
-  // Enemy spawn
-  if (now - dungeon.lastSpawn >= dungeon.spawnInterval) {
-    spawnEnemy();
-    dungeon.lastSpawn = now;
-    // Gradually ramp spawn rate
-    const elapsed = (now - dungeon.startTime) / 1000;
-    dungeon.spawnInterval = Math.max(220, (1100 / stats.enemySpawnMult) * Math.pow(0.985, elapsed));
+  // Spawn enemies (suppressed if boss is alive)
+  const bossAlive = dungeon.enemies.some(e => e.isBoss);
+  if (!bossAlive && !dungeon.bossKilled) {
+    if (now - dungeon.lastSpawn >= dungeon.spawnInterval) {
+      spawnEnemy();
+      dungeon.lastSpawn = now;
+      const elapsed = (now - dungeon.startTime) / 1000;
+      dungeon.spawnInterval = Math.max(220, (1100 / stats.enemySpawnMult) * Math.pow(0.985, elapsed));
+    }
+  }
+
+  // Wave progression (infinite mode)
+  if (run.mode === 'infinite') {
+    dungeon.waveProgress += dt;
+    if (dungeon.waveProgress > 30) {
+      dungeon.waveProgress = 0;
+      dungeon.wave++;
+      stats.enemyHpMult *= 1.1;
+      stats.enemySpdMult *= 1.03;
+      flashBannerDungeon(`Wave ${dungeon.wave}`, '#c9a227');
+    }
   }
 
   // Enemies move toward player
@@ -1214,11 +2065,9 @@ function tickDungeon(dt, now) {
     e.x += (dx / d) * e.spd * dt * 60;
     e.y += (dy / d) * e.spd * dt * 60;
     if (e.flash > 0) e.flash -= dt;
-
-    // Collision with player
     const r = e.r + 12;
     if (dx * dx + dy * dy < r * r) {
-      const taken = Math.max(1, e.dmg - stats.def) * dt;  // damage per second proximity
+      const taken = Math.max(1, e.dmg - stats.def) * dt;
       p.hp -= taken;
     }
   }
@@ -1231,26 +2080,78 @@ function tickDungeon(dt, now) {
     pr.life -= dt;
     if (pr.life <= 0) { dungeon.projectiles.splice(i, 1); continue; }
 
-    // Hit check
     for (let j = 0; j < dungeon.enemies.length; j++) {
       const e = dungeon.enemies[j];
+      if (pr.hit.has(e)) continue;
       const dx = e.x - pr.x, dy = e.y - pr.y;
       if (dx * dx + dy * dy < (e.r + 4) * (e.r + 4)) {
         e.hp -= pr.dmg;
         e.flash = 0.12;
         dungeon.hits.push({ x: e.x, y: e.y - 10, text: Math.round(pr.dmg).toString(), life: 0.6, crit: pr.crit });
-        dungeon.projectiles.splice(i, 1);
-        if (e.hp <= 0) {
-          dungeon.enemies.splice(j, 1);
-          dungeon.kills++;
-          dungeon.gems.push({ x: e.x, y: e.y, value: 1 });
+        // Lifesteal
+        if (stats.lifesteal > 0) {
+          const heal = pr.dmg * stats.lifesteal;
+          p.hp = Math.min(p.hpMax, p.hp + heal);
         }
-        break;
+        // Blood particles
+        if (settings.blood) {
+          for (let k = 0; k < 4; k++) {
+            dungeon.particles.push({
+              x: e.x, y: e.y,
+              vx: (Math.random() - 0.5) * 80,
+              vy: (Math.random() - 0.5) * 80 - 30,
+              life: 0.4, color: '#a02020', size: 2,
+            });
+          }
+        }
+        // AOE
+        if (pr.aoe > 0) {
+          for (const e2 of dungeon.enemies) {
+            if (e2 === e) continue;
+            const ddx = e2.x - e.x, ddy = e2.y - e.y;
+            if (ddx * ddx + ddy * ddy < pr.aoe * pr.aoe) {
+              e2.hp -= pr.dmg * 0.5;
+              e2.flash = 0.12;
+            }
+          }
+          // Visual blast
+          dungeon.particles.push({ x: e.x, y: e.y, vx: 0, vy: 0, life: 0.3, color: '#ff8030', size: pr.aoe, blast: true });
+        }
+        pr.hit.add(e);
+        if (pr.pierce > 0) {
+          pr.pierce--;
+        } else {
+          dungeon.projectiles.splice(i, 1);
+          break;
+        }
       }
     }
   }
 
-  // Gems — pull toward player when within pickup radius
+  // Cull dead enemies
+  for (let i = dungeon.enemies.length - 1; i >= 0; i--) {
+    const e = dungeon.enemies[i];
+    if (e.hp <= 0) {
+      dungeon.kills++;
+      run.killsTotal = (run.killsTotal || 0) + 1;
+      dungeon.gems.push({ x: e.x, y: e.y, value: 1 });
+      // Cash drop
+      const cashAmt = Math.floor(e.cash * (1 + persistent.upgrades.cash * 0.25));
+      dungeon.cashThisRun += cashAmt;
+      // Part drop
+      if (Math.random() < e.partChance) {
+        run.partsEarned++;
+      }
+      if (e.isBoss) {
+        dungeon.bossKilled = true;
+        // Win raid → next phase
+        setTimeout(() => endRaid(true), 800);
+      }
+      dungeon.enemies.splice(i, 1);
+    }
+  }
+
+  // Gems → XP
   for (let i = dungeon.gems.length - 1; i >= 0; i--) {
     const g = dungeon.gems[i];
     const dx = p.x - g.x, dy = p.y - g.y;
@@ -1267,7 +2168,6 @@ function tickDungeon(dt, now) {
         dungeon.xp -= dungeon.xpNext;
         dungeon.level++;
         dungeon.xpNext = Math.round(dungeon.xpNext * 1.4);
-        // Level-up reward
         p.hpMax += 10;
         p.hp = p.hpMax;
         stats.dmg += 2;
@@ -1275,7 +2175,19 @@ function tickDungeon(dt, now) {
     }
   }
 
-  // Floating damage numbers
+  // Particles
+  for (let i = dungeon.particles.length - 1; i >= 0; i--) {
+    const pa = dungeon.particles[i];
+    pa.life -= dt;
+    if (!pa.blast) {
+      pa.x += pa.vx * dt;
+      pa.y += pa.vy * dt;
+      pa.vy += 200 * dt;
+    }
+    if (pa.life <= 0) dungeon.particles.splice(i, 1);
+  }
+
+  // Hits
   for (let i = dungeon.hits.length - 1; i >= 0; i--) {
     const h = dungeon.hits[i];
     h.life -= dt;
@@ -1283,16 +2195,37 @@ function tickDungeon(dt, now) {
     if (h.life <= 0) dungeon.hits.splice(i, 1);
   }
 
-  // HUD
+  // Pet
+  if (dungeon.pet) {
+    dungeon.pet.t += dt;
+    const targetX = p.x - 30 + Math.sin(dungeon.pet.t * 1.5) * 12;
+    const targetY = p.y - 30 + Math.cos(dungeon.pet.t * 1.2) * 8;
+    dungeon.pet.x += (targetX - dungeon.pet.x) * 0.08;
+    dungeon.pet.y += (targetY - dungeon.pet.y) * 0.08;
+  }
+
   $('d-time').textContent = Math.floor((now - dungeon.startTime) / 1000) + 's';
   syncHUD();
 
-  // Death
   if (p.hp <= 0) {
-    endGame();
+    endRaid(false);
   }
 
   dungeon.pulse += dt;
+
+  // For story mode, raid timer ends raid after 60s (or boss fight ends on boss death)
+  if (run.mode === 'story' && !dungeon.bossSpawned) {
+    const elapsed = (now - dungeon.startTime) / 1000;
+    if (elapsed > 60) {
+      // End of regular raid → exit dungeon
+      endRaid(true);
+    }
+  }
+}
+
+function flashBannerDungeon(text, color) {
+  // Simple in-canvas banner via floating text
+  dungeon.hits.push({ x: dungeon.player.x, y: dungeon.player.y - 60, text, life: 1.5, crit: false, big: true, color });
 }
 
 function renderDungeon() {
@@ -1301,11 +2234,9 @@ function renderDungeon() {
   const ctx = dctx;
   const p = dungeon.player;
 
-  // Camera offset puts player at screen center
   const camX = w / 2 - p.x;
   const camY = h / 2 - p.y;
 
-  // Background grid
   ctx.fillStyle = '#060609';
   ctx.fillRect(0, 0, w, h);
 
@@ -1338,38 +2269,64 @@ function renderDungeon() {
   // Enemies
   for (const e of dungeon.enemies) {
     const sx = e.x + camX, sy = e.y + camY;
-    ctx.fillStyle = e.flash > 0 ? '#ffffff' : e.color;
-    ctx.beginPath();
-    ctx.arc(sx, sy, e.r, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = '#000';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    // Eyes for character
-    ctx.fillStyle = '#ffeacc';
-    ctx.beginPath();
-    ctx.arc(sx - e.r * 0.3, sy - e.r * 0.15, 1.8, 0, Math.PI * 2);
-    ctx.arc(sx + e.r * 0.3, sy - e.r * 0.15, 1.8, 0, Math.PI * 2);
-    ctx.fill();
+    drawEnemy(ctx, sx, sy, e);
+  }
+
+  // Particles
+  for (const pa of dungeon.particles) {
+    const sx = pa.x + camX, sy = pa.y + camY;
+    ctx.save();
+    if (pa.blast) {
+      const lifeNorm = Math.max(0, pa.life / 0.3);
+      ctx.globalAlpha = lifeNorm;
+      ctx.fillStyle = pa.color;
+      ctx.beginPath();
+      ctx.arc(sx, sy, pa.size * (1 - lifeNorm * 0.5), 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.globalAlpha = Math.max(0, pa.life / 0.4);
+      ctx.fillStyle = pa.color;
+      ctx.beginPath();
+      ctx.arc(sx, sy, pa.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
   }
 
   // Projectiles
   for (const pr of dungeon.projectiles) {
     const sx = pr.x + camX, sy = pr.y + camY;
     ctx.save();
-    ctx.shadowColor = pr.crit ? '#ff8030' : '#f0c84a';
+    ctx.shadowColor = pr.crit ? '#ff8030' : pr.color;
     ctx.shadowBlur = 10;
-    ctx.fillStyle = pr.crit ? '#ff9050' : '#f0c84a';
-    ctx.beginPath();
-    ctx.arc(sx, sy, pr.crit ? 5 : 4, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillStyle = pr.crit ? '#ff9050' : pr.color;
+    if (pr.type === 'magic') {
+      ctx.beginPath();
+      ctx.arc(sx, sy, pr.crit ? 6 : 5, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (pr.type === 'melee') {
+      // melee projectile is a short slash
+      const ang = Math.atan2(pr.vy, pr.vx);
+      ctx.translate(sx, sy);
+      ctx.rotate(ang);
+      ctx.fillRect(-12, -2, 24, 4);
+    } else {
+      ctx.beginPath();
+      ctx.arc(sx, sy, pr.crit ? 5 : 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
   }
 
-  // Player (hooded mini figure — echoes Death)
+  // Player
   drawPlayer(w / 2, h / 2);
 
-  // Pickup ring (faint)
+  // Pet
+  if (dungeon.pet) {
+    drawPet(ctx, dungeon.pet.x + camX, dungeon.pet.y + camY, dungeon.pet.kind, dungeon.pulse);
+  }
+
+  // Pickup ring
   ctx.save();
   ctx.strokeStyle = 'rgba(105, 176, 112, 0.08)';
   ctx.lineWidth = 1;
@@ -1378,16 +2335,35 @@ function renderDungeon() {
   ctx.stroke();
   ctx.restore();
 
-  // Floating hit numbers
+  // Floating hits
   for (const hN of dungeon.hits) {
     const sx = hN.x + camX, sy = hN.y + camY;
     ctx.save();
     ctx.globalAlpha = Math.min(1, hN.life * 1.6);
-    ctx.fillStyle = hN.crit ? '#ff9050' : '#f0c84a';
-    ctx.font = `bold ${hN.crit ? 16 : 13}px Georgia`;
+    ctx.fillStyle = hN.color || (hN.crit ? '#ff9050' : '#f0c84a');
+    ctx.font = `bold ${hN.big ? 28 : (hN.crit ? 16 : 13)}px Georgia`;
     ctx.textAlign = 'center';
     ctx.fillText(hN.text, sx, sy);
     ctx.restore();
+  }
+
+  // Boss HP bar
+  const boss = dungeon.enemies.find(e => e.isBoss);
+  if (boss) {
+    const barW = w * 0.5;
+    const barX = (w - barW) / 2;
+    const barY = h - 40;
+    ctx.fillStyle = '#1a0a0a';
+    ctx.fillRect(barX, barY, barW, 14);
+    ctx.fillStyle = '#e04848';
+    ctx.fillRect(barX, barY, barW * (boss.hp / boss.hpMax), 14);
+    ctx.strokeStyle = '#0a0a0c';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(barX, barY, barW, 14);
+    ctx.fillStyle = '#e9e6df';
+    ctx.font = 'bold 14px Georgia';
+    ctx.textAlign = 'center';
+    ctx.fillText('DEATH ITSELF', w / 2, barY - 6);
   }
 
   // Vignette
@@ -1400,32 +2376,407 @@ function renderDungeon() {
 
 function drawPlayer(x, y) {
   const ctx = dctx;
+  const look = run.build ? run.build.look : { robe: '#1a1a26', accent: '#f0c84a' };
   // Cloak
-  ctx.fillStyle = '#1a1a26';
+  ctx.fillStyle = look.robe;
   ctx.beginPath();
-  ctx.moveTo(x - 10, y - 14);
-  ctx.bezierCurveTo(x - 16, y - 4, x - 14, y + 12, x - 10, y + 16);
-  ctx.lineTo(x + 10, y + 16);
-  ctx.bezierCurveTo(x + 14, y + 12, x + 16, y - 4, x + 10, y - 14);
-  ctx.bezierCurveTo(x + 8, y - 18, x - 8, y - 18, x - 10, y - 14);
+  ctx.moveTo(x - 11, y - 14);
+  ctx.bezierCurveTo(x - 17, y - 4, x - 15, y + 12, x - 11, y + 16);
+  ctx.lineTo(x + 11, y + 16);
+  ctx.bezierCurveTo(x + 15, y + 12, x + 17, y - 4, x + 11, y - 14);
+  ctx.bezierCurveTo(x + 9, y - 18, x - 9, y - 18, x - 11, y - 14);
   ctx.closePath();
   ctx.fill();
-  // Hood face
+  // Hood face void
   ctx.fillStyle = '#000';
   ctx.beginPath();
   ctx.ellipse(x, y - 9, 6, 7, 0, 0, Math.PI * 2);
   ctx.fill();
-  // Eyes
-  ctx.fillStyle = '#f0c84a';
+  // Eyes (build accent)
+  ctx.fillStyle = look.accent;
   ctx.beginPath();
   ctx.arc(x - 2.4, y - 9, 1.2, 0, Math.PI * 2);
   ctx.arc(x + 2.4, y - 9, 1.2, 0, Math.PI * 2);
   ctx.fill();
+  // Accessory
+  drawAccessory(ctx, x, y - 17, settings.accessory, look.accent);
+}
+
+function drawPet(ctx, x, y, kind, pulse) {
+  ctx.save();
+  if (kind === 'skull') {
+    ctx.fillStyle = '#dcd4ba';
+    ctx.beginPath();
+    ctx.arc(x, y, 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.beginPath();
+    ctx.arc(x - 2, y - 1, 1.2, 0, Math.PI * 2);
+    ctx.arc(x + 2, y - 1, 1.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillRect(x - 2, y + 2, 1, 2);
+    ctx.fillRect(x + 1, y + 2, 1, 2);
+  } else if (kind === 'crow') {
+    ctx.fillStyle = '#1a1a1a';
+    const flap = Math.sin(pulse * 12) * 4;
+    ctx.beginPath();
+    ctx.ellipse(x, y, 6, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // wings
+    ctx.beginPath();
+    ctx.moveTo(x, y - 2);
+    ctx.lineTo(x - 8, y - 2 - flap);
+    ctx.lineTo(x - 4, y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x, y - 2);
+    ctx.lineTo(x + 8, y - 2 - flap);
+    ctx.lineTo(x + 4, y);
+    ctx.closePath();
+    ctx.fill();
+    // beak
+    ctx.fillStyle = '#c9a227';
+    ctx.beginPath();
+    ctx.moveTo(x + 5, y);
+    ctx.lineTo(x + 9, y);
+    ctx.lineTo(x + 5, y + 2);
+    ctx.closePath();
+    ctx.fill();
+  } else if (kind === 'imp') {
+    ctx.fillStyle = '#e04848';
+    ctx.beginPath();
+    ctx.arc(x, y, 7, 0, Math.PI * 2);
+    ctx.fill();
+    // horns
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath();
+    ctx.moveTo(x - 4, y - 5);
+    ctx.lineTo(x - 6, y - 10);
+    ctx.lineTo(x - 2, y - 6);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x + 4, y - 5);
+    ctx.lineTo(x + 6, y - 10);
+    ctx.lineTo(x + 2, y - 6);
+    ctx.closePath();
+    ctx.fill();
+    // eyes
+    ctx.fillStyle = '#ffff80';
+    ctx.beginPath();
+    ctx.arc(x - 2, y - 1, 1, 0, Math.PI * 2);
+    ctx.arc(x + 2, y - 1, 1, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawEnemy(ctx, x, y, e) {
+  ctx.save();
+  const baseColor = e.flash > 0 ? '#ffffff' : e.color;
+  const r = e.r;
+
+  switch (e.sprite) {
+    case 'zombie': {
+      ctx.fillStyle = baseColor;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+      // arms outstretched
+      ctx.strokeStyle = baseColor;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(x - r * 0.8, y);
+      ctx.lineTo(x - r * 1.4, y + r * 0.2);
+      ctx.moveTo(x + r * 0.8, y);
+      ctx.lineTo(x + r * 1.4, y + r * 0.2);
+      ctx.stroke();
+      // dead eyes
+      ctx.fillStyle = '#ffeacc';
+      ctx.beginPath();
+      ctx.arc(x - r * 0.3, y - r * 0.15, 1.5, 0, Math.PI * 2);
+      ctx.arc(x + r * 0.3, y - r * 0.15, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case 'bat': {
+      ctx.fillStyle = baseColor;
+      ctx.beginPath();
+      ctx.ellipse(x, y, r * 0.8, r * 0.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Wings
+      const flap = Math.sin(performance.now() / 100) * r * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - r * 1.4, y - flap);
+      ctx.lineTo(x - r * 0.7, y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + r * 1.4, y - flap);
+      ctx.lineTo(x + r * 0.7, y);
+      ctx.closePath();
+      ctx.fill();
+      // Eyes
+      ctx.fillStyle = '#ff5050';
+      ctx.beginPath();
+      ctx.arc(x - r * 0.3, y - r * 0.1, 1, 0, Math.PI * 2);
+      ctx.arc(x + r * 0.3, y - r * 0.1, 1, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case 'skeleton': {
+      // Skull
+      ctx.fillStyle = baseColor;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+      // eye sockets
+      ctx.fillStyle = '#000';
+      ctx.beginPath();
+      ctx.arc(x - r * 0.35, y - r * 0.15, 2.5, 0, Math.PI * 2);
+      ctx.arc(x + r * 0.35, y - r * 0.15, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      // jaw
+      ctx.fillRect(x - r * 0.3, y + r * 0.4, r * 0.6, 2);
+      break;
+    }
+    case 'ghoul': {
+      ctx.fillStyle = baseColor;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+      // claws
+      ctx.strokeStyle = '#1a1a1a';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x - r, y); ctx.lineTo(x - r * 1.3, y - r * 0.3);
+      ctx.moveTo(x - r, y); ctx.lineTo(x - r * 1.4, y);
+      ctx.moveTo(x - r, y); ctx.lineTo(x - r * 1.3, y + r * 0.3);
+      ctx.moveTo(x + r, y); ctx.lineTo(x + r * 1.3, y - r * 0.3);
+      ctx.moveTo(x + r, y); ctx.lineTo(x + r * 1.4, y);
+      ctx.moveTo(x + r, y); ctx.lineTo(x + r * 1.3, y + r * 0.3);
+      ctx.stroke();
+      // teeth
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(x - 2, y + 4, 1.5, 0, Math.PI * 2);
+      ctx.arc(x + 2, y + 4, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+      // eyes
+      ctx.fillStyle = '#ffff80';
+      ctx.beginPath();
+      ctx.arc(x - r * 0.3, y - r * 0.15, 2, 0, Math.PI * 2);
+      ctx.arc(x + r * 0.3, y - r * 0.15, 2, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case 'wraith': {
+      // Misty form
+      ctx.globalAlpha = 0.7;
+      ctx.fillStyle = baseColor;
+      ctx.beginPath();
+      ctx.moveTo(x, y - r);
+      ctx.bezierCurveTo(x + r * 1.2, y - r * 0.5, x + r, y + r, x, y + r * 1.2);
+      ctx.bezierCurveTo(x - r, y + r, x - r * 1.2, y - r * 0.5, x, y - r);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = 1.0;
+      // glowing eyes
+      ctx.fillStyle = '#80ffff';
+      ctx.shadowColor = '#80ffff';
+      ctx.shadowBlur = 5;
+      ctx.beginPath();
+      ctx.arc(x - r * 0.3, y - r * 0.15, 2, 0, Math.PI * 2);
+      ctx.arc(x + r * 0.3, y - r * 0.15, 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      break;
+    }
+    case 'tank': {
+      // Big armored thing
+      ctx.fillStyle = baseColor;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+      // armor plates
+      ctx.strokeStyle = '#2a2a2a';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(x, y, r * 0.7, 0, Math.PI * 2);
+      ctx.stroke();
+      // spikes
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        const sx = Math.cos(a), sy = Math.sin(a);
+        ctx.beginPath();
+        ctx.moveTo(x + sx * r, y + sy * r);
+        ctx.lineTo(x + sx * r * 1.3, y + sy * r * 1.3);
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      }
+      // angry eye
+      ctx.fillStyle = '#ff3030';
+      ctx.beginPath();
+      ctx.arc(x, y - r * 0.1, 3, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case 'imp': {
+      ctx.fillStyle = baseColor;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+      // pointy ears
+      ctx.beginPath();
+      ctx.moveTo(x - r * 0.7, y - r * 0.5);
+      ctx.lineTo(x - r * 1.1, y - r * 1.0);
+      ctx.lineTo(x - r * 0.4, y - r * 0.7);
+      ctx.closePath();
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(x + r * 0.7, y - r * 0.5);
+      ctx.lineTo(x + r * 1.1, y - r * 1.0);
+      ctx.lineTo(x + r * 0.4, y - r * 0.7);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#ffff80';
+      ctx.beginPath();
+      ctx.arc(x - r * 0.3, y - r * 0.15, 1.5, 0, Math.PI * 2);
+      ctx.arc(x + r * 0.3, y - r * 0.15, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case 'reaper': {
+      // Dark hooded figure
+      ctx.fillStyle = baseColor;
+      ctx.beginPath();
+      ctx.moveTo(x, y - r);
+      ctx.bezierCurveTo(x + r * 1.2, y - r * 0.4, x + r * 1.1, y + r, x, y + r);
+      ctx.bezierCurveTo(x - r * 1.1, y + r, x - r * 1.2, y - r * 0.4, x, y - r);
+      ctx.closePath();
+      ctx.fill();
+      // Glowing red eyes
+      ctx.fillStyle = '#ff3030';
+      ctx.shadowColor = '#ff3030';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(x - r * 0.25, y - r * 0.3, 2.5, 0, Math.PI * 2);
+      ctx.arc(x + r * 0.25, y - r * 0.3, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      break;
+    }
+    case 'boss': {
+      // Final boss - the big Death
+      ctx.save();
+      // Cloak
+      const cloakGrad = ctx.createRadialGradient(x, y, 0, x, y, r * 1.5);
+      cloakGrad.addColorStop(0, '#1a1a26');
+      cloakGrad.addColorStop(1, '#000000');
+      ctx.fillStyle = cloakGrad;
+      ctx.beginPath();
+      ctx.moveTo(x, y - r * 1.2);
+      ctx.bezierCurveTo(x + r * 1.4, y - r * 0.5, x + r * 1.5, y + r * 1.2, x, y + r * 1.4);
+      ctx.bezierCurveTo(x - r * 1.5, y + r * 1.2, x - r * 1.4, y - r * 0.5, x, y - r * 1.2);
+      ctx.closePath();
+      ctx.fill();
+      // Hood opening
+      ctx.fillStyle = '#000';
+      ctx.beginPath();
+      ctx.ellipse(x, y - r * 0.4, r * 0.5, r * 0.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // Glowing eyes
+      ctx.shadowColor = '#ff5050';
+      ctx.shadowBlur = 16;
+      ctx.fillStyle = '#ff8080';
+      ctx.beginPath();
+      ctx.arc(x - r * 0.18, y - r * 0.45, r * 0.07, 0, Math.PI * 2);
+      ctx.arc(x + r * 0.18, y - r * 0.45, r * 0.07, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.restore();
+      // Scythe
+      ctx.strokeStyle = '#a09080';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(x + r * 0.9, y - r * 0.5);
+      ctx.lineTo(x + r * 1.4, y + r * 1.0);
+      ctx.stroke();
+      ctx.strokeStyle = '#dcd4ba';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(x + r * 0.7, y - r * 0.5, r * 0.5, -Math.PI * 0.5, 0);
+      ctx.stroke();
+      break;
+    }
+  }
+  ctx.restore();
 }
 
 /* =====================================================================
- *  GAME OVER
+ *  RAID FLOW
  * ===================================================================== */
+
+function beginRaid() {
+  // Reset wheels for this raid
+  wheels.buff.angle = 0; wheels.buff.spinning = false; wheels.buff.spun = false; wheels.buff.resultIdx = -1;
+  wheels.curse.angle = 0; wheels.curse.spinning = false; wheels.curse.spun = false; wheels.curse.resultIdx = -1;
+  $('spin-buff-btn').disabled = false;
+  $('spin-curse-btn').disabled = false;
+  $('buff-result').textContent = '';  $('buff-result').classList.remove('shown');
+  $('curse-result').textContent = ''; $('curse-result').classList.remove('shown');
+  const ed = $('enter-dungeon-btn');
+  ed.disabled = true; ed.classList.remove('glow');
+  // Build base stats from build + spells + upgrades
+  stats = computeBaseStats(run.build, run.weapon, run.spells);
+  updateStatPreview(null, stats);
+  updateLoadoutDisplay();
+  showScene('wheels');
+}
+
+function enterDungeon() {
+  // Determine if this is a boss fight (story mode raid 3)
+  const isBoss = run.mode === 'story' && run.raid >= run.totalRaids;
+  dungeonStart(isBoss);
+  showScene('dungeon');
+}
+
+function endRaid(survived) {
+  if (scene === 'gameover' || scene === 'win') return;
+  // Tally cash
+  persistent.cash += dungeon.cashThisRun;
+  persistent.parts += run.partsEarned;
+  run.partsEarned = 0;
+  run.cashEarned += dungeon.cashThisRun;
+  saveSave();
+
+  const elapsed = Math.floor((performance.now() - dungeon.startTime) / 1000);
+  if (!survived) {
+    showGameOver(elapsed);
+    return;
+  }
+  // Story mode flow
+  if (run.mode === 'story') {
+    if (dungeon.bossKilled) {
+      showWin(elapsed);
+      return;
+    }
+    // Move to shop, then next raid
+    run.raid++;
+    if (run.raid > run.totalRaids) {
+      // Shouldn't happen here, but safeguard
+      showWin(elapsed);
+      return;
+    }
+    showShop();
+  } else {
+    // Infinite mode never "ends survived" — only on death. So this shouldn't be reached.
+    showGameOver(elapsed);
+  }
+}
 
 const EPITAPHS = [
   'Death always collects.',
@@ -1434,41 +2785,128 @@ const EPITAPHS = [
   'You should have spun differently.',
   'The dungeon swallowed you whole.',
 ];
+const WIN_LINES = [
+  'For a moment. Death never forgets a debt.',
+  "He's amused. That should worry you.",
+  'You bought yourself another day. They cost more each time.',
+];
 
-function endGame() {
-  if (scene === 'gameover') return;
-  $('final-time').textContent = Math.floor((performance.now() - dungeon.startTime) / 1000) + 's';
-  $('final-kills').textContent = dungeon.kills;
+function showGameOver(elapsed) {
+  $('final-time').textContent = elapsed + 's';
+  $('final-kills').textContent = run.killsTotal || dungeon.kills;
   $('final-lvl').textContent = dungeon.level;
+  $('final-cash').textContent = run.cashEarned;
   $('epitaph').textContent = EPITAPHS[Math.floor(Math.random() * EPITAPHS.length)];
   showScene('gameover');
 }
+function showWin(elapsed) {
+  $('win-time').textContent = elapsed + 's';
+  $('win-kills').textContent = run.killsTotal || dungeon.kills;
+  $('win-lvl').textContent = dungeon.level;
+  $('win-cash').textContent = run.cashEarned;
+  $('win-epitaph').textContent = WIN_LINES[Math.floor(Math.random() * WIN_LINES.length)];
+  showScene('win');
+}
 
 /* =====================================================================
- *  TRANSITIONS
+ *  SHOP
+ * ===================================================================== */
+
+function showShop() {
+  $('shop-cash-value').textContent = persistent.cash;
+  const grid = $('shop-grid');
+  grid.innerHTML = '';
+  for (const u of SHOP_UPGRADES) {
+    const lvl = persistent.upgrades[u.id] || 0;
+    const cost = Math.round(u.cost * Math.pow(u.costMult, lvl));
+    const maxed = lvl >= u.max;
+    const card = document.createElement('div');
+    card.className = 'shop-item';
+    card.innerHTML = `
+      <h4>${u.name}</h4>
+      <div class="desc">${u.desc}</div>
+      <div class="row">
+        <span class="level">Lv ${lvl} / ${u.max}</span>
+        <button class="btn small ${maxed ? '' : 'good'}" ${maxed || persistent.cash < cost ? 'disabled' : ''}>$ ${maxed ? 'MAX' : cost}</button>
+      </div>
+    `;
+    if (!maxed && persistent.cash >= cost) {
+      card.querySelector('button').addEventListener('click', () => {
+        persistent.cash -= cost;
+        persistent.upgrades[u.id] = lvl + 1;
+        saveSave();
+        showShop();
+      });
+    }
+    grid.appendChild(card);
+  }
+  showScene('shop');
+}
+
+$('shop-craft-btn').addEventListener('click', showCraft);
+$('shop-continue').addEventListener('click', () => {
+  beginRaid();
+});
+
+/* =====================================================================
+ *  CRAFTING
+ * ===================================================================== */
+
+function showCraft() {
+  $('craft-parts-value').textContent = persistent.parts;
+  const grid = $('craft-grid');
+  grid.innerHTML = '';
+  // Show all weapons; locked ones are buyable with parts
+  const COST_PER_WEAPON = 3;
+  for (const w of WEAPONS) {
+    const owned = persistent.unlockedWeapons.includes(w.id);
+    const card = document.createElement('div');
+    card.className = 'shop-item';
+    card.innerHTML = `
+      <h4>${w.icon} ${w.name}</h4>
+      <div class="desc">${w.type.toUpperCase()} · ${w.dmg} dmg · ${w.atkspd.toFixed(1)} atk/s · ${w.range} range${w.projectiles > 1 ? ` · x${w.projectiles}` : ''}${w.aoe ? ` · AOE` : ''}</div>
+      <div class="row">
+        <span class="level">${owned ? 'Unlocked' : 'Locked'}</span>
+        <button class="btn small ${owned ? '' : 'magic'}" ${owned || persistent.parts < COST_PER_WEAPON ? 'disabled' : ''}>${owned ? 'OWNED' : COST_PER_WEAPON + ' parts'}</button>
+      </div>
+    `;
+    if (!owned && persistent.parts >= COST_PER_WEAPON) {
+      card.querySelector('button').addEventListener('click', () => {
+        persistent.parts -= COST_PER_WEAPON;
+        persistent.unlockedWeapons.push(w.id);
+        saveSave();
+        showCraft();
+      });
+    }
+    grid.appendChild(card);
+  }
+  showScene('craft');
+}
+
+$('craft-back').addEventListener('click', showShop);
+
+/* =====================================================================
+ *  TRANSITIONS / FLOW
  * ===================================================================== */
 
 function startNewRun() {
-  // Reset stats
-  stats = { ...BASE_STATS };
-  // Reset wheels
-  wheels.buff.angle = 0; wheels.buff.spinning = false; wheels.buff.spun = false; wheels.buff.resultIdx = -1;
-  wheels.curse.angle = 0; wheels.curse.spinning = false; wheels.curse.spun = false; wheels.curse.resultIdx = -1;
-  // Reset UI
-  $('spin-buff-btn').disabled = false;
-  $('spin-curse-btn').disabled = false;
-  $('buff-result').textContent = '';  $('buff-result').classList.remove('shown');
-  $('curse-result').textContent = ''; $('curse-result').classList.remove('shown');
-  const ed = $('enter-dungeon-btn');
-  ed.disabled = true; ed.classList.remove('glow');
-  updateStatPreview(null, stats);
-  showScene('wheels');
+  // From title → mode select
+  showScene('modeselect');
 }
 
-function enterDungeon() {
-  dungeonStart();
-  showScene('dungeon');
-}
+document.querySelectorAll('.mode-card').forEach(c => {
+  c.addEventListener('click', () => {
+    run.mode = c.dataset.mode;
+    run.raid = 1;
+    run.totalRaids = 3;
+    run.cashEarned = 0;
+    run.killsTotal = 0;
+    run.partsEarned = 0;
+    showBuildPicker();
+    showScene('buildpicker');
+  });
+});
+$('modeselect-back').addEventListener('click', () => showScene('title'));
 
 /* =====================================================================
  *  MAIN LOOP
@@ -1496,6 +2934,9 @@ function tick(now) {
 
 $('start-btn').addEventListener('click', startNewRun);
 $('retry-btn').addEventListener('click', startNewRun);
+$('title-btn').addEventListener('click', () => showScene('title'));
+$('win-again-btn').addEventListener('click', startNewRun);
+$('win-title-btn').addEventListener('click', () => showScene('title'));
 $('spin-buff-btn').addEventListener('click', () => startSpin('buff'));
 $('spin-curse-btn').addEventListener('click', () => startSpin('curse'));
 $('enter-dungeon-btn').addEventListener('click', enterDungeon);
@@ -1508,12 +2949,18 @@ window.addEventListener('keydown', e => {
       dungeon.keys.add(k);
     }
   }
+  if (k === 'escape') {
+    if ($('settings-modal').classList.contains('active')) closeSettings();
+    else openSettings();
+  }
 });
 window.addEventListener('keyup', e => {
   dungeon.keys.delete(e.key.toLowerCase());
 });
 
 // Boot
+loadSave();
+applySettings();
 resizeCanvas(wheelsCanvas, wctx);
 resizeCanvas(dungeonCanvas, dctx);
 requestAnimationFrame(tick);
