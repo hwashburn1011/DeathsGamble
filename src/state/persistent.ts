@@ -7,12 +7,18 @@ export const defaultPersistent = (): PersistentState => ({
   upgrades: { hp: 0, dmg: 0, spd: 0, def: 0, crit: 0, luck: 0, cash: 0 },
 });
 
+// Honor prefers-reduced-motion if the user has it set system-wide.
+const reducedMotion =
+  typeof window !== 'undefined' &&
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 export const defaultSettings = (): SettingsState => ({
   brightness: 1.0,
   difficulty: 'normal',
   wheelMode: 'wheel',
   blood: true,
-  motionIntensity: 'normal',
+  motionIntensity: reducedMotion ? 'low' : 'normal',
 });
 
 interface SaveBundle {

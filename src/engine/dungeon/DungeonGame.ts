@@ -12,11 +12,19 @@ import {
   Text,
   TextStyle,
 } from 'pixi.js';
-import type { BuildDef, EnemyTypeDef, PlayerStats, WeaponDef } from '../../types';
+import type { BuildDef, EnemyTypeDef, PlayerStats, SettingsState, WeaponDef } from '../../types';
 import { ENEMY_TYPES, FINAL_BOSS } from '../../data/enemies';
 import { PLAYER_SPRITE_BY_BUILD, ENEMY_SPRITE_BY_TYPE } from '../pixi/manifest';
 
 const ROUND_DURATION_S = 60;
+
+/** Multiplier applied to all juice (shake, flash, hit-stop, zoom). */
+const MOTION_MULT: Record<SettingsState['motionIntensity'], number> = {
+  off: 0,
+  low: 0.5,
+  normal: 1.0,
+  high: 1.5,
+};
 
 interface PlayerEntity {
   x: number;
@@ -98,6 +106,7 @@ export interface DungeonGameOptions {
   weapon: WeaponDef;
   stats: PlayerStats;
   isBossRaid: boolean;
+  motionIntensity: SettingsState['motionIntensity'];
   onStatsChange: (s: {
     hp: number;
     hpMax: number;
@@ -197,6 +206,8 @@ export class DungeonGame {
   private deathPlaying = false;    // player death animation in progress
   private deathT = 0;
   private boss: EnemyEntity | null = null;
+  private hitStopT = 0;            // time-scale freeze remaining (real seconds)
+  private motionMult = 1;          // multiplier from settings (0/0.5/1/1.5)
 
   private tickerCb: (() => void) | null = null;
 
@@ -204,6 +215,7 @@ export class DungeonGame {
     this.app = app;
     this.opts = opts;
     this.stats = { ...opts.stats };
+    this.motionMult = MOTION_MULT[opts.motionIntensity] ?? 1;
 
     // Layer order
     this.worldRoot.addChild(this.worldLayer);
@@ -297,14 +309,19 @@ export class DungeonGame {
   }
 
   // ---------- Loop ----------
-  private tick(dt: number): void {
+  private tick(realDt: number): void {
     if (this.gameOver || this.finished) {
-      // After death/finish, only animate screen fx + camera so the
-      // closing flourish reads.
-      if (this.deathPlaying) this.tickDeathAnim(dt);
-      this.updateScreenFx(dt);
-      this.updateCamera(dt);
+      if (this.deathPlaying) this.tickDeathAnim(realDt);
+      this.updateScreenFx(realDt);
+      this.updateCamera(realDt);
       return;
+    }
+
+    // Hit-stop scales the gameplay dt without affecting the camera/fx tick.
+    let dt = realDt;
+    if (this.hitStopT > 0) {
+      this.hitStopT = Math.max(0, this.hitStopT - realDt);
+      dt = realDt * 0.05; // near-freeze
     }
 
     const now = performance.now();
@@ -626,6 +643,7 @@ export class DungeonGame {
           this.player.flashTimer = 0.12;
           this.applyShake(4, 0.25);
           this.applyScreenFlash(0.55);
+          this.applyHitStop(0.05);
           // One popup per second of contact
           if (Math.floor(performance.now() / 600) !== Math.floor((performance.now() - 50) / 600)) {
             this.spawnHit(this.player.x, this.player.y - 18, `-${Math.ceil(wasHp - this.player.hp)}`, 'player-damage');
@@ -660,7 +678,11 @@ export class DungeonGame {
           if (pr.crit) {
             this.applyShake(2.5, 0.18);
             this.applyZoomPulse(1.04, 0.18);
+            this.applyHitStop(0.04);
             this.spawnCritSparks(e.x, e.y);
+          }
+          if (e.isBoss) {
+            this.applyHitStop(0.05);
           }
           if (this.stats.lifesteal > 0) {
             const heal = pr.dmg * this.stats.lifesteal;
@@ -749,18 +771,28 @@ export class DungeonGame {
   }
 
   // ---------- Juice helpers ----------
+  // All scaled by motionMult — set to 0 in settings to disable entirely.
   private applyShake(magnitude: number, duration: number): void {
-    // Take the larger of current vs new — shakes don't dampen each other
-    if (magnitude > this.shakeMag) this.shakeMag = magnitude;
+    const m = magnitude * this.motionMult;
+    if (m > this.shakeMag) this.shakeMag = m;
     if (duration > this.shakeT) this.shakeT = duration;
   }
 
   private applyZoomPulse(scale: number, _duration: number): void {
-    if (scale > this.zoomTarget) this.zoomTarget = scale;
+    // Soften zoom proportionally — at motionMult 0, zoom is disabled
+    const eased = 1 + (scale - 1) * this.motionMult;
+    if (eased > this.zoomTarget) this.zoomTarget = eased;
   }
 
   private applyScreenFlash(intensity: number): void {
-    if (intensity > this.screenFlashAlpha) this.screenFlashAlpha = intensity;
+    const i = intensity * this.motionMult;
+    if (i > this.screenFlashAlpha) this.screenFlashAlpha = i;
+  }
+
+  /** Brief time-scale freeze on big hits (~30-100ms). */
+  private applyHitStop(durationS: number): void {
+    const d = durationS * this.motionMult;
+    if (d > this.hitStopT) this.hitStopT = d;
   }
 
   private onLevelUp(): void {

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Application } from 'pixi.js';
 import { GlassPanel } from '../ui/GlassPanel';
 import { useGameStore } from '../state/gameStore';
+import { useSettingsStore } from '../state/settingsStore';
 import { DungeonGame } from '../engine/dungeon/DungeonGame';
 import './dungeon.css';
 
@@ -29,6 +30,7 @@ export function DungeonScene() {
   const isBossRaidFn = useGameStore((s) => s.isBossRaid);
   const nextRound = useGameStore((s) => s.nextRound);
   const triggerWin = useGameStore((s) => s.triggerWin);
+  const motionIntensity = useSettingsStore((s) => s.motionIntensity);
   const isBossRaid = isBossRaidFn();
 
   const [hud, setHud] = useState<HudStats>({
@@ -76,6 +78,7 @@ export function DungeonScene() {
           weapon: run.weapon!,
           stats: stats!,
           isBossRaid,
+          motionIntensity,
           onStatsChange: (s) => {
             if (cancelled) return;
             setHud(s);
@@ -122,7 +125,7 @@ export function DungeonScene() {
       }
       while (container.firstChild) container.removeChild(container.firstChild);
     };
-  }, [run.build, run.weapon, run.raid, run.endlessRound, stats, isBossRaid, addCashEarned, addKills, showScene, nextRound, triggerWin]);
+  }, [run.build, run.weapon, run.raid, run.endlessRound, stats, isBossRaid, motionIntensity, addCashEarned, addKills, showScene, nextRound, triggerWin]);
 
   const hpPct = Math.max(0, hud.hp / hud.hpMax) * 100;
   const xpPct = (hud.xp / hud.xpNext) * 100;

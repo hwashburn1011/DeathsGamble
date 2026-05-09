@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { GlassPanel } from './GlassPanel';
 import { GlassButton } from './GlassButton';
 import { useSettingsStore } from '../state/settingsStore';
-import type { Difficulty, WheelMode } from '../types';
+import type { Difficulty, SettingsState, WheelMode } from '../types';
 import './settings-modal.css';
 
 interface Props {
@@ -74,6 +74,20 @@ export function SettingsModal({ onClose }: Props) {
           <div className="settings-row">
             <span className="settings-label">Blood / Gore</span>
             <Toggle on={settings.blood} onClick={() => settings.set('blood', !settings.blood)} />
+          </div>
+
+          <div className="settings-row">
+            <span className="settings-label">Motion</span>
+            <Segmented<SettingsState['motionIntensity']>
+              value={settings.motionIntensity}
+              options={[
+                { value: 'off', label: 'Off' },
+                { value: 'low', label: 'Low' },
+                { value: 'normal', label: 'Normal' },
+                { value: 'high', label: 'High' },
+              ]}
+              onChange={(v) => settings.set('motionIntensity', v)}
+            />
           </div>
 
           <div className="settings-actions">
