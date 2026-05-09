@@ -674,6 +674,7 @@
           <div class="row"><span class="name">ATK SPD</span> <span class="val neutral" id="prev-atkspd">1.0</span></div>
           <div class="row"><span class="name">RANGE</span>   <span class="val neutral" id="prev-range">240</span></div>
           <div class="row"><span class="name">CRIT</span>    <span class="val neutral" id="prev-crit">5%</span></div>
+          <div class="row"><span class="name">LUCK</span>    <span class="val neutral" id="prev-luck">0.0</span></div>
         </div>
 
         <div id="wheels-loadout">
@@ -708,7 +709,7 @@
       <span>TIME</span><span class="v" id="d-time">0</span>
       <span style="margin-left:18px">KILLS</span><span class="v" id="d-kills">0</span>
       <span style="margin-left:18px">LVL</span><span class="v" id="d-lvl">1</span>
-      <span style="margin-left:18px" id="d-wavewrap">WAVE</span><span class="v" id="d-wave">1</span>
+      <span style="margin-left:18px" id="d-roundlbl">ROUND</span><span class="v" id="d-round">1</span>
       <span style="margin-left:18px">$</span><span class="v" id="d-cash">0</span>
     </div>
     <div id="dungeon-hud">
@@ -721,6 +722,7 @@
       <div class="row"><span class="name">ATK SPD</span> <span id="hud-atkspd">1.0</span></div>
       <div class="row"><span class="name">RANGE</span>   <span id="hud-range">240</span></div>
       <div class="row"><span class="name">CRIT</span>    <span id="hud-crit">5%</span></div>
+      <div class="row"><span class="name">LUCK</span>    <span id="hud-luck">0.0</span></div>
       <div id="xp-bar"><div id="xp-bar-fill" style="width:0%"></div></div>
     </div>
     <div id="weapon-display">
@@ -888,21 +890,21 @@ const SPELLS = [
 const SPELLS_BY_ID = Object.fromEntries(SPELLS.map(s => [s.id, s]));
 
 const BUILDS = [
-  { id:'gambler',  name:'The Gambler',  weapon:'pistol', spells:['overkill'],  baseHp:90,  baseSpd:3.2, baseDef:0,
-    look:{ robe:'#3a2a10', accent:'#c9a227' }, desc:'Risk-taker. High roll, high stakes.' },
-  { id:'duelist',  name:'The Duelist',  weapon:'sword',  spells:['crit'],      baseHp:110, baseSpd:3.5, baseDef:1,
+  { id:'gambler',  name:'The Gambler',  weapon:'pistol', spells:['overkill'],  baseHp:90,  baseSpd:3.2, baseDef:0, baseLuck:1.5,
+    look:{ robe:'#3a2a10', accent:'#c9a227' }, desc:'Fortune favors the bold. Stupid favors the dead.' },
+  { id:'duelist',  name:'The Duelist',  weapon:'sword',  spells:['crit'],      baseHp:110, baseSpd:3.5, baseDef:1, baseLuck:0.2,
     look:{ robe:'#4a1818', accent:'#e04848' }, desc:'Honor. Steel. A blade for every breath.' },
-  { id:'brute',    name:'The Brute',    weapon:'club',   spells:['tank'],      baseHp:180, baseSpd:2.5, baseDef:4,
+  { id:'brute',    name:'The Brute',    weapon:'club',   spells:['tank'],      baseHp:180, baseSpd:2.5, baseDef:4, baseLuck:0,
     look:{ robe:'#3a3030', accent:'#a08080' }, desc:'Unmoving. Unkillable. Slow.' },
-  { id:'arcanist', name:'The Arcanist', weapon:'staff',  spells:['pierce'],    baseHp:75,  baseSpd:3.0, baseDef:0,
+  { id:'arcanist', name:'The Arcanist', weapon:'staff',  spells:['pierce'],    baseHp:75,  baseSpd:3.0, baseDef:0, baseLuck:0.4,
     look:{ robe:'#1a2a4a', accent:'#5a8af0' }, desc:'Knowledge bends physics. Bones less so.' },
-  { id:'rogue',    name:'The Rogue',    weapon:'knives', spells:['lifesteal'], baseHp:85,  baseSpd:4.0, baseDef:0,
+  { id:'rogue',    name:'The Rogue',    weapon:'knives', spells:['lifesteal'], baseHp:85,  baseSpd:4.0, baseDef:0, baseLuck:0.6,
     look:{ robe:'#1a1a1a', accent:'#909090' }, desc:'Fast. Quiet. Never on the books.' },
-  { id:'huntsman', name:'The Huntsman', weapon:'bow',    spells:['reach'],     baseHp:100, baseSpd:3.3, baseDef:1,
+  { id:'huntsman', name:'The Huntsman', weapon:'bow',    spells:['reach'],     baseHp:100, baseSpd:3.3, baseDef:1, baseLuck:0.3,
     look:{ robe:'#3a4030', accent:'#a0c080' }, desc:'A patient eye. A long arm.' },
-  { id:'witch',    name:'The Witch',    weapon:'wand',   spells:['haste'],     baseHp:80,  baseSpd:3.5, baseDef:0,
+  { id:'witch',    name:'The Witch',    weapon:'wand',   spells:['haste'],     baseHp:80,  baseSpd:3.5, baseDef:0, baseLuck:0.4,
     look:{ robe:'#2a1030', accent:'#c060ff' }, desc:'Fingers crackle with the unkind kind of magic.' },
-  { id:'soldier',  name:'The Soldier',  weapon:'rifle',  spells:[],            baseHp:120, baseSpd:3.0, baseDef:2,
+  { id:'soldier',  name:'The Soldier',  weapon:'rifle',  spells:[],            baseHp:120, baseSpd:3.0, baseDef:2, baseLuck:0,
     look:{ robe:'#2a3a2a', accent:'#a0b0a0' }, desc:'Trained. Equipped. Tired.' },
 ];
 
@@ -925,46 +927,50 @@ const SHOP_UPGRADES = [
   { id:'spd',  name:'Swiftness', desc:'+0.4 Speed',                cost:60, costMult:1.6, max:5 },
   { id:'def',  name:'Hardiness', desc:'+2 Defense',                cost:70, costMult:1.7, max:5 },
   { id:'crit', name:'Fortune',   desc:'+5% Crit chance',           cost:80, costMult:1.8, max:5 },
+  { id:'luck', name:"Charm",     desc:'+0.2 Luck (better wheel rolls)', cost:100, costMult:1.9, max:5 },
   { id:'cash', name:'Greed',     desc:'+25% cash from raids',      cost:120,costMult:2.0, max:5 },
 ];
 const SHOP_BY_ID = Object.fromEntries(SHOP_UPGRADES.map(u => [u.id, u]));
 
+// `apply(stats, mult)` — `mult` scales the magnitude (used for endless escalation
+// and difficulty curse-mult). luckScore: higher = player-favorable (used by Luck stat
+// to bias spin RNG — bigger boons / milder curses).
 const BUFF_SEGMENTS = [
-  { label:'+25 HP',      color:'#4d8a52', apply: s => { s.hp += 25; s.hpMax += 25; } },
-  { label:'+5 DMG',      color:'#69b070', apply: s => { s.dmg += 5; } },
-  { label:'+3 DEF',      color:'#4d8a52', apply: s => { s.def += 3; } },
-  { label:'+1 SPD',      color:'#69b070', apply: s => { s.spd += 1; } },
-  { label:'+0.3 ATKSPD', color:'#4d8a52', apply: s => { s.atkspd += 0.3; } },
-  { label:'+50 RANGE',   color:'#69b070', apply: s => { s.range += 50; } },
-  { label:'+15% CRIT',   color:'#4d8a52', apply: s => { s.crit = Math.min(1, s.crit + 0.15); } },
-  { label:'+30 PICKUP',  color:'#69b070', apply: s => { s.pickup += 30; } },
-  { label:'+25 HP',      color:'#4d8a52', apply: s => { s.hp += 25; s.hpMax += 25; } },
-  { label:'+5 DMG',      color:'#69b070', apply: s => { s.dmg += 5; } },
-  { label:'+1 SPD',      color:'#4d8a52', apply: s => { s.spd += 1; } },
-  { label:'JACKPOT',     color:'#e6c34a', apply: s => { s.dmg += 10; s.hp += 25; s.hpMax += 25; s.atkspd += 0.3; } },
+  { label:'+25 HP',      luckScore: 8,  color:'#4d8a52', apply: (s,m=1) => { s.hp += 25*m; s.hpMax += 25*m; } },
+  { label:'+5 DMG',      luckScore: 7,  color:'#69b070', apply: (s,m=1) => { s.dmg += 5*m; } },
+  { label:'+3 DEF',      luckScore: 5,  color:'#4d8a52', apply: (s,m=1) => { s.def += 3*m; } },
+  { label:'+1 SPD',      luckScore: 6,  color:'#69b070', apply: (s,m=1) => { s.spd += 1*m; } },
+  { label:'+0.3 ATKSPD', luckScore: 7,  color:'#4d8a52', apply: (s,m=1) => { s.atkspd += 0.3*m; } },
+  { label:'+50 RANGE',   luckScore: 6,  color:'#69b070', apply: (s,m=1) => { s.range += 50*m; } },
+  { label:'+15% CRIT',   luckScore: 7,  color:'#4d8a52', apply: (s,m=1) => { s.crit = Math.min(1, s.crit + 0.15*m); } },
+  { label:'+30 PICKUP',  luckScore: 4,  color:'#69b070', apply: (s,m=1) => { s.pickup += 30*m; } },
+  { label:'+25 HP',      luckScore: 8,  color:'#4d8a52', apply: (s,m=1) => { s.hp += 25*m; s.hpMax += 25*m; } },
+  { label:'+5 DMG',      luckScore: 7,  color:'#69b070', apply: (s,m=1) => { s.dmg += 5*m; } },
+  { label:'+1 SPD',      luckScore: 6,  color:'#4d8a52', apply: (s,m=1) => { s.spd += 1*m; } },
+  { label:'JACKPOT',     luckScore: 12, color:'#e6c34a', apply: (s,m=1) => { s.dmg += 10*m; s.hp += 25*m; s.hpMax += 25*m; s.atkspd += 0.3*m; } },
 ];
 const CURSE_SEGMENTS = [
-  { label:'-15 HP',         color:'#7a3030', apply: s => { s.hp = Math.max(20, s.hp - 15); s.hpMax = Math.max(20, s.hpMax - 15); } },
-  { label:'-3 DMG',         color:'#9a3030', apply: s => { s.dmg = Math.max(1, s.dmg - 3); } },
-  { label:'-1 SPD',         color:'#7a3030', apply: s => { s.spd = Math.max(1, s.spd - 1); } },
-  { label:'-0.2 ATKSPD',    color:'#9a3030', apply: s => { s.atkspd = Math.max(0.3, s.atkspd - 0.2); } },
-  { label:'ENEMY +20% HP',  color:'#7a3030', apply: s => { s.enemyHpMult *= 1.2; } },
-  { label:'ENEMY +25% SPD', color:'#9a3030', apply: s => { s.enemySpdMult *= 1.25; } },
-  { label:'+30% SPAWNS',    color:'#7a3030', apply: s => { s.enemySpawnMult *= 1.3; } },
-  { label:'-40 RANGE',      color:'#9a3030', apply: s => { s.range = Math.max(80, s.range - 40); } },
-  { label:'-3 DEF',         color:'#7a3030', apply: s => { s.def -= 3; } },
-  { label:'+2 ENEMY DMG',   color:'#9a3030', apply: s => { s.enemyDmgBonus += 2; } },
-  { label:'-10% CRIT',      color:'#7a3030', apply: s => { s.crit = Math.max(0, s.crit - 0.10); } },
-  { label:'CURSE',          color:'#1a0a0a', apply: s => { s.enemyHpMult *= 1.3; s.enemySpawnMult *= 1.2; s.hp = Math.max(20, s.hp - 10); } },
+  { label:'-15 HP',         luckScore: 4, color:'#7a3030', apply: (s,m=1) => { s.hp = Math.max(20, s.hp - 15*m); s.hpMax = Math.max(20, s.hpMax - 15*m); } },
+  { label:'-3 DMG',         luckScore: 5, color:'#9a3030', apply: (s,m=1) => { s.dmg = Math.max(1, s.dmg - 3*m); } },
+  { label:'-1 SPD',         luckScore: 5, color:'#7a3030', apply: (s,m=1) => { s.spd = Math.max(1, s.spd - 1*m); } },
+  { label:'-0.2 ATKSPD',    luckScore: 5, color:'#9a3030', apply: (s,m=1) => { s.atkspd = Math.max(0.3, s.atkspd - 0.2*m); } },
+  { label:'ENEMY +20% HP',  luckScore: 5, color:'#7a3030', apply: (s,m=1) => { s.enemyHpMult *= (1 + 0.2*m); } },
+  { label:'ENEMY +25% SPD', luckScore: 4, color:'#9a3030', apply: (s,m=1) => { s.enemySpdMult *= (1 + 0.25*m); } },
+  { label:'+30% SPAWNS',    luckScore: 4, color:'#7a3030', apply: (s,m=1) => { s.enemySpawnMult *= (1 + 0.3*m); } },
+  { label:'-40 RANGE',      luckScore: 5, color:'#9a3030', apply: (s,m=1) => { s.range = Math.max(80, s.range - 40*m); } },
+  { label:'-3 DEF',         luckScore: 5, color:'#7a3030', apply: (s,m=1) => { s.def -= 3*m; } },
+  { label:'+2 ENEMY DMG',   luckScore: 4, color:'#9a3030', apply: (s,m=1) => { s.enemyDmgBonus += 2*m; } },
+  { label:'-10% CRIT',      luckScore: 6, color:'#7a3030', apply: (s,m=1) => { s.crit = Math.max(0, s.crit - 0.10*m); } },
+  { label:'CURSE',          luckScore: 1, color:'#1a0a0a', apply: (s,m=1) => { s.enemyHpMult *= (1 + 0.3*m); s.enemySpawnMult *= (1 + 0.2*m); s.hp = Math.max(20, s.hp - 10*m); } },
 ];
 const SEG_COUNT = 12;
 const SEG_ANGLE = (Math.PI * 2) / SEG_COUNT;
 
 // Difficulty multipliers
 const DIFFICULTY = {
-  easy:   { curseMult: 0.5, enemyHpMult: 0.7, enemySpdMult: 0.9, enemySpawnMult: 0.7, enemyDmgMult: 0.7, cashMult: 1.5 },
-  normal: { curseMult: 1.0, enemyHpMult: 1.0, enemySpdMult: 1.0, enemySpawnMult: 1.0, enemyDmgMult: 1.0, cashMult: 1.0 },
-  hard:   { curseMult: 1.4, enemyHpMult: 1.4, enemySpdMult: 1.15, enemySpawnMult: 1.4, enemyDmgMult: 1.3, cashMult: 0.7 },
+  easy:   { storyRaids: 2, curseMult: 0.5, enemyHpMult: 0.7, enemySpdMult: 0.9, enemySpawnMult: 0.7, enemyDmgMult: 0.7, cashMult: 1.5 },
+  normal: { storyRaids: 3, curseMult: 1.0, enemyHpMult: 1.0, enemySpdMult: 1.0, enemySpawnMult: 1.0, enemyDmgMult: 1.0, cashMult: 1.0 },
+  hard:   { storyRaids: 5, curseMult: 1.4, enemyHpMult: 1.4, enemySpdMult: 1.15, enemySpawnMult: 1.4, enemyDmgMult: 1.3, cashMult: 0.7 },
 };
 
 // ============== Persistent state (localStorage) ==============
@@ -972,7 +978,7 @@ const SAVE_KEY = 'deathsgamble_save_v3';
 const persistent = {
   cash: 0,
   parts: 0,
-  upgrades: { hp:0, dmg:0, spd:0, def:0, crit:0, cash:0 },
+  upgrades: { hp:0, dmg:0, spd:0, def:0, crit:0, luck:0, cash:0 },
   unlockedWeapons: ['fists', 'pistol', 'club'],  // start with a few
 };
 const settings = {
@@ -1007,7 +1013,7 @@ function resetSave() {
   localStorage.removeItem(SAVE_KEY);
   persistent.cash = 0;
   persistent.parts = 0;
-  persistent.upgrades = { hp:0, dmg:0, spd:0, def:0, crit:0, cash:0 };
+  persistent.upgrades = { hp:0, dmg:0, spd:0, def:0, crit:0, luck:0, cash:0 };
   persistent.unlockedWeapons = ['fists', 'pistol', 'club'];
 }
 
@@ -1016,6 +1022,7 @@ const run = {
   mode: 'story',     // 'story' | 'infinite'
   raid: 1,
   totalRaids: 3,
+  endlessRound: 0,   // number of endless rounds completed (0 = first round about to start)
   build: null,       // chosen build
   weapon: null,      // current weapon
   spells: [],        // active spells on weapon
@@ -1038,6 +1045,7 @@ function computeBaseStats(build, weapon, spells) {
     atkspd: weapon.atkspd,         // base from weapon
     range:  weapon.range,
     crit: 0.05 + u.crit * 0.05,
+    luck: (build.baseLuck || 0) + (u.luck || 0) * 0.2,
     pickup: 60,
     enemyHpMult: 1.0,
     enemySpdMult: 1.0,
@@ -1597,11 +1605,36 @@ function positionWheelButtons(g) {
 
 function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
 
+// Luck-biased weighted segment selection.
+// luck = 0 → uniform random; higher luck → bias toward segments with high luckScore.
+// Each segment's weight = 1 + luck * (luckScore / maxScore).
+function pickSegmentWithLuck(segments, luck) {
+  const scores = segments.map(s => s.luckScore || 5);
+  const maxScore = Math.max(...scores);
+  const weights = scores.map(s => 1 + luck * (s / maxScore));
+  const total = weights.reduce((a, b) => a + b, 0);
+  let r = Math.random() * total;
+  for (let i = 0; i < segments.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return i;
+  }
+  return segments.length - 1;
+}
+
+// Magnitude multiplier applied at spin-resolve time.
+// Endless mode: segments grow 10% per completed round (compound).
+function spinMagnitude(side) {
+  const roundMult = (run.mode === 'infinite') ? Math.pow(1.1, run.endlessRound) : 1.0;
+  const diffMult  = (side === 'curse') ? DIFFICULTY[settings.difficulty].curseMult : 1.0;
+  return roundMult * diffMult;
+}
+
 function startSpin(side) {
   const w = wheels[side];
   if (w.spinning || w.spun) return;
   w.spinning = true;
-  const targetSeg = Math.floor(Math.random() * SEG_COUNT);
+  const segs = side === 'buff' ? BUFF_SEGMENTS : CURSE_SEGMENTS;
+  const targetSeg = pickSegmentWithLuck(segs, stats ? stats.luck || 0 : 0);
   const baseTarget = -Math.PI / 2 - targetSeg * SEG_ANGLE;
   const fullRotations = 5 + Math.floor(Math.random() * 3);
   const jitter = (Math.random() - 0.5) * SEG_ANGLE * 0.6;
@@ -1637,19 +1670,13 @@ function onSpinComplete(side) {
   const segments = side === 'buff' ? BUFF_SEGMENTS : CURSE_SEGMENTS;
   const seg = segments[w.resultIdx];
   const before = { ...stats };
-  // Curse magnitude scaled by difficulty (only on curse wheel)
-  if (side === 'curse') {
-    const mult = DIFFICULTY[settings.difficulty].curseMult;
-    // Apply with magnitude reduction by skipping with probability (1-mult)
-    if (Math.random() < mult) seg.apply(stats);
-    else flashBanner('Curse weakened', 'good');
-  } else {
-    seg.apply(stats);
-  }
+  const m = spinMagnitude(side);
+  seg.apply(stats, m);
   updateStatPreview(before, stats);
 
   const resultEl = $(side === 'buff' ? 'buff-result' : 'curse-result');
-  resultEl.textContent = seg.label;
+  // Show magnitude indicator if scaled
+  resultEl.textContent = m !== 1.0 ? `${seg.label}  ×${m.toFixed(1)}` : seg.label;
   resultEl.classList.add('shown');
 
   if (wheels.buff.spun && wheels.curse.spun) {
@@ -1661,13 +1688,14 @@ function onSpinComplete(side) {
 
 function updateStatPreview(before, after) {
   const map = [
-    ['hp',     'prev-hp',     v => v],
-    ['dmg',    'prev-dmg',    v => v],
+    ['hp',     'prev-hp',     v => Math.round(v)],
+    ['dmg',    'prev-dmg',    v => Math.round(v)],
     ['def',    'prev-def',    v => v],
     ['spd',    'prev-spd',    v => v.toFixed(1)],
     ['atkspd', 'prev-atkspd', v => v.toFixed(1)],
-    ['range',  'prev-range',  v => v],
+    ['range',  'prev-range',  v => Math.round(v)],
     ['crit',   'prev-crit',   v => Math.round(v * 100) + '%'],
+    ['luck',   'prev-luck',   v => (v || 0).toFixed(1)],
   ];
   for (const [key, id, fmt] of map) {
     const el = $(id);
@@ -1685,9 +1713,14 @@ function updateLoadoutDisplay() {
   $('wl-weapon').textContent = run.weapon ? run.weapon.name : '—';
   $('wl-spells').textContent = run.spells.length ? run.spells.map(id => SPELLS_BY_ID[id].name).join(', ') : 'None';
   if (run.mode === 'story') {
-    $('wl-raid').textContent = `Raid ${run.raid} of ${run.totalRaids}`;
+    const isBoss = run.raid >= run.totalRaids;
+    $('wl-raid').textContent = isBoss
+      ? `Final Boss (Raid ${run.raid}/${run.totalRaids})`
+      : `Raid ${run.raid} of ${run.totalRaids}`;
   } else {
-    $('wl-raid').textContent = 'Infinite mode';
+    const round = (run.endlessRound || 0) + 1;
+    const mult = Math.pow(1.1, run.endlessRound || 0);
+    $('wl-raid').textContent = `Endless · Round ${round} · ×${mult.toFixed(2)}`;
   }
 }
 
@@ -1733,6 +1766,9 @@ function showBuildPicker() {
     card.className = 'build-card';
     const w = WEAPONS_BY_ID[b.weapon];
     const spellList = b.spells.map(id => SPELLS_BY_ID[id].name).join(', ') || 'None';
+    const luckHtml = (b.baseLuck && b.baseLuck > 0)
+      ? `<div><span class="name">LUCK</span><span class="val" style="color:#c9a227">${b.baseLuck.toFixed(1)}</span></div>`
+      : '';
     card.innerHTML = `
       <div class="portrait"><canvas width="100" height="120"></canvas></div>
       <h3>${b.name}</h3>
@@ -1740,6 +1776,7 @@ function showBuildPicker() {
         <div><span class="name">HP</span><span class="val">${b.baseHp}</span></div>
         <div><span class="name">SPD</span><span class="val">${b.baseSpd.toFixed(1)}</span></div>
         <div><span class="name">DEF</span><span class="val">${b.baseDef}</span></div>
+        ${luckHtml}
         <div class="weapon-row">${w.icon} ${w.name}</div>
         <div class="spell-row">✦ ${spellList}</div>
       </div>
@@ -1862,9 +1899,8 @@ const dungeon = {
 };
 
 function dungeonStart(isBossFight = false) {
-  // Hide wave display in story mode (use raid instead)
-  $('d-wavewrap').style.display = run.mode === 'infinite' ? '' : 'none';
-  $('d-wave').style.display = run.mode === 'infinite' ? '' : 'none';
+  // Round/Raid label flips between modes
+  $('d-roundlbl').textContent = run.mode === 'infinite' ? 'ROUND' : 'RAID';
 
   dungeon.player = { x: 0, y: 0, hpMax: stats.hpMax, hp: stats.hp };
   dungeon.enemies.length = 0;
@@ -1910,10 +1946,13 @@ function syncHUD() {
   $('hud-atkspd').textContent = effectiveAtkspd().toFixed(1);
   $('hud-range').textContent = effectiveRange();
   $('hud-crit').textContent = Math.round(stats.crit * 100) + '%';
+  $('hud-luck').textContent = (stats.luck || 0).toFixed(1);
   $('xp-bar-fill').style.width = (dungeon.xp / dungeon.xpNext * 100) + '%';
   $('d-lvl').textContent = dungeon.level;
   $('d-kills').textContent = dungeon.kills;
-  $('d-wave').textContent = dungeon.wave;
+  $('d-round').textContent = run.mode === 'infinite'
+    ? ((run.endlessRound || 0) + 1)
+    : (run.raid + ' / ' + run.totalRaids);
   $('d-cash').textContent = dungeon.cashThisRun;
   $('wd-icon').textContent = run.weapon.icon;
   $('wd-name').textContent = run.weapon.name;
@@ -1929,18 +1968,27 @@ function spawnEnemy() {
   const py = dungeon.player.y + Math.sin(angle) * dist;
 
   const t = (performance.now() - dungeon.startTime) / 1000;
-  // Pick enemy type by tier (later = harder)
+  // Tighter tier ramp inside a 60s round so it visibly escalates.
+  // Endless rounds also unlock higher tiers earlier as the run goes on.
+  const endlessBonus = Math.min(2, (run.endlessRound || 0) * 0.5);  // up to +2 tiers in late endless
   let availTier = 1;
-  if (t > 30) availTier = 2;
-  if (t > 60) availTier = 3;
-  if (t > 120) availTier = 4;
+  if (t > 15) availTier = 2;
+  if (t > 35) availTier = 3;
+  if (t > 50) availTier = 4;
+  availTier = Math.min(4, availTier + Math.floor(endlessBonus));
   const choices = ENEMY_TYPES.filter(e => e.tier <= availTier);
-  const proto = choices[Math.floor(Math.random() * choices.length)];
+  // Bias picks toward the higher tiers as the round progresses
+  const lateBias = Math.min(1, t / 45);
+  const weighted = choices.map(c => ({ c, w: 1 + (c.tier - 1) * lateBias * 1.5 }));
+  const totalW = weighted.reduce((a, x) => a + x.w, 0);
+  let r = Math.random() * totalW;
+  let proto = choices[0];
+  for (const x of weighted) { r -= x.w; if (r <= 0) { proto = x.c; break; } }
 
   dungeon.enemies.push({
     x: px, y: py,
     sprite: proto.sprite,
-    hp: proto.hp * stats.enemyHpMult * (1 + t * 0.04),
+    hp: proto.hp * stats.enemyHpMult * (1 + t * 0.05 + (run.endlessRound || 0) * 0.15),
     spd: proto.spd * stats.enemySpdMult,
     dmg: proto.dmg + stats.enemyDmgBonus,
     r: proto.size,
@@ -2042,21 +2090,14 @@ function tickDungeon(dt, now) {
       spawnEnemy();
       dungeon.lastSpawn = now;
       const elapsed = (now - dungeon.startTime) / 1000;
-      dungeon.spawnInterval = Math.max(220, (1100 / stats.enemySpawnMult) * Math.pow(0.985, elapsed));
+      // Sharper ramp: 0.97^elapsed (was 0.985), and faster floor in late endless
+      const floor = Math.max(140, 220 - (run.endlessRound || 0) * 10);
+      dungeon.spawnInterval = Math.max(floor, (1100 / stats.enemySpawnMult) * Math.pow(0.97, elapsed));
     }
   }
 
-  // Wave progression (infinite mode)
-  if (run.mode === 'infinite') {
-    dungeon.waveProgress += dt;
-    if (dungeon.waveProgress > 30) {
-      dungeon.waveProgress = 0;
-      dungeon.wave++;
-      stats.enemyHpMult *= 1.1;
-      stats.enemySpdMult *= 1.03;
-      flashBannerDungeon(`Wave ${dungeon.wave}`, '#c9a227');
-    }
-  }
+  // (Endless mode now uses round-based progression — wheels spin between rounds.
+  //  The "wave" counter still ticks for display but doesn't auto-buff anymore.)
 
   // Enemies move toward player
   for (const e of dungeon.enemies) {
@@ -2213,11 +2254,10 @@ function tickDungeon(dt, now) {
 
   dungeon.pulse += dt;
 
-  // For story mode, raid timer ends raid after 60s (or boss fight ends on boss death)
-  if (run.mode === 'story' && !dungeon.bossSpawned) {
+  // 60s round timer for both story (non-boss) and infinite. Boss raids end only on boss kill.
+  if (!dungeon.bossSpawned) {
     const elapsed = (now - dungeon.startTime) / 1000;
     if (elapsed > 60) {
-      // End of regular raid → exit dungeon
       endRaid(true);
     }
   }
@@ -2758,23 +2798,23 @@ function endRaid(survived) {
     showGameOver(elapsed);
     return;
   }
-  // Story mode flow
   if (run.mode === 'story') {
     if (dungeon.bossKilled) {
       showWin(elapsed);
       return;
     }
-    // Move to shop, then next raid
     run.raid++;
     if (run.raid > run.totalRaids) {
-      // Shouldn't happen here, but safeguard
+      // Safeguard — shouldn't reach here unless storyRaids changed mid-run
       showWin(elapsed);
       return;
     }
     showShop();
   } else {
-    // Infinite mode never "ends survived" — only on death. So this shouldn't be reached.
-    showGameOver(elapsed);
+    // INFINITE: round complete → bump round, re-spin the wheels with bigger magnitudes
+    run.endlessRound = (run.endlessRound || 0) + 1;
+    flashBanner(`Round ${run.endlessRound + 1} — wheels grow stronger`, 'gold');
+    beginRaid();
   }
 }
 
@@ -2898,7 +2938,8 @@ document.querySelectorAll('.mode-card').forEach(c => {
   c.addEventListener('click', () => {
     run.mode = c.dataset.mode;
     run.raid = 1;
-    run.totalRaids = 3;
+    run.totalRaids = DIFFICULTY[settings.difficulty].storyRaids;
+    run.endlessRound = 0;
     run.cashEarned = 0;
     run.killsTotal = 0;
     run.partsEarned = 0;
