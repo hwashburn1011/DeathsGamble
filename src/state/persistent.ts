@@ -19,6 +19,9 @@ export const defaultSettings = (): SettingsState => ({
   wheelMode: 'wheel',
   blood: true,
   motionIntensity: reducedMotion ? 'low' : 'normal',
+  volumeMaster: 0.7,
+  volumeSfx: 0.7,
+  volumeMusic: 0.5,
 });
 
 interface SaveBundle {

@@ -176,4 +176,7 @@ export interface SettingsState {
   wheelMode: WheelMode;
   blood: boolean;
   motionIntensity: 'off' | 'low' | 'normal' | 'high';
+  volumeMaster: number;   // 0..1
+  volumeSfx: number;      // 0..1
+  volumeMusic: number;    // 0..1
 }

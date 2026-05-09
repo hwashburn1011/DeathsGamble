@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useGameStore } from './state/gameStore';
 import { useSettingsStore } from './state/settingsStore';
+import { AudioManager } from './engine/audio/AudioManager';
 import { TitleScene } from './scenes/TitleScene';
 import { ModeSelectScene } from './scenes/ModeSelectScene';
 import { BuildPickerScene } from './scenes/BuildPickerScene';
@@ -46,10 +47,19 @@ export function App() {
   const [phase, setPhase] = useState<'in' | 'out'>('in');
   const [transitionMs, setTransitionMs] = useState(TRANSITION_DEFAULT_MS);
 
+  const volumeMaster = useSettingsStore((s) => s.volumeMaster);
+  const volumeSfx = useSettingsStore((s) => s.volumeSfx);
+  const volumeMusic = useSettingsStore((s) => s.volumeMusic);
+
   // Apply brightness as CSS var on root
   useEffect(() => {
     document.documentElement.style.setProperty('--brightness', String(brightness));
   }, [brightness]);
+
+  // Push audio volumes to manager on boot + whenever they change
+  useEffect(() => {
+    AudioManager.setVolumes(volumeMaster, volumeSfx, volumeMusic);
+  }, [volumeMaster, volumeSfx, volumeMusic]);
 
   // Drive crossfade: when target diverges from active, start an out-fade,
   // swap, then fade back in. Skip the fade entirely on motion=off so

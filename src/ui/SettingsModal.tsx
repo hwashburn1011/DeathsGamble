@@ -25,6 +25,13 @@ export function SettingsModal({ onClose }: Props) {
     document.documentElement.style.setProperty('--brightness', String(settings.brightness));
   }, [settings.brightness]);
 
+  // Push audio volumes through to the AudioManager whenever they change
+  useEffect(() => {
+    import('../engine/audio/AudioManager').then(({ AudioManager }) => {
+      AudioManager.setVolumes(settings.volumeMaster, settings.volumeSfx, settings.volumeMusic);
+    });
+  }, [settings.volumeMaster, settings.volumeSfx, settings.volumeMusic]);
+
   return (
     <div className="settings-backdrop" onClick={onClose}>
       <div className="settings-card-wrap" onClick={(e) => e.stopPropagation()}>
@@ -88,6 +95,51 @@ export function SettingsModal({ onClose }: Props) {
               ]}
               onChange={(v) => settings.set('motionIntensity', v)}
             />
+          </div>
+
+          <div className="settings-row">
+            <span className="settings-label">Master Vol</span>
+            <div className="settings-control">
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={settings.volumeMaster}
+                onChange={(e) => settings.set('volumeMaster', Number(e.target.value))}
+              />
+              <span className="settings-val">{Math.round(settings.volumeMaster * 100)}%</span>
+            </div>
+          </div>
+
+          <div className="settings-row">
+            <span className="settings-label">SFX Vol</span>
+            <div className="settings-control">
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={settings.volumeSfx}
+                onChange={(e) => settings.set('volumeSfx', Number(e.target.value))}
+              />
+              <span className="settings-val">{Math.round(settings.volumeSfx * 100)}%</span>
+            </div>
+          </div>
+
+          <div className="settings-row">
+            <span className="settings-label">Music Vol</span>
+            <div className="settings-control">
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={settings.volumeMusic}
+                onChange={(e) => settings.set('volumeMusic', Number(e.target.value))}
+              />
+              <span className="settings-val">{Math.round(settings.volumeMusic * 100)}%</span>
+            </div>
           </div>
 
           <div className="settings-actions">

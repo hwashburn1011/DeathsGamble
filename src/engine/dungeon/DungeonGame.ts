@@ -15,6 +15,7 @@ import {
 import type { BuildDef, EnemyTypeDef, PlayerStats, SettingsState, WeaponDef } from '../../types';
 import { ENEMY_TYPES, FINAL_BOSS } from '../../data/enemies';
 import { PLAYER_SPRITE_BY_BUILD, ENEMY_SPRITE_BY_TYPE } from '../pixi/manifest';
+import { AudioManager } from '../audio/AudioManager';
 
 const ROUND_DURATION_S = 60;
 
@@ -399,6 +400,7 @@ export class DungeonGame {
       this.applyShake(10, 0.5);
       this.applyZoomPulse(1.1, 0.5);
       this.levelGlowAlpha = 0.8;
+      AudioManager.play('boss_defeat');
       this.spawnHit(this.player.x, this.player.y - 30, 'DEATH FALLS', 'heal');
       setTimeout(() => {
         this.opts.onBossDefeated({
@@ -652,6 +654,7 @@ export class DungeonGame {
     // Cinematic intro flourish — bg pulse + camera shake
     this.applyShake(8, 0.6);
     this.applyZoomPulse(1.06, 0.4);
+    AudioManager.play('boss_intro');
   }
 
   private updateEnemies(dt: number): void {
@@ -682,6 +685,7 @@ export class DungeonGame {
           this.applyShake(4, 0.25);
           this.applyScreenFlash(0.55);
           this.applyHitStop(0.05);
+          AudioManager.play('player_hurt');
           // One popup per second of contact
           if (Math.floor(performance.now() / 600) !== Math.floor((performance.now() - 50) / 600)) {
             this.spawnHit(this.player.x, this.player.y - 18, `-${Math.ceil(wasHp - this.player.hp)}`, 'player-damage');
@@ -714,6 +718,10 @@ export class DungeonGame {
           e.sprite.tint = pr.crit ? 0xffd070 : 0xffffff;
           this.spawnHit(e.x, e.y - 10, Math.round(pr.dmg).toString(), pr.crit ? 'crit' : 'damage');
           this.spawnBloodSplash(e.x, e.y);
+          // SFX
+          AudioManager.play(
+            e.isBoss ? 'hit_heavy' : pr.crit ? 'hit_heavy' : pr.dmg > 15 ? 'hit_med' : 'hit_light'
+          );
           if (pr.crit) {
             this.applyShake(2.5, 0.18);
             this.applyZoomPulse(1.04, 0.18);
@@ -796,6 +804,7 @@ export class DungeonGame {
         g.graphics.destroy();
         this.gems.splice(i, 1);
         this.xp += 1;
+        AudioManager.play('gem_pickup', { volume: 0.4 });
         if (this.xp >= this.xpNext) {
           this.xp -= this.xpNext;
           this.level++;
@@ -837,6 +846,7 @@ export class DungeonGame {
   private onLevelUp(): void {
     this.applyShake(6, 0.35);
     this.levelGlowAlpha = 0.55;
+    AudioManager.play('level_up');
     const count = 18;
     for (let i = 0; i < count; i++) {
       const a = (i / count) * Math.PI * 2;
