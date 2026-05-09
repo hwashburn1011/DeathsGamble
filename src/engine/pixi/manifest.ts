@@ -9,18 +9,19 @@ import type { BuildDef, EnemySprite } from '../../types';
 
 const BASE = import.meta.env.BASE_URL;
 
-// ----- Player base sprites (Dungeon Crawl, CC0) ------
-// Picks intentionally bias toward distinct silhouettes so each build reads
-// at a glance.
+// ----- Per-build character sprites (Dungeon Crawl, CC0) ------
+// Use the more thematic clothed/equipped monster sprites instead of the
+// bare player BASE sprites — those are designed to be composited under
+// gear overlays and look "naked" alone.
 export const PLAYER_SPRITE_BY_BUILD: Record<string, string> = {
-  gambler:  `${BASE}assets/tiles/dungeon-crawl/player/base/human_m.png`,
-  duelist:  `${BASE}assets/tiles/dungeon-crawl/player/base/demigod_m.png`,
-  brute:    `${BASE}assets/tiles/dungeon-crawl/player/base/ogre_m.png`,
-  arcanist: `${BASE}assets/tiles/dungeon-crawl/player/base/deep_elf_m.png`,
-  rogue:    `${BASE}assets/tiles/dungeon-crawl/player/base/halfling_m.png`,
-  huntsman: `${BASE}assets/tiles/dungeon-crawl/player/base/centaur_brown_m.png`,
-  witch:    `${BASE}assets/tiles/dungeon-crawl/player/base/spriggan_f.png`,
-  soldier:  `${BASE}assets/tiles/dungeon-crawl/player/base/dwarf_m.png`,
+  gambler:  `${BASE}assets/tiles/dungeon-crawl/dc-mon/human.png`,         // clothed humanoid
+  duelist:  `${BASE}assets/tiles/dungeon-crawl/dc-mon/halfling.png`,      // cloaked, weapon-bearing
+  brute:    `${BASE}assets/tiles/dungeon-crawl/dc-mon/ogre.png`,          // bulky, imposing
+  arcanist: `${BASE}assets/tiles/dungeon-crawl/dc-mon/wizard.png`,        // purple wizard hat
+  rogue:    `${BASE}assets/tiles/dungeon-crawl/player/base/halfling_m.png`, // small + stealthy base
+  huntsman: `${BASE}assets/tiles/dungeon-crawl/player/base/centaur_brown_m.png`, // mounted ranger
+  witch:    `${BASE}assets/tiles/dungeon-crawl/dc-mon/necromancer.png`,   // hooded dark figure
+  soldier:  `${BASE}assets/tiles/dungeon-crawl/dc-mon/orc_warrior.png`,   // armored warrior
 };
 
 // ----- Enemy sprites (Dungeon Crawl, CC0) -----
@@ -37,29 +38,31 @@ export const ENEMY_SPRITE_BY_TYPE: Record<EnemySprite, string> = {
 };
 
 // ----- Per-weapon projectile sprites -----
-// Map weapon.id → projectile sprite path. `null` = use the legacy
-// Pixi.Graphics slash arc (melee weapons that don't have a flying
-// projectile to depict).
+// Map weapon.id → projectile sprite path. `null` = use the Graphics
+// fallback in DungeonGame.fireProjectile (small bullet for guns, slash
+// arc for melee). The Dungeon Crawl bolt sprites all read as long
+// arrows/bones at game scale, so guns just use a tight bright dot
+// — a real "bullet" is too tiny to depict and the dot reads better.
 export const PROJECTILE_BY_WEAPON: Record<string, string | null> = {
-  // Melee — keep the slash arc
+  // Melee — slash arc
   fists:  null,
   club:   null,
   sword:  null,
   axe:    null,
   spear:  null,
   scythe: null,
-  // Bullets (Dungeon Crawl bolts)
-  pistol:  `${BASE}assets/tiles/dungeon-crawl/effect/bolt2.png`,
-  shotgun: `${BASE}assets/tiles/dungeon-crawl/effect/bolt0.png`,
-  smg:     `${BASE}assets/tiles/dungeon-crawl/effect/bolt1.png`,
-  sniper:  `${BASE}assets/tiles/dungeon-crawl/effect/bolt5.png`,
-  rifle:   `${BASE}assets/tiles/dungeon-crawl/effect/bolt3.png`,
-  minigun: `${BASE}assets/tiles/dungeon-crawl/effect/bolt0.png`,
-  // Bow / crossbow / thrown
+  // Guns — small bright bullet dot
+  pistol:  null,
+  shotgun: null,
+  smg:     null,
+  sniper:  null,
+  rifle:   null,
+  minigun: null,
+  // Bow / crossbow / thrown — real arrow sprites that rotate to direction
   bow:      `${BASE}assets/tiles/dungeon-crawl/effect/arrow0.png`,
-  crossbow: `${BASE}assets/tiles/dungeon-crawl/effect/arrow1.png`,
+  crossbow: `${BASE}assets/tiles/dungeon-crawl/effect/arrow0.png`,
   knives:   `${BASE}assets/tiles/dungeon-crawl/effect/arrow2.png`,
-  // Magic
+  // Magic — glyph clouds tinted with weapon color
   staff: `${BASE}assets/tiles/dungeon-crawl/effect/cloud_magic_trail0.png`,
   wand:  `${BASE}assets/tiles/dungeon-crawl/effect/cloud_magic_trail1.png`,
   orb:   `${BASE}assets/tiles/dungeon-crawl/effect/cloud_magic_trail2.png`,
@@ -153,8 +156,10 @@ export function themeFor(opts: {
     if (opts.raid === 2) return 'catacomb';
     return 'hellscape';
   }
-  // Infinite — rotate
-  const cycle: ThemeKey[] = ['crypt', 'catacomb', 'cavern', 'hellscape'];
+  // Infinite — start atmospheric (crypt), then rotate. Cavern gets a back
+  // seat since the sandstone tile reads as a flat desert; it still appears
+  // every 4th round but isn't the first thing the player sees.
+  const cycle: ThemeKey[] = ['crypt', 'hellscape', 'catacomb', 'cavern'];
   return cycle[opts.endlessRound % cycle.length];
 }
 

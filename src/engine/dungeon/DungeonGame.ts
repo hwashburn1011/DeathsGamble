@@ -209,6 +209,7 @@ export class DungeonGame {
   private particleTexture: Texture | null = null;
   private particlePool: Sprite[] = [];
   private floorSprite: TilingSprite | null = null;
+  private floorOverlay: TilingSprite | null = null;
   /** Solid decorations the player + enemies bump into. */
   private obstacles: { x: number; y: number; r: number }[] = [];
 
@@ -598,10 +599,21 @@ export class DungeonGame {
         this.projectileLayer.addChild(sprite);
         proj.sprite = sprite;
       } else {
-        // Melee — keep the slash-arc Graphics
+        // Graphics fallback — small bullet for ranged guns (smaller than the
+        // legacy melee slash arc), wider arc for melee weapons.
         const g = new Graphics();
-        g.circle(0, 0, isCrit ? 8 : 6);
-        g.fill({ color: isCrit ? 0xff9050 : baseColor, alpha: 0.85 });
+        if (w.type === 'ranged') {
+          // Bullet — bright dot with subtle glow
+          const r = isCrit ? 4 : 3;
+          g.circle(0, 0, r + 2);
+          g.fill({ color: isCrit ? 0xffd070 : baseColor, alpha: 0.35 });
+          g.circle(0, 0, r);
+          g.fill({ color: isCrit ? 0xfff0a0 : 0xffffff, alpha: 1 });
+        } else {
+          // Melee slash arc — keep the larger circle
+          g.circle(0, 0, isCrit ? 8 : 6);
+          g.fill({ color: isCrit ? 0xff9050 : baseColor, alpha: 0.85 });
+        }
         this.projectileLayer.addChild(g);
         proj.graphics = g;
       }
@@ -1051,9 +1063,9 @@ export class DungeonGame {
                            // frame to follow the player so the map feels
                            // endless (player never sees the edge).
 
-    // Floor: a single TilingSprite that we re-position each frame to stay
-    // centered on the player. Because it tiles its source texture across
-    // its bounds, the player always sees a continuous floor.
+    // Floor: a TilingSprite re-positioned each frame to stay centered on
+    // the player. Because it tiles its source texture across its bounds,
+    // the player always sees a continuous floor.
     const floorTex = Texture.from(theme.floor);
     const floor = new TilingSprite({
       texture: floorTex,
@@ -1064,6 +1076,21 @@ export class DungeonGame {
     floor.tint = theme.floorTint;
     this.bgLayer.addChild(floor);
     this.floorSprite = floor;
+
+    // Variety overlay — a second TilingSprite at a different scale + alpha
+    // breaks up the perfect repeating-tile look without needing multiple
+    // textures. Larger tile (1.5x) means it doesn't align with the base
+    // grid, so the eye sees layered variation.
+    const overlay = new TilingSprite({
+      texture: floorTex,
+      width: AREA,
+      height: AREA,
+    });
+    overlay.tileScale.set(SCALE * 1.5);
+    overlay.tint = theme.floorTint;
+    overlay.alpha = 0.35;
+    this.bgLayer.addChild(overlay);
+    this.floorOverlay = overlay;
 
     // Scatter decorations — fewer, smaller, and tracked so they collide.
     // Deterministic seed so the same theme produces the same arrangement.
@@ -1309,14 +1336,15 @@ export class DungeonGame {
     const w = this.app.screen.width;
     const h = this.app.screen.height;
 
-    // Endless map — re-center the floor TilingSprite on the player so they
-    // never see the edge. Position is in WORLD coords (worldRoot's child).
-    if (this.floorSprite) {
-      const half = this.floorSprite.width / 2;
-      this.floorSprite.position.set(this.player.x - half, this.player.y - half);
-      // Counter-shift the tile offset so the world tiles appear stationary
-      // (otherwise the floor pattern would drag along with the player).
-      this.floorSprite.tilePosition.set(-this.player.x, -this.player.y);
+    // Endless map — re-center the floor TilingSprite(s) on the player so
+    // they never see the edge. Position is in WORLD coords.
+    for (const sp of [this.floorSprite, this.floorOverlay]) {
+      if (!sp) continue;
+      const half = sp.width / 2;
+      sp.position.set(this.player.x - half, this.player.y - half);
+      // Counter-shift tile offset so the pattern appears stationary in
+      // world coords (otherwise it would drag with the player).
+      sp.tilePosition.set(-this.player.x, -this.player.y);
     }
 
     // Target = player position translated to screen center
