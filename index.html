@@ -513,8 +513,8 @@ function eyeGlowAlpha() {
 }
 
 function drawDeathBack(g) {
-  // Everything BEHIND the wheels: cloak, hood, head, eyes, sleeves.
-  const { deathCx, cy, wheelR, h } = g;
+  // Everything BEHIND the wheels: cloak, hood, head, eyes.
+  const { deathCx, cy, wheelR, h, w } = g;
   const ctx = wctx;
 
   const headTopY    = cy - wheelR * 2.35;
@@ -523,49 +523,87 @@ function drawDeathBack(g) {
   const shoulderY   = cy - wheelR * 0.65;
   const robeBottom  = h + 30;
 
+  // ---------- Floor ambient shadow under figure ----------
+  ctx.save();
+  const floorShadow = ctx.createRadialGradient(
+    deathCx, h * 0.93, 0,
+    deathCx, h * 0.93, wheelR * 4.5
+  );
+  floorShadow.addColorStop(0, 'rgba(0,0,0,0.55)');
+  floorShadow.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = floorShadow;
+  ctx.fillRect(0, h * 0.82, w, h * 0.18);
+  ctx.restore();
+
   // ---------- Robe / cloak silhouette ----------
-  const robeBottomHalf = wheelR * 4.5;
-  const robeMidHalf    = wheelR * 2.6;
-  const robeShoulderHalf = wheelR * 1.7;
+  const robeBottomHalf   = wheelR * 4.6;
+  const robeMidHalf      = wheelR * 2.7;
+  const robeShoulderHalf = wheelR * 2.1;
 
-  const robeGrad = ctx.createLinearGradient(0, headTopY, 0, robeBottom);
-  robeGrad.addColorStop(0,    '#1e1e2a');
-  robeGrad.addColorStop(0.35, '#13131c');
-  robeGrad.addColorStop(0.75, '#0a0a10');
-  robeGrad.addColorStop(1,    '#040406');
+  const cloakPath = () => {
+    ctx.beginPath();
+    ctx.moveTo(deathCx, headTopY);
+    // Right hood edge → shoulder
+    ctx.bezierCurveTo(
+      deathCx + wheelR * 0.95, headTopY + wheelR * 0.25,
+      deathCx + wheelR * 1.35, collarY - wheelR * 0.05,
+      deathCx + robeShoulderHalf, shoulderY + wheelR * 0.1
+    );
+    // Right side draping down
+    ctx.bezierCurveTo(
+      deathCx + robeMidHalf,    cy + wheelR * 0.4,
+      deathCx + robeBottomHalf, cy + wheelR * 1.6,
+      deathCx + robeBottomHalf, robeBottom
+    );
+    ctx.lineTo(deathCx - robeBottomHalf, robeBottom);
+    ctx.bezierCurveTo(
+      deathCx - robeBottomHalf, cy + wheelR * 1.6,
+      deathCx - robeMidHalf,    cy + wheelR * 0.4,
+      deathCx - robeShoulderHalf, shoulderY + wheelR * 0.1
+    );
+    ctx.bezierCurveTo(
+      deathCx - wheelR * 1.35, collarY - wheelR * 0.05,
+      deathCx - wheelR * 0.95, headTopY + wheelR * 0.25,
+      deathCx, headTopY
+    );
+    ctx.closePath();
+  };
 
-  ctx.fillStyle = robeGrad;
-  ctx.beginPath();
-  // Hood peak (slight gothic point)
-  ctx.moveTo(deathCx, headTopY);
-  // Right hood edge sweeping out to shoulder
-  ctx.bezierCurveTo(
-    deathCx + wheelR * 0.95, headTopY + wheelR * 0.25,
-    deathCx + wheelR * 1.25, collarY - wheelR * 0.05,
-    deathCx + robeShoulderHalf, shoulderY + wheelR * 0.05
-  );
-  // Right cloak side draping down
-  ctx.bezierCurveTo(
-    deathCx + robeMidHalf,    cy + wheelR * 0.25,
-    deathCx + robeBottomHalf, cy + wheelR * 1.5,
-    deathCx + robeBottomHalf, robeBottom
-  );
-  ctx.lineTo(deathCx - robeBottomHalf, robeBottom);
-  ctx.bezierCurveTo(
-    deathCx - robeBottomHalf, cy + wheelR * 1.5,
-    deathCx - robeMidHalf,    cy + wheelR * 0.25,
-    deathCx - robeShoulderHalf, shoulderY + wheelR * 0.05
-  );
-  ctx.bezierCurveTo(
-    deathCx - wheelR * 1.25, collarY - wheelR * 0.05,
-    deathCx - wheelR * 0.95, headTopY + wheelR * 0.25,
-    deathCx, headTopY
-  );
-  ctx.closePath();
+  // Base cloak fill: dark vertical gradient
+  const baseGrad = ctx.createLinearGradient(0, headTopY, 0, robeBottom);
+  baseGrad.addColorStop(0,    '#1a1a26');
+  baseGrad.addColorStop(0.45, '#10101a');
+  baseGrad.addColorStop(1,    '#040406');
+  ctx.fillStyle = baseGrad;
+  cloakPath();
   ctx.fill();
 
-  // ---------- Cloak fold highlights ----------
-  ctx.strokeStyle = 'rgba(255,255,255,0.035)';
+  // Side rim light (cool moonlight on left side)
+  const rimGrad = ctx.createLinearGradient(
+    deathCx - robeShoulderHalf - wheelR * 0.3, headTopY,
+    deathCx - wheelR * 0.2,                    headTopY
+  );
+  rimGrad.addColorStop(0, 'rgba(140,160,210,0.18)');
+  rimGrad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = rimGrad;
+  cloakPath();
+  ctx.fill();
+
+  // Center body shading (darker down the middle for fold)
+  const centerShade = ctx.createLinearGradient(
+    deathCx - wheelR * 0.6, 0,
+    deathCx + wheelR * 0.6, 0
+  );
+  centerShade.addColorStop(0,   'rgba(0,0,0,0)');
+  centerShade.addColorStop(0.5, 'rgba(0,0,0,0.4)');
+  centerShade.addColorStop(1,   'rgba(0,0,0,0)');
+  ctx.fillStyle = centerShade;
+  cloakPath();
+  ctx.fill();
+
+  // ---------- Cloak fold lines ----------
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.045)';
   ctx.lineWidth = 1.2;
   for (let i = -3; i <= 3; i++) {
     if (i === 0) continue;
@@ -574,18 +612,19 @@ function drawDeathBack(g) {
     ctx.beginPath();
     ctx.moveTo(xT, shoulderY + wheelR * 0.4);
     ctx.bezierCurveTo(
-      xT * 1.0, cy + wheelR * 0.5,
-      xB,       cy + wheelR * 1.4,
-      xB,       robeBottom * 0.95
+      xT, cy + wheelR * 0.5,
+      xB, cy + wheelR * 1.4,
+      xB, robeBottom * 0.95
     );
     ctx.stroke();
   }
+  ctx.restore();
 
-  // ---------- Hood rim highlight (subtle) ----------
-  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  // ---------- Hood rim highlight ----------
+  ctx.strokeStyle = 'rgba(220,220,230,0.10)';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.moveTo(deathCx - wheelR * 1.25, collarY - wheelR * 0.05);
+  ctx.moveTo(deathCx - wheelR * 1.35, collarY - wheelR * 0.05);
   ctx.bezierCurveTo(
     deathCx - wheelR * 0.95, headTopY + wheelR * 0.25,
     deathCx - wheelR * 0.4,  headTopY - wheelR * 0.05,
@@ -594,7 +633,7 @@ function drawDeathBack(g) {
   ctx.bezierCurveTo(
     deathCx + wheelR * 0.4,  headTopY - wheelR * 0.05,
     deathCx + wheelR * 0.95, headTopY + wheelR * 0.25,
-    deathCx + wheelR * 1.25, collarY - wheelR * 0.05
+    deathCx + wheelR * 1.35, collarY - wheelR * 0.05
   );
   ctx.stroke();
 
@@ -606,187 +645,208 @@ function drawDeathBack(g) {
   ctx.ellipse(deathCx, headCenterY, hoodOpenW, hoodOpenH, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Inner glow inside hood (warm)
+  // Warm interior glow in hood
   const hoodGlow = ctx.createRadialGradient(
     deathCx, headCenterY + hoodOpenH * 0.05, 0,
-    deathCx, headCenterY, hoodOpenW * 1.1
+    deathCx, headCenterY, hoodOpenW * 1.3
   );
-  hoodGlow.addColorStop(0, 'rgba(120,80,30,0.35)');
-  hoodGlow.addColorStop(1, 'rgba(0,0,0,0)');
+  hoodGlow.addColorStop(0,   'rgba(150,90,40,0.5)');
+  hoodGlow.addColorStop(0.5, 'rgba(80,40,15,0.18)');
+  hoodGlow.addColorStop(1,   'rgba(0,0,0,0)');
   ctx.fillStyle = hoodGlow;
   ctx.beginPath();
-  ctx.ellipse(deathCx, headCenterY, hoodOpenW * 1.1, hoodOpenH * 1.1, 0, 0, Math.PI * 2);
+  ctx.ellipse(deathCx, headCenterY, hoodOpenW * 1.3, hoodOpenH * 1.3, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // ---------- Glowing eyes ----------
-  const ga = eyeGlowAlpha();
-  const eyeY = headCenterY - hoodOpenH * 0.05;
-  const eyeDx = hoodOpenW * 0.32;
-  const eyeR  = hoodOpenW * 0.085;
+  // ---------- Faint skull silhouette inside the hood ----------
   ctx.save();
-  ctx.shadowColor = `rgba(240,200,80,${ga})`;
-  ctx.shadowBlur  = 22 * ga;
-  ctx.fillStyle = `rgba(255,225,130,${ga})`;
+  ctx.globalAlpha = 0.9;
+  ctx.strokeStyle = 'rgba(190,180,160,0.35)';
+  ctx.lineWidth = 1.1;
+  // Cranium top arc
   ctx.beginPath();
-  ctx.arc(deathCx - eyeDx, eyeY, eyeR, 0, Math.PI * 2);
-  ctx.arc(deathCx + eyeDx, eyeY, eyeR, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-
-  // ---------- Sleeves (upper arms / cloak draping over shoulders) ----------
-  drawSleeve(g, +1);
-  drawSleeve(g, -1);
-}
-
-function drawSleeve(g, sign) {
-  // sign = -1 left, +1 right
-  // Sleeve curves from shoulder out to a cuff just inside the wheel.
-  const { deathCx, cy, wheelR } = g;
-  const ctx = wctx;
-
-  const wheelCx = sign < 0 ? g.buffCx : g.curseCx;
-  const innerWheelEdgeX = wheelCx - sign * wheelR;   // edge facing Death
-  const shoulderX = deathCx + sign * wheelR * 0.55;
-  const shoulderY = cy - wheelR * 0.55;
-  const cuffX     = innerWheelEdgeX - sign * wheelR * 0.05;
-  const cuffY     = cy - wheelR * 0.25;
-
-  const ctrlX = (shoulderX + cuffX) / 2 + sign * wheelR * 0.05;
-  const ctrlY = (shoulderY + cuffY) / 2 + wheelR * 0.18;
-
-  // Outer sleeve fill
-  const sleeveGrad = ctx.createLinearGradient(shoulderX, shoulderY, cuffX, cuffY);
-  sleeveGrad.addColorStop(0, '#16161e');
-  sleeveGrad.addColorStop(1, '#0a0a10');
-  ctx.fillStyle = sleeveGrad;
+  ctx.ellipse(deathCx, headCenterY - hoodOpenH * 0.05,
+              hoodOpenW * 0.55, hoodOpenH * 0.5,
+              0, Math.PI * 1.05, Math.PI * 1.95);
+  ctx.stroke();
+  // Jaw line
   ctx.beginPath();
-  // Outer (lower/outer) edge
-  const outerOff = wheelR * 0.18;
-  const innerOff = wheelR * 0.10;
-  ctx.moveTo(shoulderX + sign * 4, shoulderY - innerOff);
-  ctx.quadraticCurveTo(ctrlX + sign * outerOff, ctrlY + outerOff,
-                       cuffX + sign * innerOff, cuffY + innerOff);
-  // Cuff
-  ctx.lineTo(cuffX - sign * innerOff, cuffY - innerOff);
-  // Inner (upper) edge back to shoulder
-  ctx.quadraticCurveTo(ctrlX - sign * innerOff, ctrlY - innerOff * 0.5,
-                       shoulderX - sign * 4, shoulderY - innerOff - wheelR * 0.1);
+  ctx.moveTo(deathCx - hoodOpenW * 0.40, headCenterY + hoodOpenH * 0.15);
+  ctx.bezierCurveTo(
+    deathCx - hoodOpenW * 0.32, headCenterY + hoodOpenH * 0.45,
+    deathCx + hoodOpenW * 0.32, headCenterY + hoodOpenH * 0.45,
+    deathCx + hoodOpenW * 0.40, headCenterY + hoodOpenH * 0.15
+  );
+  ctx.stroke();
+  // Nose triangle (dark)
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.beginPath();
+  ctx.moveTo(deathCx, headCenterY + hoodOpenH * 0.10);
+  ctx.lineTo(deathCx - hoodOpenW * 0.06, headCenterY + hoodOpenH * 0.22);
+  ctx.lineTo(deathCx + hoodOpenW * 0.06, headCenterY + hoodOpenH * 0.22);
   ctx.closePath();
   ctx.fill();
-
-  // Inner highlight along the upper edge
-  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
-  ctx.lineWidth = 1;
+  // Tooth gap hint
+  ctx.strokeStyle = 'rgba(140,130,110,0.25)';
+  ctx.lineWidth = 0.6;
   ctx.beginPath();
-  ctx.moveTo(shoulderX - sign * 2, shoulderY - innerOff - wheelR * 0.05);
-  ctx.quadraticCurveTo(ctrlX - sign * innerOff * 0.5, ctrlY - innerOff,
-                       cuffX - sign * innerOff * 0.5, cuffY - innerOff * 0.6);
+  for (let i = -2; i <= 2; i++) {
+    const x = deathCx + i * hoodOpenW * 0.06;
+    ctx.moveTo(x, headCenterY + hoodOpenH * 0.30);
+    ctx.lineTo(x, headCenterY + hoodOpenH * 0.40);
+  }
   ctx.stroke();
+  ctx.restore();
 
-  // Save the cuff position on the geometry for use by drawDeathFront.
-  if (!g.cuffs) g.cuffs = {};
-  g.cuffs[sign < 0 ? 'left' : 'right'] = { x: cuffX, y: cuffY };
+  // ---------- Multi-layer glowing eyes ----------
+  const ga = eyeGlowAlpha();
+  const eyeY = headCenterY - hoodOpenH * 0.08;
+  const eyeDx = hoodOpenW * 0.32;
+  const eyeR  = hoodOpenW * 0.10;
+
+  // Outer aura (large soft glow)
+  ctx.save();
+  for (const lr of [-1, 1]) {
+    const ex = deathCx + lr * eyeDx;
+    const aura = ctx.createRadialGradient(ex, eyeY, 0, ex, eyeY, eyeR * 6);
+    aura.addColorStop(0,   `rgba(255,200,80,${0.55 * ga})`);
+    aura.addColorStop(0.3, `rgba(255,160,60,${0.22 * ga})`);
+    aura.addColorStop(1,   'rgba(255,140,50,0)');
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.arc(ex, eyeY, eyeR * 6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // Bright eye core
+  ctx.save();
+  ctx.shadowColor = `rgba(255,200,80,${ga})`;
+  ctx.shadowBlur  = 22 * ga;
+  ctx.fillStyle = `rgba(255,235,180,${ga})`;
+  ctx.beginPath();
+  ctx.arc(deathCx - eyeDx, eyeY, eyeR * 0.55, 0, Math.PI * 2);
+  ctx.arc(deathCx + eyeDx, eyeY, eyeR * 0.55, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 function drawDeathFront(g) {
-  // Drawn AFTER the wheels — forearm bone + hand + claws gripping the rim.
-  drawHandOnWheel(g, +1);  // left wheel (buff)
-  drawHandOnWheel(g, -1);  // right wheel (curse)
+  // Drawn AFTER the wheels — bone fingers fanning from the bottom-outer
+  // of each wheel, as if Death's hands grip from behind.
+  drawDeathFingers(g, -1);  // left wheel  (buff)  → fingers fan to bottom-LEFT
+  drawDeathFingers(g, +1);  // right wheel (curse) → fingers fan to bottom-RIGHT
 }
 
-function drawHandOnWheel(g, sign) {
-  // sign = -1 for left wheel, +1 for right wheel
+function quadBez(p0, p1, p2, t) {
+  const u = 1 - t;
+  return u * u * p0 + 2 * u * t * p1 + t * t * p2;
+}
+
+function drawDeathFingers(g, sign) {
+  // sign = -1 → left wheel (g.buffCx),  fingers fan down-left
+  // sign = +1 → right wheel (g.curseCx), fingers fan down-right
   const { cy, wheelR } = g;
   const ctx = wctx;
 
   const wheelCx = sign < 0 ? g.buffCx : g.curseCx;
   const wheelCy = cy;
 
-  // Cuff position from the sleeve we drew earlier
-  const cuff = g.cuffs && g.cuffs[sign < 0 ? 'left' : 'right'];
-  const cuffX = cuff ? cuff.x : wheelCx - sign * wheelR;
-  const cuffY = cuff ? cuff.y : cy - wheelR * 0.25;
+  // Grip point on the bottom-outer rim (~7:30 on left wheel, ~4:30 on right).
+  // In canvas: angle 0=right, PI/2=down, PI=left. So:
+  //   left wheel grip angle  = PI*0.78  (between 6 and 9 o'clock — bottom-left)
+  //   right wheel grip angle = PI*0.22  (between 3 and 6 o'clock — bottom-right)
+  const gripAngle = sign < 0 ? Math.PI * 0.78 : Math.PI * 0.22;
+  const gripX = wheelCx + Math.cos(gripAngle) * (wheelR * 0.96);
+  const gripY = wheelCy + Math.sin(gripAngle) * (wheelR * 0.96);
 
-  // Hand sits on the inner-upper rim of the wheel.
-  // Inner side is opposite to `sign` direction (left wheel → grip on its right side).
-  const gripAngle = sign < 0 ? -Math.PI * 0.20 : Math.PI + Math.PI * 0.20;
-  const handX = wheelCx + Math.cos(gripAngle) * (wheelR * 0.95);
-  const handY = wheelCy + Math.sin(gripAngle) * (wheelR * 0.95);
+  // Fingers fan outward from the grip point, away from the wheel center.
+  // Center of the fan points roughly along the radial direction (outward).
+  const fanCenter = gripAngle;
+  const fanSpread = Math.PI * 0.55;  // ~100° total spread
+  const fingerCount = 5;
+  // Length scale per finger (thumb–pinky): middle longest
+  const lengthScales = [0.75, 1.05, 1.25, 1.10, 0.80];
 
   ctx.save();
 
-  // ---------- Forearm bone (cuff → hand) ----------
-  const ctrlX = (cuffX + handX) / 2;
-  const ctrlY = (cuffY + handY) / 2 - wheelR * 0.05;
+  for (let i = 0; i < fingerCount; i++) {
+    const t = i / (fingerCount - 1);
+    const fingerAngle = fanCenter - fanSpread / 2 + t * fanSpread;
+    const len = wheelR * lengthScales[i];
+    const tipX = gripX + Math.cos(fingerAngle) * len;
+    const tipY = gripY + Math.sin(fingerAngle) * len;
 
-  // Bone outline shadow
-  ctx.strokeStyle = 'rgba(0,0,0,0.55)';
-  ctx.lineWidth = 6;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(cuffX, cuffY + 1);
-  ctx.quadraticCurveTo(ctrlX, ctrlY + 1, handX, handY + 1);
-  ctx.stroke();
+    // Slight curve: bend the finger gently, perpendicular to its direction
+    const bendDir = sign < 0 ? -1 : 1;
+    const perpX = Math.cos(fingerAngle + Math.PI / 2);
+    const perpY = Math.sin(fingerAngle + Math.PI / 2);
+    const ctrlX = (gripX + tipX) / 2 + perpX * len * 0.07 * bendDir;
+    const ctrlY = (gripY + tipY) / 2 + perpY * len * 0.07 * bendDir;
 
-  // Bone
-  ctx.strokeStyle = '#d4ccb2';
-  ctx.lineWidth = 4.5;
-  ctx.beginPath();
-  ctx.moveTo(cuffX, cuffY);
-  ctx.quadraticCurveTo(ctrlX, ctrlY, handX, handY);
-  ctx.stroke();
+    // Drop shadow under the bone
+    ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(gripX + 1, gripY + 2);
+    ctx.quadraticCurveTo(ctrlX + 1, ctrlY + 2, tipX + 1, tipY + 2);
+    ctx.stroke();
 
-  // Bone highlight
-  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.moveTo(cuffX, cuffY - 1);
-  ctx.quadraticCurveTo(ctrlX, ctrlY - 1, handX, handY - 1);
-  ctx.stroke();
+    // Bone
+    ctx.strokeStyle = '#d4ccb2';
+    ctx.lineWidth = 3.5;
+    ctx.beginPath();
+    ctx.moveTo(gripX, gripY);
+    ctx.quadraticCurveTo(ctrlX, ctrlY, tipX, tipY);
+    ctx.stroke();
 
-  // ---------- Palm ----------
+    // Highlight along the upper edge of the bone
+    ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(gripX, gripY - 1);
+    ctx.quadraticCurveTo(ctrlX, ctrlY - 1, tipX, tipY - 1);
+    ctx.stroke();
+
+    // Knuckle bump (mid-finger)
+    const knuckleX = quadBez(gripX, ctrlX, tipX, 0.55);
+    const knuckleY = quadBez(gripY, ctrlY, tipY, 0.55);
+    ctx.fillStyle = '#dcd4ba';
+    ctx.strokeStyle = '#7a7260';
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    ctx.arc(knuckleX, knuckleY, 2.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Pointed claw nail at the tip
+    ctx.fillStyle = '#1a1a1f';
+    ctx.beginPath();
+    ctx.arc(tipX, tipY, 1.8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Wrist / palm joint at the grip point
   ctx.fillStyle = '#dcd4ba';
   ctx.strokeStyle = '#6d6450';
-  ctx.lineWidth = 1.2;
+  ctx.lineWidth = 1.4;
   ctx.beginPath();
-  ctx.arc(handX, handY, wheelR * 0.075, 0, Math.PI * 2);
+  ctx.arc(gripX, gripY, wheelR * 0.085, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
 
-  // ---------- Three claws curling along the rim ----------
-  // Claws fan out tangentially around the gripping point.
-  for (let i = -1; i <= 1; i++) {
-    const fingerAngle = gripAngle + i * 0.22;
-    const tipR = wheelR * 0.92;
-    const tipBaseX = wheelCx + Math.cos(fingerAngle) * (wheelR * 0.96);
-    const tipBaseY = wheelCy + Math.sin(fingerAngle) * (wheelR * 0.96);
-    // Curl: tip pulled slightly inward
-    const tipX = wheelCx + Math.cos(fingerAngle) * tipR + Math.cos(fingerAngle + Math.PI/2) * wheelR * 0.04 * (sign < 0 ? 1 : -1);
-    const tipY = wheelCy + Math.sin(fingerAngle) * tipR + Math.sin(fingerAngle + Math.PI/2) * wheelR * 0.04 * (sign < 0 ? 1 : -1);
-
-    // Finger bone shadow
-    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
-    ctx.lineWidth = 4;
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    ctx.moveTo(handX, handY + 1);
-    ctx.quadraticCurveTo(tipBaseX, tipBaseY + 1, tipX, tipY + 1);
-    ctx.stroke();
-
-    // Finger bone
-    ctx.strokeStyle = '#d4ccb2';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(handX, handY);
-    ctx.quadraticCurveTo(tipBaseX, tipBaseY, tipX, tipY);
-    ctx.stroke();
-
-    // Claw nail
-    ctx.fillStyle = '#1a1a1f';
-    ctx.beginPath();
-    ctx.arc(tipX, tipY, 2.2, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  // Subtle shading on the palm joint for roundness
+  const palmShade = ctx.createRadialGradient(
+    gripX - wheelR * 0.03, gripY - wheelR * 0.03, 0,
+    gripX, gripY, wheelR * 0.085
+  );
+  palmShade.addColorStop(0, 'rgba(255,255,255,0.25)');
+  palmShade.addColorStop(1, 'rgba(0,0,0,0.35)');
+  ctx.fillStyle = palmShade;
+  ctx.beginPath();
+  ctx.arc(gripX, gripY, wheelR * 0.085, 0, Math.PI * 2);
+  ctx.fill();
 
   ctx.restore();
 }
