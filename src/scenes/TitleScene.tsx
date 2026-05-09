@@ -4,6 +4,7 @@ import './title.css';
 
 export function TitleScene() {
   const startNewRun = useGameStore((s) => s.startNewRun);
+  const showScene = useGameStore((s) => s.showScene);
 
   return (
     <div className="scene title-scene">
@@ -17,6 +18,9 @@ export function TitleScene() {
         <div className="title-actions">
           <GlassButton size="lg" variant="gold" onClick={startNewRun}>
             Start Game
+          </GlassButton>
+          <GlassButton size="md" variant="ghost" onClick={() => showScene('credits')}>
+            Credits
           </GlassButton>
         </div>
       </div>

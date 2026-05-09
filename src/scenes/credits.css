@@ -1,0 +1,136 @@
+.credits-scene {
+  /* Override scene defaults — Credits is a scrollable list */
+  display: block;
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 60px 24px 40px;
+  overflow-y: auto;
+  height: 100vh;
+}
+
+.credits-header {
+  text-align: center;
+  margin-bottom: 28px;
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.credits-heading {
+  font-size: clamp(32px, 5vw, 56px);
+  color: var(--gold);
+  text-shadow: 0 0 20px rgba(201, 162, 39, 0.3);
+  margin-bottom: 10px;
+}
+
+.credits-sub {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink-muted);
+}
+
+.credits-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 720px;
+  margin: 0 auto 28px;
+}
+
+.credits-group {
+  /* Inherits .glass styles */
+}
+
+.credits-cat-heading {
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.credits-items {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.credits-item {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(120px, auto) auto auto;
+  gap: 14px;
+  align-items: baseline;
+  font-size: 13px;
+  padding: 6px 0;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.04);
+}
+
+.credits-item:last-child { border-bottom: none; }
+
+.credits-link {
+  text-decoration: none;
+  color: var(--ink);
+  transition: color var(--m-swift);
+}
+.credits-link:hover { color: var(--gold-bright); }
+
+.credits-name {
+  font-family: var(--font-body);
+  font-weight: 600;
+}
+
+.credits-author {
+  color: var(--ink-muted);
+  font-style: italic;
+  font-size: 12px;
+}
+
+.credits-lic {
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.credits-lic--on {
+  background: rgba(105, 176, 112, 0.15);
+  color: var(--moss-bright);
+  border: 1px solid rgba(105, 176, 112, 0.3);
+}
+
+.credits-lic--off {
+  background: rgba(160, 154, 138, 0.1);
+  color: var(--ink-dim);
+  border: 1px solid rgba(160, 154, 138, 0.2);
+}
+
+.credits-pending {
+  font-family: var(--font-display);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  color: var(--ink-dim);
+  text-transform: uppercase;
+  font-style: italic;
+}
+
+.credits-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+  margin-bottom: 40px;
+}
+
+@media (max-width: 600px) {
+  .credits-item {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding: 12px 0;
+  }
+}
