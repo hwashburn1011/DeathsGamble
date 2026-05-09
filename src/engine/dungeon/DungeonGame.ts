@@ -82,6 +82,8 @@ interface HitText {
   kind: HitKind;
 }
 
+type ParticleKind = 'spark' | 'burst' | 'blood' | 'ember' | 'dust';
+
 interface Particle {
   x: number;
   y: number;
@@ -92,6 +94,9 @@ interface Particle {
   graphics: Graphics;
   rot: number;
   vrot: number;
+  kind: ParticleKind;
+  drag: number;
+  gravity: number;
 }
 
 export interface DungeonRunSummary {
@@ -162,16 +167,19 @@ export class DungeonGame {
   // Layers — all camera-relative containers live in worldRoot, which
   // is what we shake/zoom. screenLayer sits on top, untouched by camera.
   private worldRoot: Container = new Container();
+  private bgLayer: Container = new Container();        // floor tiles
   private worldLayer: Container = new Container();
   private projectileLayer: Container = new Container();
   private particleLayer: Container = new Container();
   private hitTextLayer: Container = new Container();
   private screenLayer: Container = new Container();
+  private vignetteLayer: Graphics = new Graphics();   // corners darken (screen-space)
 
   private screenFlash: Graphics = new Graphics();
   private screenFlashAlpha = 0;        // current alpha
   private levelGlow: Graphics = new Graphics();
   private levelGlowAlpha = 0;
+  private lastAmbientSpawnMs = 0;
 
   private player!: PlayerEntity;
   private enemies: EnemyEntity[] = [];
@@ -217,7 +225,9 @@ export class DungeonGame {
     this.stats = { ...opts.stats };
     this.motionMult = MOTION_MULT[opts.motionIntensity] ?? 1;
 
-    // Layer order
+    // Layer order — bg tiles are inside worldRoot so they shake/zoom with
+    // the rest of the world (and scroll with the camera).
+    this.worldRoot.addChild(this.bgLayer);
     this.worldRoot.addChild(this.worldLayer);
     this.worldRoot.addChild(this.projectileLayer);
     this.worldRoot.addChild(this.particleLayer);
@@ -225,9 +235,13 @@ export class DungeonGame {
     app.stage.addChild(this.worldRoot);
 
     // Screen-space overlays (above world, drawn on top)
+    this.screenLayer.addChild(this.vignetteLayer);
     this.screenLayer.addChild(this.screenFlash);
     this.screenLayer.addChild(this.levelGlow);
     app.stage.addChild(this.screenLayer);
+
+    this.buildBackground();
+    this.buildVignette();
   }
 
   async start(): Promise<void> {
@@ -238,13 +252,17 @@ export class DungeonGame {
     }
     this.startTime = performance.now();
     this.attachInput();
+    this.app.renderer.on('resize', this.onResize);
     this.tickerCb = () => this.tick(this.app.ticker.deltaMS / 1000);
     this.app.ticker.add(this.tickerCb);
   }
 
+  private onResize = () => this.repaintVignette();
+
   destroy(): void {
     if (this.tickerCb) this.app.ticker.remove(this.tickerCb);
     this.detachInput();
+    this.app.renderer.off('resize', this.onResize);
     this.worldRoot.destroy({ children: true });
     this.screenLayer.destroy({ children: true });
     this.enemies.length = 0;
@@ -333,6 +351,7 @@ export class DungeonGame {
     if (!this.opts.isBossRaid) {
       this.maybeSpawn(now, elapsedS);
     }
+    this.maybeAmbient(now);
     this.updateEnemies(dt);
     this.updateProjectiles(dt);
     this.cullDeadEnemies();
@@ -517,6 +536,15 @@ export class DungeonGame {
     return best;
   }
 
+  // ---------- Ambient particle spawning ----------
+  private maybeAmbient(now: number): void {
+    const interval = 90; // ms between ambient spawns
+    if (now - this.lastAmbientSpawnMs < interval) return;
+    this.lastAmbientSpawnMs = now;
+    if (this.particles.length > 220) return; // soft cap to keep frame budget sane
+    this.spawnAmbient();
+  }
+
   // ---------- Spawn ----------
   private maybeSpawn(now: number, elapsedS: number): void {
     if (now - this.lastSpawnMs < this.spawnIntervalMs) return;
@@ -675,6 +703,7 @@ export class DungeonGame {
           e.flashTimer = 0.12;
           e.sprite.tint = pr.crit ? 0xffd070 : 0xffffff;
           this.spawnHit(e.x, e.y - 10, Math.round(pr.dmg).toString(), pr.crit ? 'crit' : 'damage');
+          this.spawnBloodSplash(e.x, e.y);
           if (pr.crit) {
             this.applyShake(2.5, 0.18);
             this.applyZoomPulse(1.04, 0.18);
@@ -796,55 +825,144 @@ export class DungeonGame {
   }
 
   private onLevelUp(): void {
-    // Visual burst
     this.applyShake(6, 0.35);
     this.levelGlowAlpha = 0.55;
-    // Radial particle ring at player
     const count = 18;
     for (let i = 0; i < count; i++) {
       const a = (i / count) * Math.PI * 2;
       const speed = 220 + Math.random() * 60;
-      const g = new Graphics();
-      g.circle(0, 0, 3);
-      g.fill({ color: 0xffd070 });
-      this.particleLayer.addChild(g);
-      this.particles.push({
-        x: this.player.x,
-        y: this.player.y,
-        vx: Math.cos(a) * speed,
-        vy: Math.sin(a) * speed,
-        life: 0.7,
-        maxLife: 0.7,
-        graphics: g,
-        rot: 0,
-        vrot: 0,
-      });
+      this.pushParticle('burst', this.player.x, this.player.y, Math.cos(a) * speed, Math.sin(a) * speed, 0.7, 0xffd070, 3);
     }
-    // Floating "LVL UP" text
     this.spawnHit(this.player.x, this.player.y - 30, `LVL ${this.level}`, 'heal');
   }
 
   private spawnCritSparks(x: number, y: number): void {
-    const count = 6;
-    for (let i = 0; i < count; i++) {
+    for (let i = 0; i < 6; i++) {
       const a = Math.random() * Math.PI * 2;
       const speed = 120 + Math.random() * 80;
-      const g = new Graphics();
-      g.circle(0, 0, 2);
-      g.fill({ color: 0xff9050 });
-      this.particleLayer.addChild(g);
-      this.particles.push({
-        x,
-        y,
-        vx: Math.cos(a) * speed,
-        vy: Math.sin(a) * speed - 60,
-        life: 0.4,
-        maxLife: 0.4,
-        graphics: g,
-        rot: 0,
-        vrot: 0,
-      });
+      this.pushParticle('spark', x, y, Math.cos(a) * speed, Math.sin(a) * speed - 60, 0.4, 0xff9050, 2);
     }
+  }
+
+  /** Splash blood drops outward from a hit point (no-op when blood gore is off). */
+  private spawnBloodSplash(x: number, y: number): void {
+    if (typeof window === 'undefined') return;
+    // Read settings JIT — avoids store import dep cycle in the engine
+    const blood = (window as Window & { __DG_BLOOD_ON?: boolean }).__DG_BLOOD_ON !== false;
+    if (!blood) return;
+    for (let i = 0; i < 5; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const speed = 80 + Math.random() * 70;
+      const dropColor = Math.random() < 0.7 ? 0xa02020 : 0x6a1010;
+      this.pushParticle('blood', x, y, Math.cos(a) * speed, Math.sin(a) * speed - 40, 0.5, dropColor, 2);
+    }
+  }
+
+  /** Ambient embers + dust drifting through the dungeon (atmosphere). */
+  private spawnAmbient(): void {
+    const screen = this.app.screen;
+    const camOffsetX = -this.worldRoot.position.x;
+    const camOffsetY = -this.worldRoot.position.y;
+    const inv = 1 / Math.max(0.001, this.zoomScale);
+    // Spawn anywhere within the camera's view, in world coords
+    const x = (Math.random() * screen.width + camOffsetX) * inv + this.player.x - screen.width / 2;
+    const y = (Math.random() * screen.height + camOffsetY) * inv + this.player.y - screen.height / 2;
+    if (Math.random() < 0.55) {
+      // Ember — warm, rises
+      this.pushParticle('ember', x, y, (Math.random() - 0.5) * 8, -10 - Math.random() * 12, 2.4, 0xffae50, 1.8);
+    } else {
+      // Dust — cool, drifts
+      this.pushParticle('dust', x, y, (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 8, 3.5, 0x808a98, 1);
+    }
+  }
+
+  /** Internal — push a particle with kind-specific physics defaults. */
+  private pushParticle(
+    kind: ParticleKind,
+    x: number,
+    y: number,
+    vx: number,
+    vy: number,
+    life: number,
+    color: number,
+    radius: number
+  ): void {
+    const g = new Graphics();
+    g.circle(0, 0, radius);
+    g.fill({ color });
+    this.particleLayer.addChild(g);
+    let drag = 0.92;
+    let gravity = 50;
+    if (kind === 'ember') { drag = 0.99; gravity = -8; }
+    if (kind === 'dust')  { drag = 0.99; gravity = 0; }
+    if (kind === 'blood') { drag = 0.88; gravity = 240; }
+    this.particles.push({
+      x, y, vx, vy,
+      life, maxLife: life,
+      graphics: g,
+      rot: 0, vrot: 0,
+      kind, drag, gravity,
+    });
+  }
+
+  // ---------- Background tiles (procedural stone) ----------
+  private buildBackground(): void {
+    // Tile a large area in world coords so the player can wander and the
+    // camera scrolls naturally. Procedural Graphics — no asset dependency.
+    const TILE = 64;
+    const RANGE = 60; // ±60 tiles each direction → 120x120 tiles total
+    const g = new Graphics();
+    for (let i = -RANGE; i < RANGE; i++) {
+      for (let j = -RANGE; j < RANGE; j++) {
+        const x = i * TILE;
+        const y = j * TILE;
+        // Base stone color varies subtly per tile for texture
+        const v = ((i * 7 + j * 13) & 7) / 7;
+        const base = 0x10101a + Math.floor(v * 0x080810);
+        g.rect(x, y, TILE, TILE);
+        g.fill({ color: base });
+        // Tile border lines — almost invisible, just enough texture
+        g.rect(x, y, TILE, 1);
+        g.fill({ color: 0x1a1a26, alpha: 0.5 });
+        g.rect(x, y, 1, TILE);
+        g.fill({ color: 0x1a1a26, alpha: 0.5 });
+        // Sparse cracks / debris flecks
+        const seed = (i * 31 + j * 17) & 31;
+        if (seed === 3) {
+          g.circle(x + 18 + ((i + j) & 7) * 3, y + 24, 1.3);
+          g.fill({ color: 0x3a2818, alpha: 0.55 });
+        } else if (seed === 11) {
+          g.rect(x + 12, y + 36, 6, 1);
+          g.fill({ color: 0x2a2a32, alpha: 0.7 });
+        } else if (seed === 19) {
+          g.circle(x + 50, y + 14, 0.9);
+          g.fill({ color: 0x4a3a28, alpha: 0.5 });
+        }
+      }
+    }
+    this.bgLayer.addChild(g);
+  }
+
+  // ---------- Vignette (screen-space) ----------
+  private buildVignette(): void {
+    this.repaintVignette();
+  }
+
+  private repaintVignette(): void {
+    const w = this.app.screen.width;
+    const h = this.app.screen.height;
+    const g = this.vignetteLayer;
+    g.clear();
+    // Four corner-darkening rects (cheap stand-in for radial gradient)
+    const t = Math.max(80, Math.min(w, h) * 0.18);
+    g.rect(0, 0, w, t);
+    g.fill({ color: 0x000000, alpha: 0.4 });
+    g.rect(0, h - t, w, t);
+    g.fill({ color: 0x000000, alpha: 0.4 });
+    g.rect(0, 0, t, h);
+    g.fill({ color: 0x000000, alpha: 0.4 });
+    g.rect(w - t, 0, t, h);
+    g.fill({ color: 0x000000, alpha: 0.4 });
   }
 
   private spawnHit(x: number, y: number, txt: string, kind: HitKind): void {
@@ -904,11 +1022,17 @@ export class DungeonGame {
       p.life -= dt;
       p.x += p.vx * dt;
       p.y += p.vy * dt;
-      p.vx *= 0.92;
-      p.vy *= 0.92;
-      p.vy += 50 * dt; // mild gravity
+      p.vx *= p.drag;
+      p.vy *= p.drag;
+      p.vy += p.gravity * dt;
       p.graphics.position.set(p.x, p.y);
-      p.graphics.alpha = Math.max(0, p.life / p.maxLife);
+      // Ambient particles (ember/dust) use a softer fade curve
+      if (p.kind === 'ember' || p.kind === 'dust') {
+        const t = p.life / p.maxLife;
+        p.graphics.alpha = Math.max(0, Math.min(1, t < 0.2 ? t * 5 : 1) * 0.55);
+      } else {
+        p.graphics.alpha = Math.max(0, p.life / p.maxLife);
+      }
       if (p.life <= 0) {
         this.particleLayer.removeChild(p.graphics);
         p.graphics.destroy();

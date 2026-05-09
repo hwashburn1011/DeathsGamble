@@ -31,7 +31,14 @@ export function DungeonScene() {
   const nextRound = useGameStore((s) => s.nextRound);
   const triggerWin = useGameStore((s) => s.triggerWin);
   const motionIntensity = useSettingsStore((s) => s.motionIntensity);
+  const blood = useSettingsStore((s) => s.blood);
   const isBossRaid = isBossRaidFn();
+
+  // Engine reads blood toggle off a global (avoids dragging zustand into the
+  // engine module). Keep it in sync with the store.
+  useEffect(() => {
+    (window as Window & { __DG_BLOOD_ON?: boolean }).__DG_BLOOD_ON = blood;
+  }, [blood]);
 
   const [hud, setHud] = useState<HudStats>({
     hp: stats?.hp ?? run.build?.baseHp ?? 100,
