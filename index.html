@@ -126,7 +126,7 @@
 
   .wheel-button-group {
     position: absolute;
-    bottom: 60px;
+    top: 75%;
     transform: translateX(-50%);
     text-align: center;
   }
@@ -899,11 +899,13 @@ function renderWheelsScene() {
 function positionWheelButtons(g) {
   const buffGroup = $('buff-group');
   const curseGroup = $('curse-group');
-  // Place buttons just below each wheel.
-  const yFromTop = g.cy + g.wheelR + 28;
-  const yFromBottom = Math.max(20, g.h - yFromTop);
-  buffGroup.style.bottom = yFromBottom + 'px';
-  curseGroup.style.bottom = yFromBottom + 'px';
+  // Position the TOP of each button group just below its wheel,
+  // so the whole group (label → button → result) sits below the wheel.
+  const yFromTop = g.cy + g.wheelR + 18;
+  buffGroup.style.top  = yFromTop + 'px';
+  curseGroup.style.top = yFromTop + 'px';
+  buffGroup.style.bottom = 'auto';
+  curseGroup.style.bottom = 'auto';
   buffGroup.style.left = g.buffCx + 'px';
   curseGroup.style.left = g.curseCx + 'px';
 }
