@@ -5,6 +5,8 @@ import { TitleScene } from './scenes/TitleScene';
 import { ModeSelectScene } from './scenes/ModeSelectScene';
 import { BuildPickerScene } from './scenes/BuildPickerScene';
 import { WheelsScene } from './scenes/WheelsScene';
+import { DungeonScene } from './scenes/DungeonScene';
+import { GameoverScene } from './scenes/GameoverScene';
 import { CreditsScene } from './scenes/CreditsScene';
 import { SettingsButton } from './ui/SettingsButton';
 import type { SceneName } from './types';
@@ -14,12 +16,11 @@ const SCENES: Record<SceneName, () => JSX.Element> = {
   modeselect: ModeSelectScene,
   buildpicker: BuildPickerScene,
   wheels: WheelsScene,
+  dungeon: DungeonScene,
+  gameover: GameoverScene,
   credits: CreditsScene,
-  // The following are placeholders that route through WheelsScene's bridge
-  // until they're ported in subsequent turns.
-  dungeon: WheelsScene,
+  // Still placeholders bridging to legacy/v0.5.html
   shop: WheelsScene,
-  gameover: WheelsScene,
   win: WheelsScene,
 };
 

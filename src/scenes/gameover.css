@@ -1,0 +1,57 @@
+.gameover-scene {
+  padding: 30px;
+}
+
+.gameover-card {
+  max-width: 540px;
+  text-align: center;
+}
+
+.gameover-heading {
+  font-size: clamp(36px, 6vw, 64px);
+  color: var(--blood-bright);
+  text-shadow: 0 0 24px rgba(224, 72, 72, 0.4);
+  margin-bottom: 14px;
+}
+
+.gameover-epitaph {
+  font-style: italic;
+  color: var(--ink-muted);
+  font-size: 16px;
+  margin-bottom: 28px;
+}
+
+.gameover-stats {
+  display: flex;
+  justify-content: center;
+  gap: 36px;
+  margin-bottom: 32px;
+  flex-wrap: wrap;
+}
+
+.gameover-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.gameover-stat-label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.gameover-stat-value {
+  font-family: var(--font-display);
+  font-size: 22px;
+  color: var(--gold);
+}
+
+.gameover-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
