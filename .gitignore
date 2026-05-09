@@ -5,6 +5,9 @@ node_modules/
 dist/
 dist-ssr/
 
+# TS incremental build cache
+*.tsbuildinfo
+
 # Editor / OS
 .DS_Store
 Thumbs.db
