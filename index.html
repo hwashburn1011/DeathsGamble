@@ -492,9 +492,11 @@ window.addEventListener('resize', () => {
 function wheelGeometry() {
   const w = wheelsCanvas.clientWidth;
   const h = wheelsCanvas.clientHeight;
-  const wheelR = Math.min(w * 0.18, h * 0.28);
-  const cy = h * 0.55;
-  const offset = wheelR * 1.55;
+  // Smaller wheels + wider spacing so Death's reach reads,
+  // and so the hood has headroom above the wheels.
+  const wheelR = Math.min(w * 0.14, h * 0.20);
+  const cy = h * 0.6;
+  const offset = wheelR * 1.95;
   return {
     w, h,
     cy,
@@ -505,138 +507,287 @@ function wheelGeometry() {
   };
 }
 
-function drawDeathFigure(g) {
-  const { deathCx, cy, wheelR, buffCx, curseCx } = g;
+function eyeGlowAlpha() {
+  const t = performance.now() / 1000;
+  return 0.7 + 0.3 * Math.sin(t * 2.4);
+}
+
+function drawDeathBack(g) {
+  // Everything BEHIND the wheels: cloak, hood, head, eyes, sleeves.
+  const { deathCx, cy, wheelR, h } = g;
   const ctx = wctx;
 
-  // Robe height extends below visible area
-  const headY     = cy - wheelR * 1.55;
-  const shoulderY = cy - wheelR * 0.4;
-  const robeBottomY = g.h + 20;
+  const headTopY    = cy - wheelR * 2.35;
+  const headCenterY = cy - wheelR * 1.65;
+  const collarY     = cy - wheelR * 0.95;
+  const shoulderY   = cy - wheelR * 0.65;
+  const robeBottom  = h + 30;
 
-  // ---------- Robe base (silhouette) ----------
-  const robeWidth = wheelR * 3.8;
-  ctx.save();
-  const grad = ctx.createLinearGradient(0, headY, 0, robeBottomY);
-  grad.addColorStop(0, '#16161e');
-  grad.addColorStop(0.5, '#0d0d14');
-  grad.addColorStop(1, '#050507');
-  ctx.fillStyle = grad;
+  // ---------- Robe / cloak silhouette ----------
+  const robeBottomHalf = wheelR * 4.5;
+  const robeMidHalf    = wheelR * 2.6;
+  const robeShoulderHalf = wheelR * 1.7;
+
+  const robeGrad = ctx.createLinearGradient(0, headTopY, 0, robeBottom);
+  robeGrad.addColorStop(0,    '#1e1e2a');
+  robeGrad.addColorStop(0.35, '#13131c');
+  robeGrad.addColorStop(0.75, '#0a0a10');
+  robeGrad.addColorStop(1,    '#040406');
+
+  ctx.fillStyle = robeGrad;
   ctx.beginPath();
-  // Right side curve down
-  ctx.moveTo(deathCx + wheelR * 0.55, headY + wheelR * 0.2);
+  // Hood peak (slight gothic point)
+  ctx.moveTo(deathCx, headTopY);
+  // Right hood edge sweeping out to shoulder
   ctx.bezierCurveTo(
-    deathCx + robeWidth * 0.45, shoulderY - wheelR * 0.3,
-    deathCx + robeWidth * 0.55, cy + wheelR * 0.5,
-    deathCx + robeWidth * 0.6,  robeBottomY
+    deathCx + wheelR * 0.95, headTopY + wheelR * 0.25,
+    deathCx + wheelR * 1.25, collarY - wheelR * 0.05,
+    deathCx + robeShoulderHalf, shoulderY + wheelR * 0.05
   );
-  ctx.lineTo(deathCx - robeWidth * 0.6, robeBottomY);
+  // Right cloak side draping down
   ctx.bezierCurveTo(
-    deathCx - robeWidth * 0.55, cy + wheelR * 0.5,
-    deathCx - robeWidth * 0.45, shoulderY - wheelR * 0.3,
-    deathCx - wheelR * 0.55, headY + wheelR * 0.2
+    deathCx + robeMidHalf,    cy + wheelR * 0.25,
+    deathCx + robeBottomHalf, cy + wheelR * 1.5,
+    deathCx + robeBottomHalf, robeBottom
   );
-  // Hood top
+  ctx.lineTo(deathCx - robeBottomHalf, robeBottom);
   ctx.bezierCurveTo(
-    deathCx - wheelR * 0.85, headY - wheelR * 0.2,
-    deathCx - wheelR * 0.5, headY - wheelR * 0.95,
-    deathCx, headY - wheelR * 1.05
+    deathCx - robeBottomHalf, cy + wheelR * 1.5,
+    deathCx - robeMidHalf,    cy + wheelR * 0.25,
+    deathCx - robeShoulderHalf, shoulderY + wheelR * 0.05
   );
   ctx.bezierCurveTo(
-    deathCx + wheelR * 0.5, headY - wheelR * 0.95,
-    deathCx + wheelR * 0.85, headY - wheelR * 0.2,
-    deathCx + wheelR * 0.55, headY + wheelR * 0.2
+    deathCx - wheelR * 1.25, collarY - wheelR * 0.05,
+    deathCx - wheelR * 0.95, headTopY + wheelR * 0.25,
+    deathCx, headTopY
   );
   ctx.closePath();
   ctx.fill();
-  ctx.restore();
 
-  // ---------- Hood inner shadow / face void ----------
-  ctx.save();
-  ctx.fillStyle = '#000';
-  ctx.beginPath();
-  ctx.ellipse(deathCx, headY - wheelR * 0.25, wheelR * 0.42, wheelR * 0.55, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
+  // ---------- Cloak fold highlights ----------
+  ctx.strokeStyle = 'rgba(255,255,255,0.035)';
+  ctx.lineWidth = 1.2;
+  for (let i = -3; i <= 3; i++) {
+    if (i === 0) continue;
+    const xT = deathCx + i * wheelR * 0.55;
+    const xB = deathCx + i * wheelR * 0.95;
+    ctx.beginPath();
+    ctx.moveTo(xT, shoulderY + wheelR * 0.4);
+    ctx.bezierCurveTo(
+      xT * 1.0, cy + wheelR * 0.5,
+      xB,       cy + wheelR * 1.4,
+      xB,       robeBottom * 0.95
+    );
+    ctx.stroke();
+  }
 
-  // ---------- Glowing eyes ----------
-  ctx.save();
-  ctx.shadowColor = '#c9a227';
-  ctx.shadowBlur = 14;
-  ctx.fillStyle = '#f0c84a';
+  // ---------- Hood rim highlight (subtle) ----------
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.arc(deathCx - wheelR * 0.13, headY - wheelR * 0.30, wheelR * 0.045, 0, Math.PI * 2);
-  ctx.arc(deathCx + wheelR * 0.13, headY - wheelR * 0.30, wheelR * 0.045, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-
-  // ---------- Hood rim highlight ----------
-  ctx.save();
-  ctx.strokeStyle = '#1a1a22';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(deathCx - wheelR * 0.55, headY + wheelR * 0.15);
+  ctx.moveTo(deathCx - wheelR * 1.25, collarY - wheelR * 0.05);
   ctx.bezierCurveTo(
-    deathCx - wheelR * 0.85, headY - wheelR * 0.2,
-    deathCx - wheelR * 0.5, headY - wheelR * 0.95,
-    deathCx, headY - wheelR * 1.05
+    deathCx - wheelR * 0.95, headTopY + wheelR * 0.25,
+    deathCx - wheelR * 0.4,  headTopY - wheelR * 0.05,
+    deathCx, headTopY
   );
   ctx.bezierCurveTo(
-    deathCx + wheelR * 0.5, headY - wheelR * 0.95,
-    deathCx + wheelR * 0.85, headY - wheelR * 0.2,
-    deathCx + wheelR * 0.55, headY + wheelR * 0.15
+    deathCx + wheelR * 0.4,  headTopY - wheelR * 0.05,
+    deathCx + wheelR * 0.95, headTopY + wheelR * 0.25,
+    deathCx + wheelR * 1.25, collarY - wheelR * 0.05
   );
   ctx.stroke();
+
+  // ---------- Hood opening (face void) ----------
+  const hoodOpenW = wheelR * 0.55;
+  const hoodOpenH = wheelR * 0.8;
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.ellipse(deathCx, headCenterY, hoodOpenW, hoodOpenH, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Inner glow inside hood (warm)
+  const hoodGlow = ctx.createRadialGradient(
+    deathCx, headCenterY + hoodOpenH * 0.05, 0,
+    deathCx, headCenterY, hoodOpenW * 1.1
+  );
+  hoodGlow.addColorStop(0, 'rgba(120,80,30,0.35)');
+  hoodGlow.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = hoodGlow;
+  ctx.beginPath();
+  ctx.ellipse(deathCx, headCenterY, hoodOpenW * 1.1, hoodOpenH * 1.1, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ---------- Glowing eyes ----------
+  const ga = eyeGlowAlpha();
+  const eyeY = headCenterY - hoodOpenH * 0.05;
+  const eyeDx = hoodOpenW * 0.32;
+  const eyeR  = hoodOpenW * 0.085;
+  ctx.save();
+  ctx.shadowColor = `rgba(240,200,80,${ga})`;
+  ctx.shadowBlur  = 22 * ga;
+  ctx.fillStyle = `rgba(255,225,130,${ga})`;
+  ctx.beginPath();
+  ctx.arc(deathCx - eyeDx, eyeY, eyeR, 0, Math.PI * 2);
+  ctx.arc(deathCx + eyeDx, eyeY, eyeR, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 
-  // ---------- Skeletal arms gripping wheels ----------
-  drawArm(deathCx - wheelR * 0.45, shoulderY, buffCx, cy, +1);
-  drawArm(deathCx + wheelR * 0.45, shoulderY, curseCx, cy, -1);
+  // ---------- Sleeves (upper arms / cloak draping over shoulders) ----------
+  drawSleeve(g, +1);
+  drawSleeve(g, -1);
 }
 
-function drawArm(sx, sy, hx, hy, sign) {
-  // Bezier "bone" with claw at the end
+function drawSleeve(g, sign) {
+  // sign = -1 left, +1 right
+  // Sleeve curves from shoulder out to a cuff just inside the wheel.
+  const { deathCx, cy, wheelR } = g;
   const ctx = wctx;
-  const midX = (sx + hx) / 2;
-  const midY = (sy + hy) / 2 - 30 * sign;
+
+  const wheelCx = sign < 0 ? g.buffCx : g.curseCx;
+  const innerWheelEdgeX = wheelCx - sign * wheelR;   // edge facing Death
+  const shoulderX = deathCx + sign * wheelR * 0.55;
+  const shoulderY = cy - wheelR * 0.55;
+  const cuffX     = innerWheelEdgeX - sign * wheelR * 0.05;
+  const cuffY     = cy - wheelR * 0.25;
+
+  const ctrlX = (shoulderX + cuffX) / 2 + sign * wheelR * 0.05;
+  const ctrlY = (shoulderY + cuffY) / 2 + wheelR * 0.18;
+
+  // Outer sleeve fill
+  const sleeveGrad = ctx.createLinearGradient(shoulderX, shoulderY, cuffX, cuffY);
+  sleeveGrad.addColorStop(0, '#16161e');
+  sleeveGrad.addColorStop(1, '#0a0a10');
+  ctx.fillStyle = sleeveGrad;
+  ctx.beginPath();
+  // Outer (lower/outer) edge
+  const outerOff = wheelR * 0.18;
+  const innerOff = wheelR * 0.10;
+  ctx.moveTo(shoulderX + sign * 4, shoulderY - innerOff);
+  ctx.quadraticCurveTo(ctrlX + sign * outerOff, ctrlY + outerOff,
+                       cuffX + sign * innerOff, cuffY + innerOff);
+  // Cuff
+  ctx.lineTo(cuffX - sign * innerOff, cuffY - innerOff);
+  // Inner (upper) edge back to shoulder
+  ctx.quadraticCurveTo(ctrlX - sign * innerOff, ctrlY - innerOff * 0.5,
+                       shoulderX - sign * 4, shoulderY - innerOff - wheelR * 0.1);
+  ctx.closePath();
+  ctx.fill();
+
+  // Inner highlight along the upper edge
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(shoulderX - sign * 2, shoulderY - innerOff - wheelR * 0.05);
+  ctx.quadraticCurveTo(ctrlX - sign * innerOff * 0.5, ctrlY - innerOff,
+                       cuffX - sign * innerOff * 0.5, cuffY - innerOff * 0.6);
+  ctx.stroke();
+
+  // Save the cuff position on the geometry for use by drawDeathFront.
+  if (!g.cuffs) g.cuffs = {};
+  g.cuffs[sign < 0 ? 'left' : 'right'] = { x: cuffX, y: cuffY };
+}
+
+function drawDeathFront(g) {
+  // Drawn AFTER the wheels — forearm bone + hand + claws gripping the rim.
+  drawHandOnWheel(g, +1);  // left wheel (buff)
+  drawHandOnWheel(g, -1);  // right wheel (curse)
+}
+
+function drawHandOnWheel(g, sign) {
+  // sign = -1 for left wheel, +1 for right wheel
+  const { cy, wheelR } = g;
+  const ctx = wctx;
+
+  const wheelCx = sign < 0 ? g.buffCx : g.curseCx;
+  const wheelCy = cy;
+
+  // Cuff position from the sleeve we drew earlier
+  const cuff = g.cuffs && g.cuffs[sign < 0 ? 'left' : 'right'];
+  const cuffX = cuff ? cuff.x : wheelCx - sign * wheelR;
+  const cuffY = cuff ? cuff.y : cy - wheelR * 0.25;
+
+  // Hand sits on the inner-upper rim of the wheel.
+  // Inner side is opposite to `sign` direction (left wheel → grip on its right side).
+  const gripAngle = sign < 0 ? -Math.PI * 0.20 : Math.PI + Math.PI * 0.20;
+  const handX = wheelCx + Math.cos(gripAngle) * (wheelR * 0.95);
+  const handY = wheelCy + Math.sin(gripAngle) * (wheelR * 0.95);
 
   ctx.save();
-  // Sleeve (cloak fold around upper arm)
-  ctx.strokeStyle = '#101018';
-  ctx.lineWidth = 22;
+
+  // ---------- Forearm bone (cuff → hand) ----------
+  const ctrlX = (cuffX + handX) / 2;
+  const ctrlY = (cuffY + handY) / 2 - wheelR * 0.05;
+
+  // Bone outline shadow
+  ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+  ctx.lineWidth = 6;
   ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.moveTo(sx, sy);
-  ctx.quadraticCurveTo(midX, midY, hx, hy);
+  ctx.moveTo(cuffX, cuffY + 1);
+  ctx.quadraticCurveTo(ctrlX, ctrlY + 1, handX, handY + 1);
   ctx.stroke();
 
   // Bone
-  ctx.strokeStyle = '#c8c0a8';
-  ctx.lineWidth = 5;
+  ctx.strokeStyle = '#d4ccb2';
+  ctx.lineWidth = 4.5;
   ctx.beginPath();
-  ctx.moveTo(sx, sy);
-  ctx.quadraticCurveTo(midX, midY, hx, hy);
+  ctx.moveTo(cuffX, cuffY);
+  ctx.quadraticCurveTo(ctrlX, ctrlY, handX, handY);
   ctx.stroke();
 
-  // Hand / claw at wheel center
-  ctx.fillStyle = '#d8d0b8';
-  ctx.strokeStyle = '#888070';
-  ctx.lineWidth = 1.5;
+  // Bone highlight
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+  ctx.lineWidth = 1.2;
   ctx.beginPath();
-  ctx.arc(hx, hy, 10, 0, Math.PI * 2);
+  ctx.moveTo(cuffX, cuffY - 1);
+  ctx.quadraticCurveTo(ctrlX, ctrlY - 1, handX, handY - 1);
+  ctx.stroke();
+
+  // ---------- Palm ----------
+  ctx.fillStyle = '#dcd4ba';
+  ctx.strokeStyle = '#6d6450';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.arc(handX, handY, wheelR * 0.075, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
 
-  // Three thin claws fanning around the hub
+  // ---------- Three claws curling along the rim ----------
+  // Claws fan out tangentially around the gripping point.
   for (let i = -1; i <= 1; i++) {
-    const a = -sign * (Math.PI * 0.15 * i + Math.PI * 0.5);
+    const fingerAngle = gripAngle + i * 0.22;
+    const tipR = wheelR * 0.92;
+    const tipBaseX = wheelCx + Math.cos(fingerAngle) * (wheelR * 0.96);
+    const tipBaseY = wheelCy + Math.sin(fingerAngle) * (wheelR * 0.96);
+    // Curl: tip pulled slightly inward
+    const tipX = wheelCx + Math.cos(fingerAngle) * tipR + Math.cos(fingerAngle + Math.PI/2) * wheelR * 0.04 * (sign < 0 ? 1 : -1);
+    const tipY = wheelCy + Math.sin(fingerAngle) * tipR + Math.sin(fingerAngle + Math.PI/2) * wheelR * 0.04 * (sign < 0 ? 1 : -1);
+
+    // Finger bone shadow
+    ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(hx, hy);
-    ctx.lineTo(hx + Math.cos(a) * 22, hy + Math.sin(a) * 22);
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = '#c8c0a8';
+    ctx.moveTo(handX, handY + 1);
+    ctx.quadraticCurveTo(tipBaseX, tipBaseY + 1, tipX, tipY + 1);
     ctx.stroke();
+
+    // Finger bone
+    ctx.strokeStyle = '#d4ccb2';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(handX, handY);
+    ctx.quadraticCurveTo(tipBaseX, tipBaseY, tipX, tipY);
+    ctx.stroke();
+
+    // Claw nail
+    ctx.fillStyle = '#1a1a1f';
+    ctx.beginPath();
+    ctx.arc(tipX, tipY, 2.2, 0, Math.PI * 2);
+    ctx.fill();
   }
+
   ctx.restore();
 }
 
@@ -722,28 +873,37 @@ function drawWheel(cx, cy, r, segments, angle, kind) {
 
 function renderWheelsScene() {
   const g = wheelGeometry();
-  wctx.clearRect(0, 0, g.w, g.h);
+  const ctx = wctx;
+  ctx.clearRect(0, 0, g.w, g.h);
 
-  // Floor line
-  wctx.fillStyle = '#0a0a0c';
-  wctx.fillRect(0, g.h * 0.88, g.w, 4);
+  // Faint floor mist
+  const mist = ctx.createLinearGradient(0, g.h * 0.7, 0, g.h);
+  mist.addColorStop(0, 'rgba(0,0,0,0)');
+  mist.addColorStop(1, 'rgba(40,40,55,0.2)');
+  ctx.fillStyle = mist;
+  ctx.fillRect(0, g.h * 0.7, g.w, g.h * 0.3);
 
-  drawDeathFigure(g);
+  // Ground line
+  ctx.fillStyle = '#0a0a0c';
+  ctx.fillRect(0, g.h * 0.92, g.w, 3);
+
+  // Render order: Death (back) → wheels → Death (front, hands gripping rim)
+  drawDeathBack(g);
   drawWheel(g.buffCx,  g.cy, g.wheelR, BUFF_SEGMENTS,  wheels.buff.angle,  'buff');
   drawWheel(g.curseCx, g.cy, g.wheelR, CURSE_SEGMENTS, wheels.curse.angle, 'curse');
+  drawDeathFront(g);
 
-  // Position the bottom button groups under each wheel (use page coords)
   positionWheelButtons(g);
 }
 
 function positionWheelButtons(g) {
-  const stage = $('wheels-stage').getBoundingClientRect();
   const buffGroup = $('buff-group');
   const curseGroup = $('curse-group');
-  // Bottom buttons sit just under each wheel
-  const yPx = g.cy + g.wheelR + 28;
-  buffGroup.style.bottom = (stage.height - yPx) + 'px';
-  curseGroup.style.bottom = (stage.height - yPx) + 'px';
+  // Place buttons just below each wheel.
+  const yFromTop = g.cy + g.wheelR + 28;
+  const yFromBottom = Math.max(20, g.h - yFromTop);
+  buffGroup.style.bottom = yFromBottom + 'px';
+  curseGroup.style.bottom = yFromBottom + 'px';
   buffGroup.style.left = g.buffCx + 'px';
   curseGroup.style.left = g.curseCx + 'px';
 }
