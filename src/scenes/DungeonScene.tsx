@@ -5,6 +5,7 @@ import { useGameStore } from '../state/gameStore';
 import { useSettingsStore } from '../state/settingsStore';
 import { usePersistentStore } from '../state/persistentStore';
 import { DungeonGame } from '../engine/dungeon/DungeonGame';
+import { themeFor } from '../engine/pixi/manifest';
 import './dungeon.css';
 
 interface HudStats {
@@ -91,6 +92,13 @@ export function DungeonScene() {
           isBossRaid,
           motionIntensity,
           cashMult,
+          theme: themeFor({
+            mode: run.mode,
+            raid: run.raid,
+            totalRaids: run.totalRaids,
+            endlessRound: run.endlessRound,
+            isBossRaid,
+          }),
           onPreloadProgress: (loaded, total) => {
             if (cancelled) return;
             setLoadProgress({ loaded, total });

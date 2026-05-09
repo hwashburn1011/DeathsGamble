@@ -11,10 +11,11 @@ import {
   Assets,
   Text,
   TextStyle,
+  TilingSprite,
 } from 'pixi.js';
 import type { BuildDef, EnemyTypeDef, PlayerStats, SettingsState, WeaponDef } from '../../types';
 import { ENEMY_TYPES, FINAL_BOSS } from '../../data/enemies';
-import { PLAYER_SPRITE_BY_BUILD, ENEMY_SPRITE_BY_TYPE } from '../pixi/manifest';
+import { PLAYER_SPRITE_BY_BUILD, ENEMY_SPRITE_BY_TYPE, THEMES, type ThemeKey } from '../pixi/manifest';
 import { AudioManager } from '../audio/AudioManager';
 
 const ROUND_DURATION_S = 60;
@@ -26,6 +27,18 @@ const MOTION_MULT: Record<SettingsState['motionIntensity'], number> = {
   normal: 1.0,
   high: 1.5,
 };
+
+/** Tiny seeded PRNG — deterministic decoration placement. */
+function mulberry32(seed: number): () => number {
+  let s = seed >>> 0;
+  return function () {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let t = s;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
 
 interface PlayerEntity {
   x: number;
@@ -112,6 +125,7 @@ export interface DungeonGameOptions {
   isBossRaid: boolean;
   motionIntensity: SettingsState['motionIntensity'];
   cashMult: number;        // 1 + greedLevel*0.25
+  theme: ThemeKey;
   onPreloadProgress?: (loaded: number, total: number) => void;
   onStatsChange: (s: {
     hp: number;
@@ -301,9 +315,12 @@ export class DungeonGame {
 
   // ---------- Preload ----------
   private async preload(): Promise<void> {
+    const theme = THEMES[this.opts.theme];
     const urls = [
       PLAYER_SPRITE_BY_BUILD[this.opts.build.id] ?? PLAYER_SPRITE_BY_BUILD['gambler'],
       ...Object.values(ENEMY_SPRITE_BY_TYPE),
+      theme.floor,
+      ...theme.decorations,
     ];
     let loaded = 0;
     const total = urls.length;
@@ -983,42 +1000,54 @@ export class DungeonGame {
     }
   }
 
-  // ---------- Background tiles (procedural stone) ----------
+  // ---------- Background tiles (real CC0 dungeon-crawl floor + decorations) ----------
   private buildBackground(): void {
-    // Tile a large area in world coords so the player can wander and the
-    // camera scrolls naturally. Procedural Graphics — no asset dependency.
-    const TILE = 64;
-    const RANGE = 60; // ±60 tiles each direction → 120x120 tiles total
-    const g = new Graphics();
-    for (let i = -RANGE; i < RANGE; i++) {
-      for (let j = -RANGE; j < RANGE; j++) {
-        const x = i * TILE;
-        const y = j * TILE;
-        // Base stone color varies subtly per tile for texture
-        const v = ((i * 7 + j * 13) & 7) / 7;
-        const base = 0x10101a + Math.floor(v * 0x080810);
-        g.rect(x, y, TILE, TILE);
-        g.fill({ color: base });
-        // Tile border lines — almost invisible, just enough texture
-        g.rect(x, y, TILE, 1);
-        g.fill({ color: 0x1a1a26, alpha: 0.5 });
-        g.rect(x, y, 1, TILE);
-        g.fill({ color: 0x1a1a26, alpha: 0.5 });
-        // Sparse cracks / debris flecks
-        const seed = (i * 31 + j * 17) & 31;
-        if (seed === 3) {
-          g.circle(x + 18 + ((i + j) & 7) * 3, y + 24, 1.3);
-          g.fill({ color: 0x3a2818, alpha: 0.55 });
-        } else if (seed === 11) {
-          g.rect(x + 12, y + 36, 6, 1);
-          g.fill({ color: 0x2a2a32, alpha: 0.7 });
-        } else if (seed === 19) {
-          g.circle(x + 50, y + 14, 0.9);
-          g.fill({ color: 0x4a3a28, alpha: 0.5 });
-        }
-      }
+    const theme = THEMES[this.opts.theme];
+    const SCALE = 2;       // upscale 32x32 source → 64x64 in world
+    const AREA = 4000;     // covers ±2000 px from origin in world space
+
+    // Floor: single TilingSprite — Pixi tiles the texture across the whole
+    // area in one draw call, no thousands-of-sprites overhead.
+    const floorTex = Texture.from(theme.floor);
+    const floor = new TilingSprite({
+      texture: floorTex,
+      width: AREA,
+      height: AREA,
+    });
+    floor.position.set(-AREA / 2, -AREA / 2);
+    floor.tileScale.set(SCALE);
+    floor.tint = theme.floorTint;
+    this.bgLayer.addChild(floor);
+
+    // Subtle dark vignette layer over the floor — gives the floor depth even
+    // before the dynamic torch lighting kicks in.
+    const tint = new Graphics();
+    tint.rect(-AREA / 2, -AREA / 2, AREA, AREA);
+    tint.fill({ color: 0x000000, alpha: 0.18 });
+    this.bgLayer.addChild(tint);
+
+    // Scatter decorations — deterministic seed so the same theme produces
+    // the same arrangement every time (recognizable spaces).
+    const rng = mulberry32(0x9e3779b1 ^ this.opts.theme.charCodeAt(0));
+    const COUNT = 90;
+    for (let i = 0; i < COUNT; i++) {
+      const url = theme.decorations[Math.floor(rng() * theme.decorations.length)];
+      const tex = Texture.from(url);
+      const sprite = new Sprite(tex);
+      sprite.anchor.set(0.5, 1.0); // bottom-center for grounded objects
+      // Scatter in a smaller radius around origin so player encounters them
+      // near where they spawn / move
+      const r = 200 + rng() * 1600;
+      const a = rng() * Math.PI * 2;
+      sprite.position.set(Math.cos(a) * r, Math.sin(a) * r);
+      // Per-instance scale variance + slight tint variation for visual life
+      const scale = SCALE * (0.85 + rng() * 0.5);
+      sprite.scale.set(scale);
+      // Random horizontal flip for a chance of mirroring
+      if (rng() < 0.5) sprite.scale.x = -scale;
+      sprite.alpha = 0.75 + rng() * 0.25;
+      this.bgLayer.addChild(sprite);
     }
-    this.bgLayer.addChild(g);
   }
 
   // ---------- Vignette (screen-space) ----------

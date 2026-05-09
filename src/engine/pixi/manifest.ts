@@ -41,9 +41,94 @@ export const ENEMY_SPRITE_BY_TYPE: Record<EnemySprite, string> = {
 // the base path.
 export const TINY_DUNGEON_BASE = `${BASE}assets/tiles/kenney-tiny-dungeon/tiles`;
 
+// ----- Dungeon themes (per-raid environments) -----
+// Each theme picks a single floor texture (used as a TilingSprite base) plus
+// a list of decoration sprites that get scattered randomly across the floor.
+export type ThemeKey = 'crypt' | 'catacomb' | 'hellscape' | 'cavern';
+
+const DC = `${BASE}assets/tiles/dungeon-crawl`;
+
+export interface ThemeDef {
+  floor: string;
+  /** Decoration sprite paths. Picked at random for each scatter slot. */
+  decorations: string[];
+  /** Tint applied to the floor TilingSprite (multiplicative). */
+  floorTint: number;
+}
+
+export const THEMES: Record<ThemeKey, ThemeDef> = {
+  // Raid 1 — crypt (basic dungeon, dry stone)
+  crypt: {
+    floor: `${DC}/dc-dngn/floor/grey_dirt0.png`,
+    decorations: [
+      `${DC}/dc-dngn/crumbled_column.png`,
+      `${DC}/dc-dngn/granite_statue.png`,
+      `${DC}/dc-dngn/granite_stump.png`,
+      `${DC}/dc-dngn/dngn_dry_fountain.png`,
+      `${DC}/dc-dngn/elephant_statue.png`,
+    ],
+    floorTint: 0xa8a89c,
+  },
+  // Raid 2 — catacomb (tomb stone, mausoleum)
+  catacomb: {
+    floor: `${DC}/dc-dngn/floor/tomb0.png`,
+    decorations: [
+      `${DC}/dc-dngn/granite_stump.png`,
+      `${DC}/dc-dngn/dngn_blue_fountain.png`,
+      `${DC}/dc-dngn/crumbled_column.png`,
+      `${DC}/dc-dngn/granite_statue.png`,
+      `${DC}/dc-dngn/dngn_orcish_idol.png`,
+    ],
+    floorTint: 0x9090a0,
+  },
+  // Raid 3+ / boss — hellscape (bloody cobble, demonic accents)
+  hellscape: {
+    floor: `${DC}/dc-dngn/floor/cobble_blood1.png`,
+    decorations: [
+      `${DC}/dc-dngn/dngn_blood_fountain.png`,
+      `${DC}/dc-misc/blood_red1.png`,
+      `${DC}/dc-misc/blood_red2.png`,
+      `${DC}/dc-misc/blood_red3.png`,
+      `${DC}/dc-dngn/dngn_orcish_idol.png`,
+      `${DC}/dc-dngn/crumbled_column.png`,
+    ],
+    floorTint: 0xc06060,
+  },
+  // Endless variant — cavern (sandstone)
+  cavern: {
+    floor: `${DC}/dc-dngn/floor/sandstone_floor0.png`,
+    decorations: [
+      `${DC}/dc-dngn/crumbled_column.png`,
+      `${DC}/dc-dngn/granite_stump.png`,
+      `${DC}/dc-dngn/dngn_dry_fountain.png`,
+    ],
+    floorTint: 0xb0a080,
+  },
+};
+
+/** Resolve a theme for the current run state. */
+export function themeFor(opts: {
+  mode: 'story' | 'infinite';
+  raid: number;
+  totalRaids: number;
+  endlessRound: number;
+  isBossRaid: boolean;
+}): ThemeKey {
+  if (opts.isBossRaid) return 'hellscape';
+  if (opts.mode === 'story') {
+    if (opts.raid <= 1) return 'crypt';
+    if (opts.raid === 2) return 'catacomb';
+    return 'hellscape';
+  }
+  // Infinite — rotate
+  const cycle: ThemeKey[] = ['crypt', 'catacomb', 'cavern', 'hellscape'];
+  return cycle[opts.endlessRound % cycle.length];
+}
+
 // ----- Aggregate list for preloading -----
-export function dungeonAssetsToLoad(build: BuildDef): string[] {
+export function dungeonAssetsToLoad(build: BuildDef, theme: ThemeKey): string[] {
   const playerSprite = PLAYER_SPRITE_BY_BUILD[build.id] ?? PLAYER_SPRITE_BY_BUILD['gambler'];
   const enemySprites = Object.values(ENEMY_SPRITE_BY_TYPE);
-  return [playerSprite, ...enemySprites];
+  const t = THEMES[theme];
+  return [playerSprite, ...enemySprites, t.floor, ...t.decorations];
 }
