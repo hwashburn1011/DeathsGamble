@@ -6,15 +6,17 @@
 <title>Death's Gamble</title>
 <style>
   :root {
-    --bg: #0a0a0c;
-    --bg2: #15151a;
+    --bg: #07070a;
+    --bg2: #11111a;
     --ink: #e9e6df;
     --ink-dim: #8a8478;
     --accent: #c9a227;
+    --accent-bright: #f0c84a;
     --danger: #b03030;
+    --danger-bright: #e04848;
     --good: #4d8a52;
-    --hood: #1a1a1f;
-    --hood-light: #2a2a32;
+    --good-bright: #69b070;
+    --hood: #0d0d12;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -22,7 +24,7 @@
   html, body {
     height: 100%;
     background:
-      radial-gradient(ellipse at 50% 0%, #1c1c22 0%, var(--bg) 60%) no-repeat,
+      radial-gradient(ellipse at 50% 0%, #1c1c26 0%, var(--bg) 70%) no-repeat,
       var(--bg);
     color: var(--ink);
     font-family: 'Georgia', 'Times New Roman', serif;
@@ -30,14 +32,7 @@
     user-select: none;
   }
 
-  #app {
-    position: relative;
-    width: 100vw;
-    height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
+  #app { position: relative; width: 100vw; height: 100vh; }
 
   /* ---------- Screens ---------- */
   .screen {
@@ -50,12 +45,12 @@
   }
   .screen.active { display: flex; }
 
-  /* ---------- Title screen ---------- */
+  /* ---------- Title ---------- */
   #title-screen h1 {
-    font-size: clamp(48px, 9vw, 120px);
+    font-size: clamp(48px, 9vw, 130px);
     letter-spacing: 0.08em;
     text-transform: uppercase;
-    text-shadow: 0 0 24px rgba(201, 162, 39, 0.25);
+    text-shadow: 0 0 30px rgba(201, 162, 39, 0.3);
     margin-bottom: 8px;
   }
   #title-screen .subtitle {
@@ -65,108 +60,205 @@
     font-size: clamp(14px, 1.6vw, 18px);
   }
 
-  /* ---------- Game screen ---------- */
-  #game-screen {
-    flex-direction: column;
-    gap: 0;
-  }
-  #stage {
-    position: relative;
-    width: min(92vw, 720px);
-    height: min(78vh, 720px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  #stage canvas {
-    width: 100%;
-    height: 100%;
-    display: block;
-  }
-  #hud {
-    position: absolute;
-    top: 12px;
-    left: 12px;
-    right: 12px;
-    display: flex;
-    justify-content: space-between;
-    pointer-events: none;
-    z-index: 5;
-  }
-  .hud-block {
-    background: rgba(10, 10, 12, 0.7);
-    border: 1px solid #2a2a32;
-    padding: 8px 14px;
-    border-radius: 6px;
-    font-size: 14px;
-    letter-spacing: 0.05em;
-    backdrop-filter: blur(2px);
-  }
-  .hud-block .label {
-    color: var(--ink-dim);
-    font-size: 11px;
-    text-transform: uppercase;
-    margin-right: 6px;
-  }
-  .hud-block .value { font-weight: bold; }
-  .hud-block.hp .value { color: var(--danger); }
-  .hud-block.gold .value { color: var(--accent); }
-
   /* ---------- Buttons ---------- */
   .btn {
     appearance: none;
     border: 1px solid var(--accent);
     background: transparent;
     color: var(--accent);
-    padding: 14px 38px;
-    font-size: 20px;
+    padding: 12px 30px;
+    font-size: 16px;
     letter-spacing: 0.18em;
     text-transform: uppercase;
     font-family: inherit;
     cursor: pointer;
     border-radius: 4px;
-    transition: background 0.15s, color 0.15s, transform 0.05s;
+    transition: background 0.15s, color 0.15s, transform 0.05s, box-shadow 0.2s;
   }
-  .btn:hover { background: var(--accent); color: var(--bg); }
-  .btn:active { transform: translateY(1px); }
+  .btn:hover:not(:disabled) { background: var(--accent); color: var(--bg); }
+  .btn:active:not(:disabled) { transform: translateY(1px); }
   .btn:disabled {
-    opacity: 0.35;
+    opacity: 0.3;
     cursor: not-allowed;
     transform: none;
-    background: transparent;
-    color: var(--accent);
+  }
+  .btn.large { padding: 16px 42px; font-size: 20px; }
+  .btn.good { border-color: var(--good); color: var(--good); }
+  .btn.good:hover:not(:disabled) { background: var(--good); color: #fff; }
+  .btn.danger { border-color: var(--danger); color: var(--danger); }
+  .btn.danger:hover:not(:disabled) { background: var(--danger); color: #fff; }
+  .btn.glow {
+    box-shadow: 0 0 12px var(--accent), 0 0 28px rgba(201, 162, 39, 0.4);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 10px var(--accent), 0 0 22px rgba(201,162,39,0.3); }
+    50%      { box-shadow: 0 0 18px var(--accent-bright), 0 0 40px rgba(201,162,39,0.6); }
   }
 
-  /* ---------- Message banner ---------- */
-  #banner {
-    position: absolute;
-    bottom: 90px;
-    left: 50%;
-    transform: translateX(-50%) translateY(20px);
-    background: rgba(10, 10, 12, 0.85);
-    border: 1px solid #2a2a32;
-    padding: 10px 22px;
-    border-radius: 4px;
-    font-size: 16px;
-    letter-spacing: 0.06em;
-    opacity: 0;
-    transition: opacity 0.3s, transform 0.3s;
+  /* ---------- Wheels scene ---------- */
+  #wheels-screen { padding: 0; }
+  #wheels-stage {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+  }
+  #wheels-canvas {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    display: block;
+  }
+  #wheels-overlay {
+    position: absolute; inset: 0;
     pointer-events: none;
-    z-index: 5;
-    text-align: center;
-    min-width: 220px;
   }
-  #banner.show {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
-  #banner.good { border-color: var(--good); color: var(--good); }
-  #banner.bad { border-color: var(--danger); color: var(--danger); }
-  #banner.gold { border-color: var(--accent); color: var(--accent); }
+  #wheels-overlay > * { pointer-events: auto; }
 
-  /* ---------- Spin button ---------- */
-  #spin-btn {
-    margin-top: 18px;
+  #wheels-title {
+    position: absolute;
+    top: 18px; left: 50%;
+    transform: translateX(-50%);
+    font-size: 22px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+  }
+
+  .wheel-button-group {
+    position: absolute;
+    bottom: 60px;
+    transform: translateX(-50%);
+    text-align: center;
+  }
+  .wheel-button-group .label {
+    display: block;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    font-size: 12px;
+    color: var(--ink-dim);
+  }
+  .wheel-button-group .result {
+    margin-top: 10px;
+    font-size: 14px;
+    letter-spacing: 0.05em;
+    min-height: 18px;
+  }
+  #buff-group { left: 27%; }
+  #curse-group { left: 73%; }
+  #buff-group .label  { color: var(--good-bright); }
+  #curse-group .label { color: var(--danger-bright); }
+  #buff-group .result.shown  { color: var(--good-bright); }
+  #curse-group .result.shown { color: var(--danger-bright); }
+
+  #stats-preview {
+    position: absolute;
+    top: 60px; left: 18px;
+    background: rgba(7, 7, 10, 0.7);
+    border: 1px solid #2a2a32;
+    padding: 12px 16px;
+    border-radius: 4px;
+    font-size: 13px;
+    line-height: 1.7;
+    min-width: 170px;
+  }
+  #stats-preview h3 {
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-bottom: 8px;
+  }
+  #stats-preview .row {
+    display: flex; justify-content: space-between; gap: 14px;
+  }
+  #stats-preview .row .name { color: var(--ink-dim); }
+  #stats-preview .row .val.up   { color: var(--good-bright); }
+  #stats-preview .row .val.down { color: var(--danger-bright); }
+  #stats-preview .row .val.neutral { color: var(--ink); }
+
+  #enter-dungeon-btn {
+    position: absolute;
+    bottom: 30px; right: 30px;
+  }
+
+  /* ---------- Dungeon ---------- */
+  #dungeon-screen { padding: 0; }
+  #dungeon-canvas {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    display: block;
+    background: #060609;
+    cursor: crosshair;
+  }
+  #dungeon-hud {
+    position: absolute;
+    top: 14px; right: 14px;
+    background: rgba(7, 7, 10, 0.78);
+    border: 1px solid #2a2a32;
+    padding: 12px 16px;
+    border-radius: 4px;
+    font-size: 13px;
+    min-width: 200px;
+  }
+  #dungeon-hud h3 {
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-bottom: 8px;
+  }
+  #dungeon-hud .row {
+    display: flex; justify-content: space-between; gap: 12px; line-height: 1.7;
+  }
+  #dungeon-hud .row .name { color: var(--ink-dim); }
+  #hp-bar {
+    height: 8px;
+    background: #1a0a0a;
+    border: 1px solid #3a1a1a;
+    border-radius: 2px;
+    margin: 4px 0 8px;
+    overflow: hidden;
+  }
+  #hp-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--danger-bright), #ff7050);
+    transition: width 0.15s;
+  }
+  #xp-bar {
+    height: 5px;
+    background: #0a1a14;
+    border: 1px solid #1a3a28;
+    border-radius: 2px;
+    margin-top: 6px;
+    overflow: hidden;
+  }
+  #xp-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--good-bright), #80ffaa);
+    transition: width 0.15s;
+  }
+  #dungeon-info {
+    position: absolute;
+    top: 14px; left: 14px;
+    background: rgba(7, 7, 10, 0.78);
+    border: 1px solid #2a2a32;
+    padding: 8px 14px;
+    border-radius: 4px;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    color: var(--ink-dim);
+  }
+  #dungeon-info .v { color: var(--ink); margin-left: 6px; }
+
+  #control-hint {
+    position: absolute;
+    bottom: 14px; left: 50%;
+    transform: translateX(-50%);
+    color: var(--ink-dim);
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
   }
 
   /* ---------- Game over ---------- */
@@ -188,9 +280,7 @@
     gap: 36px;
     margin-bottom: 36px;
   }
-  #gameover-stats .stat {
-    text-align: center;
-  }
+  #gameover-stats .stat { text-align: center; }
   #gameover-stats .stat .label {
     color: var(--ink-dim);
     font-size: 12px;
@@ -204,168 +294,384 @@
     font-weight: bold;
     color: var(--accent);
   }
-
-  .footer {
-    position: absolute;
-    bottom: 10px;
-    left: 0;
-    right: 0;
-    text-align: center;
-    color: var(--ink-dim);
-    font-size: 11px;
-    letter-spacing: 0.15em;
-  }
 </style>
 </head>
 <body>
 <div id="app">
 
-  <!-- TITLE SCREEN -->
+  <!-- TITLE -->
   <div id="title-screen" class="screen active">
     <h1>Death's Gamble</h1>
-    <p class="subtitle">Spin the wheel. Cheat the reaper. Or don't.</p>
-    <button class="btn" id="start-btn">Start Game</button>
+    <p class="subtitle">Spin both wheels. Survive the dungeon.</p>
+    <button class="btn large" id="start-btn">Start Game</button>
   </div>
 
-  <!-- GAME SCREEN -->
-  <div id="game-screen" class="screen">
-    <div id="stage">
-      <div id="hud">
-        <div class="hud-block hp"><span class="label">HP</span><span class="value" id="hp-value">3</span></div>
-        <div class="hud-block gold"><span class="label">Gold</span><span class="value" id="gold-value">0</span></div>
-        <div class="hud-block"><span class="label">Spins</span><span class="value" id="spins-value">0</span></div>
+  <!-- WHEELS -->
+  <div id="wheels-screen" class="screen">
+    <div id="wheels-stage">
+      <canvas id="wheels-canvas"></canvas>
+      <div id="wheels-overlay">
+        <div id="wheels-title">Make Your Bargain</div>
+
+        <div id="stats-preview">
+          <h3>Loadout</h3>
+          <div class="row"><span class="name">HP</span>      <span class="val neutral" id="prev-hp">100</span></div>
+          <div class="row"><span class="name">DMG</span>     <span class="val neutral" id="prev-dmg">10</span></div>
+          <div class="row"><span class="name">DEF</span>     <span class="val neutral" id="prev-def">0</span></div>
+          <div class="row"><span class="name">SPD</span>     <span class="val neutral" id="prev-spd">3.0</span></div>
+          <div class="row"><span class="name">ATK SPD</span> <span class="val neutral" id="prev-atkspd">1.0</span></div>
+          <div class="row"><span class="name">RANGE</span>   <span class="val neutral" id="prev-range">240</span></div>
+          <div class="row"><span class="name">CRIT</span>    <span class="val neutral" id="prev-crit">5%</span></div>
+        </div>
+
+        <div class="wheel-button-group" id="buff-group">
+          <span class="label">Boon</span>
+          <button class="btn good" id="spin-buff-btn">Spin</button>
+          <div class="result" id="buff-result"></div>
+        </div>
+
+        <div class="wheel-button-group" id="curse-group">
+          <span class="label">Curse</span>
+          <button class="btn danger" id="spin-curse-btn">Spin</button>
+          <div class="result" id="curse-result"></div>
+        </div>
+
+        <button class="btn large" id="enter-dungeon-btn" disabled>Enter Dungeon</button>
       </div>
-      <canvas id="game-canvas" width="720" height="720"></canvas>
-      <div id="banner"></div>
     </div>
-    <button class="btn" id="spin-btn">Spin</button>
   </div>
 
-  <!-- GAME OVER SCREEN -->
+  <!-- DUNGEON -->
+  <div id="dungeon-screen" class="screen">
+    <canvas id="dungeon-canvas"></canvas>
+    <div id="dungeon-info">
+      <span>TIME</span><span class="v" id="d-time">0</span>
+      <span style="margin-left:18px">KILLS</span><span class="v" id="d-kills">0</span>
+      <span style="margin-left:18px">LVL</span><span class="v" id="d-lvl">1</span>
+    </div>
+    <div id="dungeon-hud">
+      <h3>Stats</h3>
+      <div id="hp-bar"><div id="hp-bar-fill" style="width:100%"></div></div>
+      <div class="row"><span class="name">HP</span>      <span id="hud-hp">100 / 100</span></div>
+      <div class="row"><span class="name">DMG</span>     <span id="hud-dmg">10</span></div>
+      <div class="row"><span class="name">DEF</span>     <span id="hud-def">0</span></div>
+      <div class="row"><span class="name">SPD</span>     <span id="hud-spd">3.0</span></div>
+      <div class="row"><span class="name">ATK SPD</span> <span id="hud-atkspd">1.0</span></div>
+      <div class="row"><span class="name">RANGE</span>   <span id="hud-range">240</span></div>
+      <div class="row"><span class="name">CRIT</span>    <span id="hud-crit">5%</span></div>
+      <div id="xp-bar"><div id="xp-bar-fill" style="width:0%"></div></div>
+    </div>
+    <div id="control-hint">WASD / Arrow keys to move — auto-attacks fire</div>
+  </div>
+
+  <!-- GAME OVER -->
   <div id="gameover-screen" class="screen">
     <h2>You Lost the Bet</h2>
     <p class="epitaph" id="epitaph">Death always collects.</p>
     <div id="gameover-stats">
-      <div class="stat"><span class="label">Spins Survived</span><span class="value" id="final-spins">0</span></div>
-      <div class="stat"><span class="label">Gold Won</span><span class="value" id="final-gold">0</span></div>
+      <div class="stat"><span class="label">Time Survived</span><span class="value" id="final-time">0</span></div>
+      <div class="stat"><span class="label">Kills</span><span class="value" id="final-kills">0</span></div>
+      <div class="stat"><span class="label">Level</span><span class="value" id="final-lvl">1</span></div>
     </div>
-    <button class="btn" id="retry-btn">Try Again</button>
+    <button class="btn large" id="retry-btn">Gamble Again</button>
   </div>
-
-  <div class="footer">Click SPIN — beware the skull.</div>
 </div>
 
 <script>
 'use strict';
 
-// ============== Game state ==============
-const state = {
-  hp: 3,
-  maxHp: 5,
-  gold: 0,
-  spins: 0,
-  bonusSpins: 0,
-  spinning: false,
-  wheelAngle: 0,        // current rotation in radians
-  spinTarget: 0,        // target rotation
-  spinStart: 0,         // angle at start of current spin
-  spinStartTime: 0,
-  spinDuration: 0,
-  pendingResolve: null,
+/* =====================================================================
+ *  DEATH'S GAMBLE — v0.2
+ *  Two wheels (boon + curse) → dungeon survival run
+ * ===================================================================== */
+
+// ---------- Base stats ----------
+const BASE_STATS = {
+  hp: 100,
+  dmg: 10,
+  def: 0,
+  spd: 3.0,        // pixels per frame at 60fps
+  atkspd: 1.0,     // attacks per second
+  range: 240,      // auto-attack acquisition range
+  crit: 0.05,      // crit chance (0-1)
+  pickup: 60,      // xp gem pickup radius
+  // World modifiers (curse-driven)
+  enemyHpMult: 1.0,
+  enemySpdMult: 1.0,
+  enemySpawnMult: 1.0,
+  enemyDmgBonus: 0,
 };
 
-// ============== Wheel definition ==============
-// 12 segments. Arrow points DOWN at the TOP of the wheel.
-// In canvas, angle 0 = right (3 o'clock); -PI/2 = top.
-// We compute which segment lies under the top pointer based on wheelAngle.
-const SEGMENTS = [
-  { type: 'gold',      label: '+10',   color: '#c9a227', amount: 10, weight: 'common' },
-  { type: 'heal',      label: '+1 HP', color: '#4d8a52', amount: 1 },
-  { type: 'gold',      label: '+10',   color: '#c9a227', amount: 10 },
-  { type: 'damage',    label: '-1 HP', color: '#7a3030', amount: 1 },
-  { type: 'gold',      label: '+25',   color: '#d4b347', amount: 25 },
-  { type: 'bonus',     label: 'AGAIN', color: '#5a5ab0', amount: 1 },
-  { type: 'gold',      label: '+10',   color: '#c9a227', amount: 10 },
-  { type: 'damage',    label: '-1 HP', color: '#7a3030', amount: 1 },
-  { type: 'jackpot',   label: '+100',  color: '#e6c34a', amount: 100 },
-  { type: 'heal',      label: '+1 HP', color: '#4d8a52', amount: 1 },
-  { type: 'gold',      label: '+10',   color: '#c9a227', amount: 10 },
-  { type: 'death',     label: 'SKULL', color: '#1a1a1a', amount: 0 },
+// ---------- Wheel definitions ----------
+// Each segment: { label, apply(stats), color }
+const BUFF_SEGMENTS = [
+  { label: '+25 HP',     color: '#4d8a52', apply: s => { s.hp += 25; } },
+  { label: '+5 DMG',     color: '#69b070', apply: s => { s.dmg += 5; } },
+  { label: '+3 DEF',     color: '#4d8a52', apply: s => { s.def += 3; } },
+  { label: '+1 SPD',     color: '#69b070', apply: s => { s.spd += 1; } },
+  { label: '+0.3 ATKSPD',color: '#4d8a52', apply: s => { s.atkspd += 0.3; } },
+  { label: '+50 RANGE',  color: '#69b070', apply: s => { s.range += 50; } },
+  { label: '+15% CRIT',  color: '#4d8a52', apply: s => { s.crit = Math.min(1, s.crit + 0.15); } },
+  { label: '+30 PICKUP', color: '#69b070', apply: s => { s.pickup += 30; } },
+  { label: '+25 HP',     color: '#4d8a52', apply: s => { s.hp += 25; } },
+  { label: '+5 DMG',     color: '#69b070', apply: s => { s.dmg += 5; } },
+  { label: '+1 SPD',     color: '#4d8a52', apply: s => { s.spd += 1; } },
+  { label: 'JACKPOT',    color: '#e6c34a', apply: s => { s.dmg += 10; s.hp += 25; s.atkspd += 0.3; } },
 ];
-const SEGMENT_COUNT = SEGMENTS.length;
-const SEG_ANGLE = (Math.PI * 2) / SEGMENT_COUNT;
 
-// ============== Canvas ==============
-const canvas = document.getElementById('game-canvas');
-const ctx = canvas.getContext('2d');
+const CURSE_SEGMENTS = [
+  { label: '-15 HP',         color: '#7a3030', apply: s => { s.hp = Math.max(20, s.hp - 15); } },
+  { label: '-3 DMG',         color: '#9a3030', apply: s => { s.dmg = Math.max(1, s.dmg - 3); } },
+  { label: '-1 SPD',         color: '#7a3030', apply: s => { s.spd = Math.max(1, s.spd - 1); } },
+  { label: '-0.2 ATKSPD',    color: '#9a3030', apply: s => { s.atkspd = Math.max(0.3, s.atkspd - 0.2); } },
+  { label: 'ENEMY +20% HP',  color: '#7a3030', apply: s => { s.enemyHpMult *= 1.2; } },
+  { label: 'ENEMY +25% SPD', color: '#9a3030', apply: s => { s.enemySpdMult *= 1.25; } },
+  { label: '+30% SPAWNS',    color: '#7a3030', apply: s => { s.enemySpawnMult *= 1.3; } },
+  { label: '-40 RANGE',      color: '#9a3030', apply: s => { s.range = Math.max(100, s.range - 40); } },
+  { label: '-3 DEF',         color: '#7a3030', apply: s => { s.def -= 3; } },
+  { label: '+2 ENEMY DMG',   color: '#9a3030', apply: s => { s.enemyDmgBonus += 2; } },
+  { label: '-10% CRIT',      color: '#7a3030', apply: s => { s.crit = Math.max(0, s.crit - 0.10); } },
+  { label: 'CURSE',          color: '#1a0a0a', apply: s => { s.enemyHpMult *= 1.3; s.enemySpawnMult *= 1.2; s.hp = Math.max(20, s.hp - 10); } },
+];
 
-// Match canvas backing pixels to display size with DPR for crisp drawing.
-function resizeCanvas() {
+const SEG_COUNT = 12;
+const SEG_ANGLE = (Math.PI * 2) / SEG_COUNT;
+
+// ---------- Game state ----------
+let scene = 'title';            // title | wheels | dungeon | gameover
+let stats = null;               // current player stats (mutated by wheels)
+
+const wheels = {
+  buff:  { angle: 0, spinning: false, spun: false, spinStart: 0, spinTarget: 0, t0: 0, dur: 0, resultIdx: -1 },
+  curse: { angle: 0, spinning: false, spun: false, spinStart: 0, spinTarget: 0, t0: 0, dur: 0, resultIdx: -1 },
+};
+
+// ---------- DOM ----------
+const $ = id => document.getElementById(id);
+const screens = {
+  title:    $('title-screen'),
+  wheels:   $('wheels-screen'),
+  dungeon:  $('dungeon-screen'),
+  gameover: $('gameover-screen'),
+};
+
+const wheelsCanvas = $('wheels-canvas');
+const wctx = wheelsCanvas.getContext('2d');
+const dungeonCanvas = $('dungeon-canvas');
+const dctx = dungeonCanvas.getContext('2d');
+
+// ---------- Scene management ----------
+function showScene(name) {
+  scene = name;
+  Object.values(screens).forEach(s => s.classList.remove('active'));
+  screens[name].classList.add('active');
+  // Resize after layout settles
+  requestAnimationFrame(() => {
+    resizeCanvas(wheelsCanvas, wctx);
+    resizeCanvas(dungeonCanvas, dctx);
+  });
+}
+
+function resizeCanvas(canvas, ctx) {
   const rect = canvas.getBoundingClientRect();
+  if (rect.width === 0 || rect.height === 0) return;
   const dpr = window.devicePixelRatio || 1;
-  canvas.width = Math.round(rect.width * dpr);
+  canvas.width  = Math.round(rect.width * dpr);
   canvas.height = Math.round(rect.height * dpr);
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
-window.addEventListener('resize', resizeCanvas);
+window.addEventListener('resize', () => {
+  resizeCanvas(wheelsCanvas, wctx);
+  resizeCanvas(dungeonCanvas, dctx);
+});
 
-// ============== Drawing ==============
-function drawDeath(cx, cy, scale) {
-  // A blocky hooded reaper, behind the wheel. Matches the pencil sketch.
-  const s = scale;
+/* =====================================================================
+ *  WHEELS SCENE
+ * ===================================================================== */
+
+function wheelGeometry() {
+  const w = wheelsCanvas.clientWidth;
+  const h = wheelsCanvas.clientHeight;
+  const wheelR = Math.min(w * 0.18, h * 0.28);
+  const cy = h * 0.55;
+  const offset = wheelR * 1.55;
+  return {
+    w, h,
+    cy,
+    wheelR,
+    buffCx:  w / 2 - offset,
+    curseCx: w / 2 + offset,
+    deathCx: w / 2,
+  };
+}
+
+function drawDeathFigure(g) {
+  const { deathCx, cy, wheelR, buffCx, curseCx } = g;
+  const ctx = wctx;
+
+  // Robe height extends below visible area
+  const headY     = cy - wheelR * 1.55;
+  const shoulderY = cy - wheelR * 0.4;
+  const robeBottomY = g.h + 20;
+
+  // ---------- Robe base (silhouette) ----------
+  const robeWidth = wheelR * 3.8;
   ctx.save();
-  ctx.translate(cx, cy);
-
-  // Body silhouette (rounded mound under hood)
-  ctx.fillStyle = '#1a1a1f';
+  const grad = ctx.createLinearGradient(0, headY, 0, robeBottomY);
+  grad.addColorStop(0, '#16161e');
+  grad.addColorStop(0.5, '#0d0d14');
+  grad.addColorStop(1, '#050507');
+  ctx.fillStyle = grad;
   ctx.beginPath();
-  ctx.moveTo(-180 * s, 320 * s);
-  ctx.bezierCurveTo(-200 * s, 60 * s, -150 * s, -50 * s, 0 * s, -60 * s);
-  ctx.bezierCurveTo(150 * s, -50 * s, 200 * s, 60 * s, 180 * s, 320 * s);
+  // Right side curve down
+  ctx.moveTo(deathCx + wheelR * 0.55, headY + wheelR * 0.2);
+  ctx.bezierCurveTo(
+    deathCx + robeWidth * 0.45, shoulderY - wheelR * 0.3,
+    deathCx + robeWidth * 0.55, cy + wheelR * 0.5,
+    deathCx + robeWidth * 0.6,  robeBottomY
+  );
+  ctx.lineTo(deathCx - robeWidth * 0.6, robeBottomY);
+  ctx.bezierCurveTo(
+    deathCx - robeWidth * 0.55, cy + wheelR * 0.5,
+    deathCx - robeWidth * 0.45, shoulderY - wheelR * 0.3,
+    deathCx - wheelR * 0.55, headY + wheelR * 0.2
+  );
+  // Hood top
+  ctx.bezierCurveTo(
+    deathCx - wheelR * 0.85, headY - wheelR * 0.2,
+    deathCx - wheelR * 0.5, headY - wheelR * 0.95,
+    deathCx, headY - wheelR * 1.05
+  );
+  ctx.bezierCurveTo(
+    deathCx + wheelR * 0.5, headY - wheelR * 0.95,
+    deathCx + wheelR * 0.85, headY - wheelR * 0.2,
+    deathCx + wheelR * 0.55, headY + wheelR * 0.2
+  );
   ctx.closePath();
   ctx.fill();
-
-  // Hood drape (slightly lighter so it reads against body)
-  ctx.fillStyle = '#22222a';
-  ctx.beginPath();
-  ctx.moveTo(-140 * s, 80 * s);
-  ctx.bezierCurveTo(-160 * s, -40 * s, -110 * s, -130 * s, 0 * s, -150 * s);
-  ctx.bezierCurveTo(110 * s, -130 * s, 160 * s, -40 * s, 140 * s, 80 * s);
-  ctx.closePath();
-  ctx.fill();
-
-  // Head (boxy, tilted)
-  ctx.save();
-  ctx.rotate(-0.08);
-  ctx.fillStyle = '#2a2a32';
-  ctx.fillRect(-70 * s, -150 * s, 140 * s, 130 * s);
-  // Eyes
-  ctx.fillStyle = '#0a0a0c';
-  ctx.beginPath();
-  ctx.arc(-26 * s, -100 * s, 7 * s, 0, Math.PI * 2);
-  ctx.arc(26 * s, -100 * s, 7 * s, 0, Math.PI * 2);
-  ctx.fill();
-  // Mouth (small dark square)
-  ctx.fillRect(-12 * s, -55 * s, 24 * s, 18 * s);
   ctx.restore();
 
+  // ---------- Hood inner shadow / face void ----------
+  ctx.save();
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.ellipse(deathCx, headY - wheelR * 0.25, wheelR * 0.42, wheelR * 0.55, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // ---------- Glowing eyes ----------
+  ctx.save();
+  ctx.shadowColor = '#c9a227';
+  ctx.shadowBlur = 14;
+  ctx.fillStyle = '#f0c84a';
+  ctx.beginPath();
+  ctx.arc(deathCx - wheelR * 0.13, headY - wheelR * 0.30, wheelR * 0.045, 0, Math.PI * 2);
+  ctx.arc(deathCx + wheelR * 0.13, headY - wheelR * 0.30, wheelR * 0.045, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // ---------- Hood rim highlight ----------
+  ctx.save();
+  ctx.strokeStyle = '#1a1a22';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(deathCx - wheelR * 0.55, headY + wheelR * 0.15);
+  ctx.bezierCurveTo(
+    deathCx - wheelR * 0.85, headY - wheelR * 0.2,
+    deathCx - wheelR * 0.5, headY - wheelR * 0.95,
+    deathCx, headY - wheelR * 1.05
+  );
+  ctx.bezierCurveTo(
+    deathCx + wheelR * 0.5, headY - wheelR * 0.95,
+    deathCx + wheelR * 0.85, headY - wheelR * 0.2,
+    deathCx + wheelR * 0.55, headY + wheelR * 0.15
+  );
+  ctx.stroke();
+  ctx.restore();
+
+  // ---------- Skeletal arms gripping wheels ----------
+  drawArm(deathCx - wheelR * 0.45, shoulderY, buffCx, cy, +1);
+  drawArm(deathCx + wheelR * 0.45, shoulderY, curseCx, cy, -1);
+}
+
+function drawArm(sx, sy, hx, hy, sign) {
+  // Bezier "bone" with claw at the end
+  const ctx = wctx;
+  const midX = (sx + hx) / 2;
+  const midY = (sy + hy) / 2 - 30 * sign;
+
+  ctx.save();
+  // Sleeve (cloak fold around upper arm)
+  ctx.strokeStyle = '#101018';
+  ctx.lineWidth = 22;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(sx, sy);
+  ctx.quadraticCurveTo(midX, midY, hx, hy);
+  ctx.stroke();
+
+  // Bone
+  ctx.strokeStyle = '#c8c0a8';
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(sx, sy);
+  ctx.quadraticCurveTo(midX, midY, hx, hy);
+  ctx.stroke();
+
+  // Hand / claw at wheel center
+  ctx.fillStyle = '#d8d0b8';
+  ctx.strokeStyle = '#888070';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(hx, hy, 10, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Three thin claws fanning around the hub
+  for (let i = -1; i <= 1; i++) {
+    const a = -sign * (Math.PI * 0.15 * i + Math.PI * 0.5);
+    ctx.beginPath();
+    ctx.moveTo(hx, hy);
+    ctx.lineTo(hx + Math.cos(a) * 22, hy + Math.sin(a) * 22);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#c8c0a8';
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
-function drawWheel(cx, cy, radius) {
+function drawWheel(cx, cy, r, segments, angle, kind) {
+  const ctx = wctx;
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.rotate(state.wheelAngle);
 
-  // Segment slices
-  for (let i = 0; i < SEGMENT_COUNT; i++) {
-    const seg = SEGMENTS[i];
+  // Backplate / shadow
+  ctx.shadowColor = 'rgba(0,0,0,0.6)';
+  ctx.shadowBlur = 24;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 1.04, 0, Math.PI * 2);
+  ctx.fillStyle = '#0a0a10';
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Outer ring
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 1.04, 0, Math.PI * 2);
+  ctx.strokeStyle = kind === 'buff' ? '#3a5a3a' : '#5a2a2a';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  ctx.rotate(angle);
+
+  // Slices
+  for (let i = 0; i < SEG_COUNT; i++) {
+    const seg = segments[i];
     const start = i * SEG_ANGLE - SEG_ANGLE / 2;
     const end = start + SEG_ANGLE;
 
     ctx.beginPath();
     ctx.moveTo(0, 0);
-    ctx.arc(0, 0, radius, start, end);
+    ctx.arc(0, 0, r, start, end);
     ctx.closePath();
     ctx.fillStyle = seg.color;
     ctx.fill();
@@ -376,43 +682,34 @@ function drawWheel(cx, cy, radius) {
     // Label
     ctx.save();
     ctx.rotate(start + SEG_ANGLE / 2);
-    ctx.translate(radius * 0.66, 0);
-    ctx.fillStyle = (seg.type === 'death') ? '#c9a227' : '#0a0a0c';
-    ctx.font = `bold ${Math.round(radius * 0.09)}px Georgia`;
+    ctx.translate(r * 0.62, 0);
+    ctx.fillStyle = '#0a0a0c';
+    ctx.font = `bold ${Math.round(r * 0.085)}px Georgia`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(seg.label, 0, 0);
     ctx.restore();
   }
 
-  // Outer rim
+  // Hub
   ctx.beginPath();
-  ctx.arc(0, 0, radius, 0, Math.PI * 2);
-  ctx.lineWidth = 6;
-  ctx.strokeStyle = '#15151a';
-  ctx.stroke();
-
-  // Inner hub
-  ctx.beginPath();
-  ctx.arc(0, 0, radius * 0.12, 0, Math.PI * 2);
+  ctx.arc(0, 0, r * 0.10, 0, Math.PI * 2);
   ctx.fillStyle = '#0a0a0c';
   ctx.fill();
-  ctx.lineWidth = 3;
-  ctx.strokeStyle = '#c9a227';
+  ctx.strokeStyle = kind === 'buff' ? '#69b070' : '#e04848';
+  ctx.lineWidth = 2;
   ctx.stroke();
 
   ctx.restore();
-}
 
-function drawPointer(cx, cy, radius) {
-  // Down-pointing arrow at the top of the wheel.
+  // Pointer at top
   ctx.save();
-  ctx.fillStyle = '#c9a227';
+  ctx.fillStyle = kind === 'buff' ? '#69b070' : '#e04848';
   ctx.strokeStyle = '#0a0a0c';
   ctx.lineWidth = 2;
-  const tipY = cy - radius + 14;
-  const baseY = cy - radius - 22;
-  const halfW = 16;
+  const tipY = cy - r + 8;
+  const baseY = cy - r - 18;
+  const halfW = 12;
   ctx.beginPath();
   ctx.moveTo(cx, tipY);
   ctx.lineTo(cx - halfW, baseY);
@@ -423,218 +720,580 @@ function drawPointer(cx, cy, radius) {
   ctx.restore();
 }
 
-function render() {
-  const w = canvas.clientWidth;
-  const h = canvas.clientHeight;
+function renderWheelsScene() {
+  const g = wheelGeometry();
+  wctx.clearRect(0, 0, g.w, g.h);
 
-  ctx.clearRect(0, 0, w, h);
+  // Floor line
+  wctx.fillStyle = '#0a0a0c';
+  wctx.fillRect(0, g.h * 0.88, g.w, 4);
 
-  // Subtle ground line
-  ctx.fillStyle = '#0a0a0c';
-  ctx.fillRect(0, h * 0.86, w, 4);
+  drawDeathFigure(g);
+  drawWheel(g.buffCx,  g.cy, g.wheelR, BUFF_SEGMENTS,  wheels.buff.angle,  'buff');
+  drawWheel(g.curseCx, g.cy, g.wheelR, CURSE_SEGMENTS, wheels.curse.angle, 'curse');
 
-  // Death sits behind the wheel
-  const cx = w / 2;
-  const cy = h * 0.55;
-  const scale = Math.min(w, h) / 720;
-
-  drawDeath(cx, cy + 20 * scale, scale);
-
-  // Wheel
-  const wheelRadius = Math.min(w, h) * 0.32;
-  drawWheel(cx, cy + wheelRadius * 0.05, wheelRadius);
-
-  // Pointer
-  drawPointer(cx, cy + wheelRadius * 0.05, wheelRadius);
+  // Position the bottom button groups under each wheel (use page coords)
+  positionWheelButtons(g);
 }
 
-// ============== Spin loop ==============
-function startSpin() {
-  if (state.spinning) return;
-  if (state.bonusSpins > 0) {
-    state.bonusSpins--;
-  }
-  state.spinning = true;
-  spinBtn.disabled = true;
-  hideBanner();
+function positionWheelButtons(g) {
+  const stage = $('wheels-stage').getBoundingClientRect();
+  const buffGroup = $('buff-group');
+  const curseGroup = $('curse-group');
+  // Bottom buttons sit just under each wheel
+  const yPx = g.cy + g.wheelR + 28;
+  buffGroup.style.bottom = (stage.height - yPx) + 'px';
+  curseGroup.style.bottom = (stage.height - yPx) + 'px';
+  buffGroup.style.left = g.buffCx + 'px';
+  curseGroup.style.left = g.curseCx + 'px';
+}
 
-  // Pick a random target segment.
-  const targetSeg = Math.floor(Math.random() * SEGMENT_COUNT);
+// --- Spin logic ---
+function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
 
-  // Angle that puts segment `i` under the top pointer:
-  //   For un-rotated wheel, segment i's center is at angle  i * SEG_ANGLE.
-  //   The pointer is at angle -PI/2 (top).
-  //   We need wheelAngle such that:  (i * SEG_ANGLE + wheelAngle) ≡ -PI/2  (mod 2π)
-  //   => wheelAngle = -PI/2 - i * SEG_ANGLE
+function startSpin(side) {
+  const w = wheels[side];
+  if (w.spinning || w.spun) return;
+  w.spinning = true;
+
+  const targetSeg = Math.floor(Math.random() * SEG_COUNT);
+  // Wheel angle so segment center sits at top pointer (-PI/2):
+  //   wheelAngle = -PI/2 - segIdx * SEG_ANGLE  (mod 2π)
   const baseTarget = -Math.PI / 2 - targetSeg * SEG_ANGLE;
+  const fullRotations = 5 + Math.floor(Math.random() * 3);
+  const jitter = (Math.random() - 0.5) * SEG_ANGLE * 0.6;
+  let target = baseTarget + fullRotations * Math.PI * 2 + jitter;
+  while (target < w.angle + Math.PI * 4) target += Math.PI * 2;
 
-  // Add several full rotations and a tiny random offset within the segment.
-  const fullRotations = 5 + Math.floor(Math.random() * 3); // 5–7 spins
-  const jitter = (Math.random() - 0.5) * SEG_ANGLE * 0.7;
-  const total = baseTarget + fullRotations * Math.PI * 2 + jitter;
+  w.spinStart = w.angle;
+  w.spinTarget = target;
+  w.t0 = performance.now();
+  w.dur = 3800 + Math.random() * 600;
+  w.resultIdx = targetSeg;
 
-  // Normalize so we always spin forward from the current angle.
-  state.spinStart = state.wheelAngle;
-  // Bring `total` to be > current angle.
-  let target = total;
-  while (target < state.wheelAngle + Math.PI * 4) target += Math.PI * 2;
-  state.spinTarget = target;
-
-  state.spinStartTime = performance.now();
-  state.spinDuration = 4200 + Math.random() * 600;
-
-  state.pendingResolve = targetSeg;
+  // Disable the spin button immediately
+  const btn = side === 'buff' ? $('spin-buff-btn') : $('spin-curse-btn');
+  btn.disabled = true;
 }
 
-function easeOutCubic(t) {
-  return 1 - Math.pow(1 - t, 3);
-}
-
-function tick(now) {
-  if (state.spinning) {
-    const elapsed = now - state.spinStartTime;
-    const t = Math.min(1, elapsed / state.spinDuration);
+function updateSpin(now) {
+  for (const side of ['buff', 'curse']) {
+    const w = wheels[side];
+    if (!w.spinning) continue;
+    const t = Math.min(1, (now - w.t0) / w.dur);
     const eased = easeOutCubic(t);
-    state.wheelAngle = state.spinStart + (state.spinTarget - state.spinStart) * eased;
-
+    w.angle = w.spinStart + (w.spinTarget - w.spinStart) * eased;
     if (t >= 1) {
-      state.spinning = false;
-      // Normalize angle to keep numbers small.
-      state.wheelAngle = ((state.wheelAngle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-      resolveSpin(state.pendingResolve);
+      w.spinning = false;
+      w.spun = true;
+      w.angle = ((w.angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+      onSpinComplete(side);
+    }
+  }
+}
+
+function onSpinComplete(side) {
+  const w = wheels[side];
+  const segments = side === 'buff' ? BUFF_SEGMENTS : CURSE_SEGMENTS;
+  const seg = segments[w.resultIdx];
+  const before = { ...stats };
+  seg.apply(stats);
+  updateStatPreview(before, stats);
+
+  const resultEl = $(side === 'buff' ? 'buff-result' : 'curse-result');
+  resultEl.textContent = seg.label;
+  resultEl.classList.add('shown');
+
+  // Light up Enter Dungeon if both spun
+  if (wheels.buff.spun && wheels.curse.spun) {
+    const btn = $('enter-dungeon-btn');
+    btn.disabled = false;
+    btn.classList.add('glow');
+  }
+}
+
+// --- Stat preview ---
+function updateStatPreview(before, after) {
+  const map = [
+    ['hp',     'prev-hp',     v => v],
+    ['dmg',    'prev-dmg',    v => v],
+    ['def',    'prev-def',    v => v],
+    ['spd',    'prev-spd',    v => v.toFixed(1)],
+    ['atkspd', 'prev-atkspd', v => v.toFixed(1)],
+    ['range',  'prev-range',  v => v],
+    ['crit',   'prev-crit',   v => Math.round(v * 100) + '%'],
+  ];
+  for (const [key, id, fmt] of map) {
+    const el = $(id);
+    const a = after[key], b = before ? before[key] : a;
+    el.textContent = fmt(a);
+    el.classList.remove('up', 'down', 'neutral');
+    if (a > b) el.classList.add('up');
+    else if (a < b) el.classList.add('down');
+    else el.classList.add('neutral');
+  }
+}
+
+/* =====================================================================
+ *  DUNGEON SCENE — Vampire-Survivors-lite
+ * ===================================================================== */
+
+const dungeon = {
+  player: null,
+  enemies: [],
+  projectiles: [],
+  gems: [],
+  hits: [],         // floating damage numbers
+  lastSpawn: 0,
+  spawnInterval: 1100,
+  startTime: 0,
+  keys: new Set(),
+  kills: 0,
+  level: 1,
+  xp: 0,
+  xpNext: 8,
+  lastShot: 0,
+  pulse: 0,
+};
+
+function dungeonStart() {
+  dungeon.player = {
+    x: 0, y: 0,
+    hpMax: stats.hp,
+    hp: stats.hp,
+  };
+  dungeon.enemies.length = 0;
+  dungeon.projectiles.length = 0;
+  dungeon.gems.length = 0;
+  dungeon.hits.length = 0;
+  dungeon.lastSpawn = 0;
+  dungeon.spawnInterval = 1100 / stats.enemySpawnMult;
+  dungeon.startTime = performance.now();
+  dungeon.kills = 0;
+  dungeon.level = 1;
+  dungeon.xp = 0;
+  dungeon.xpNext = 8;
+  dungeon.lastShot = 0;
+  syncHUD();
+}
+
+function syncHUD() {
+  const p = dungeon.player;
+  $('hp-bar-fill').style.width = (Math.max(0, p.hp) / p.hpMax * 100) + '%';
+  $('hud-hp').textContent = Math.max(0, Math.ceil(p.hp)) + ' / ' + p.hpMax;
+  $('hud-dmg').textContent = stats.dmg;
+  $('hud-def').textContent = stats.def;
+  $('hud-spd').textContent = stats.spd.toFixed(1);
+  $('hud-atkspd').textContent = stats.atkspd.toFixed(1);
+  $('hud-range').textContent = stats.range;
+  $('hud-crit').textContent = Math.round(stats.crit * 100) + '%';
+  $('xp-bar-fill').style.width = (dungeon.xp / dungeon.xpNext * 100) + '%';
+  $('d-lvl').textContent = dungeon.level;
+  $('d-kills').textContent = dungeon.kills;
+}
+
+function spawnEnemy() {
+  const w = dungeonCanvas.clientWidth;
+  const h = dungeonCanvas.clientHeight;
+  const margin = Math.max(w, h) * 0.6;
+  // Spawn just outside view in a random direction
+  const angle = Math.random() * Math.PI * 2;
+  const dist = Math.max(w, h) * 0.6 + Math.random() * 60;
+  const px = dungeon.player.x + Math.cos(angle) * dist;
+  const py = dungeon.player.y + Math.sin(angle) * dist;
+
+  // Difficulty ramp by elapsed time
+  const t = (performance.now() - dungeon.startTime) / 1000;
+  const tier = Math.random();
+  let baseHp, baseSpd, baseDmg, color, size;
+  if (tier < 0.6) {
+    baseHp = 6 + t * 0.6; baseSpd = 1.2; baseDmg = 5; color = '#9a3a3a'; size = 14;
+  } else if (tier < 0.9) {
+    baseHp = 3 + t * 0.4; baseSpd = 2.0; baseDmg = 4; color = '#a06a3a'; size = 11;
+  } else {
+    baseHp = 25 + t * 1.5; baseSpd = 0.7; baseDmg = 12; color = '#5a2a5a'; size = 20;
+  }
+
+  dungeon.enemies.push({
+    x: px, y: py,
+    hp: baseHp * stats.enemyHpMult,
+    spd: baseSpd * stats.enemySpdMult,
+    dmg: baseDmg + stats.enemyDmgBonus,
+    r: size,
+    color,
+    flash: 0,
+  });
+}
+
+function findNearestEnemy(maxDist) {
+  let best = null, bestD = maxDist * maxDist;
+  const px = dungeon.player.x, py = dungeon.player.y;
+  for (const e of dungeon.enemies) {
+    const dx = e.x - px, dy = e.y - py;
+    const d = dx * dx + dy * dy;
+    if (d < bestD) { bestD = d; best = e; }
+  }
+  return best;
+}
+
+function fireProjectile(target) {
+  const px = dungeon.player.x, py = dungeon.player.y;
+  const dx = target.x - px, dy = target.y - py;
+  const d = Math.hypot(dx, dy) || 1;
+  const isCrit = Math.random() < stats.crit;
+  dungeon.projectiles.push({
+    x: px, y: py,
+    vx: (dx / d) * 8,
+    vy: (dy / d) * 8,
+    dmg: stats.dmg * (isCrit ? 2 : 1),
+    crit: isCrit,
+    life: 1.5,    // seconds
+  });
+}
+
+function tickDungeon(dt, now) {
+  const p = dungeon.player;
+
+  // Movement
+  let mx = 0, my = 0;
+  if (dungeon.keys.has('w') || dungeon.keys.has('arrowup'))    my -= 1;
+  if (dungeon.keys.has('s') || dungeon.keys.has('arrowdown'))  my += 1;
+  if (dungeon.keys.has('a') || dungeon.keys.has('arrowleft'))  mx -= 1;
+  if (dungeon.keys.has('d') || dungeon.keys.has('arrowright')) mx += 1;
+  if (mx || my) {
+    const m = Math.hypot(mx, my);
+    p.x += (mx / m) * stats.spd * dt * 60;
+    p.y += (my / m) * stats.spd * dt * 60;
+  }
+
+  // Auto-attack
+  const shotInterval = 1000 / stats.atkspd;
+  if (now - dungeon.lastShot >= shotInterval) {
+    const target = findNearestEnemy(stats.range);
+    if (target) {
+      fireProjectile(target);
+      dungeon.lastShot = now;
     }
   }
 
-  render();
-  requestAnimationFrame(tick);
-}
+  // Enemy spawn
+  if (now - dungeon.lastSpawn >= dungeon.spawnInterval) {
+    spawnEnemy();
+    dungeon.lastSpawn = now;
+    // Gradually ramp spawn rate
+    const elapsed = (now - dungeon.startTime) / 1000;
+    dungeon.spawnInterval = Math.max(220, (1100 / stats.enemySpawnMult) * Math.pow(0.985, elapsed));
+  }
 
-// ============== Resolve outcome ==============
-function resolveSpin(segIdx) {
-  state.spins++;
-  spinsValue.textContent = state.spins;
+  // Enemies move toward player
+  for (const e of dungeon.enemies) {
+    const dx = p.x - e.x, dy = p.y - e.y;
+    const d = Math.hypot(dx, dy) || 1;
+    e.x += (dx / d) * e.spd * dt * 60;
+    e.y += (dy / d) * e.spd * dt * 60;
+    if (e.flash > 0) e.flash -= dt;
 
-  const seg = SEGMENTS[segIdx];
-  switch (seg.type) {
-    case 'gold':
-      state.gold += seg.amount;
-      flashBanner(`+${seg.amount} Gold`, 'gold');
-      break;
-    case 'jackpot':
-      state.gold += seg.amount;
-      flashBanner(`JACKPOT! +${seg.amount} Gold`, 'gold');
-      break;
-    case 'heal':
-      if (state.hp < state.maxHp) {
-        state.hp += seg.amount;
-        flashBanner(`+${seg.amount} HP`, 'good');
-      } else {
-        state.gold += 5;
-        flashBanner('Already full — +5 Gold', 'good');
+    // Collision with player
+    const r = e.r + 12;
+    if (dx * dx + dy * dy < r * r) {
+      const taken = Math.max(1, e.dmg - stats.def) * dt;  // damage per second proximity
+      p.hp -= taken;
+    }
+  }
+
+  // Projectiles
+  for (let i = dungeon.projectiles.length - 1; i >= 0; i--) {
+    const pr = dungeon.projectiles[i];
+    pr.x += pr.vx * dt * 60;
+    pr.y += pr.vy * dt * 60;
+    pr.life -= dt;
+    if (pr.life <= 0) { dungeon.projectiles.splice(i, 1); continue; }
+
+    // Hit check
+    for (let j = 0; j < dungeon.enemies.length; j++) {
+      const e = dungeon.enemies[j];
+      const dx = e.x - pr.x, dy = e.y - pr.y;
+      if (dx * dx + dy * dy < (e.r + 4) * (e.r + 4)) {
+        e.hp -= pr.dmg;
+        e.flash = 0.12;
+        dungeon.hits.push({ x: e.x, y: e.y - 10, text: Math.round(pr.dmg).toString(), life: 0.6, crit: pr.crit });
+        dungeon.projectiles.splice(i, 1);
+        if (e.hp <= 0) {
+          dungeon.enemies.splice(j, 1);
+          dungeon.kills++;
+          dungeon.gems.push({ x: e.x, y: e.y, value: 1 });
+        }
+        break;
       }
-      break;
-    case 'damage':
-      state.hp -= seg.amount;
-      flashBanner(`-${seg.amount} HP`, 'bad');
-      break;
-    case 'bonus':
-      state.bonusSpins++;
-      flashBanner('Free Spin!', 'good');
-      break;
-    case 'death':
-      state.hp = 0;
-      flashBanner('THE SKULL', 'bad');
-      break;
+    }
   }
 
-  hpValue.textContent = state.hp;
-  goldValue.textContent = state.gold;
-
-  if (state.hp <= 0) {
-    setTimeout(() => endGame(seg.type === 'death'), 1100);
-  } else {
-    spinBtn.disabled = false;
-    spinBtn.textContent = state.bonusSpins > 0 ? `Spin (${state.bonusSpins} free)` : 'Spin';
+  // Gems — pull toward player when within pickup radius
+  for (let i = dungeon.gems.length - 1; i >= 0; i--) {
+    const g = dungeon.gems[i];
+    const dx = p.x - g.x, dy = p.y - g.y;
+    const d2 = dx * dx + dy * dy;
+    if (d2 < stats.pickup * stats.pickup) {
+      const d = Math.sqrt(d2) || 1;
+      g.x += (dx / d) * 6 * dt * 60;
+      g.y += (dy / d) * 6 * dt * 60;
+    }
+    if (d2 < 14 * 14) {
+      dungeon.gems.splice(i, 1);
+      dungeon.xp += g.value;
+      if (dungeon.xp >= dungeon.xpNext) {
+        dungeon.xp -= dungeon.xpNext;
+        dungeon.level++;
+        dungeon.xpNext = Math.round(dungeon.xpNext * 1.4);
+        // Level-up reward
+        p.hpMax += 10;
+        p.hp = p.hpMax;
+        stats.dmg += 2;
+      }
+    }
   }
+
+  // Floating damage numbers
+  for (let i = dungeon.hits.length - 1; i >= 0; i--) {
+    const h = dungeon.hits[i];
+    h.life -= dt;
+    h.y -= 24 * dt;
+    if (h.life <= 0) dungeon.hits.splice(i, 1);
+  }
+
+  // HUD
+  $('d-time').textContent = Math.floor((now - dungeon.startTime) / 1000) + 's';
+  syncHUD();
+
+  // Death
+  if (p.hp <= 0) {
+    endGame();
+  }
+
+  dungeon.pulse += dt;
 }
 
-// ============== UI helpers ==============
-const banner = document.getElementById('banner');
-let bannerTimeout = null;
-function flashBanner(text, kind) {
-  banner.textContent = text;
-  banner.className = 'show ' + (kind || '');
-  clearTimeout(bannerTimeout);
-  bannerTimeout = setTimeout(() => {
-    banner.classList.remove('show');
-  }, 1400);
-}
-function hideBanner() {
-  banner.classList.remove('show');
+function renderDungeon() {
+  const w = dungeonCanvas.clientWidth;
+  const h = dungeonCanvas.clientHeight;
+  const ctx = dctx;
+  const p = dungeon.player;
+
+  // Camera offset puts player at screen center
+  const camX = w / 2 - p.x;
+  const camY = h / 2 - p.y;
+
+  // Background grid
+  ctx.fillStyle = '#060609';
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.strokeStyle = '#10101a';
+  ctx.lineWidth = 1;
+  const gs = 80;
+  const ox = ((camX % gs) + gs) % gs;
+  const oy = ((camY % gs) + gs) % gs;
+  ctx.beginPath();
+  for (let x = ox; x < w; x += gs) { ctx.moveTo(x, 0); ctx.lineTo(x, h); }
+  for (let y = oy; y < h; y += gs) { ctx.moveTo(0, y); ctx.lineTo(w, y); }
+  ctx.stroke();
+
+  // Gems
+  for (const g of dungeon.gems) {
+    const sx = g.x + camX, sy = g.y + camY;
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(dungeon.pulse * 2);
+    ctx.fillStyle = '#69b070';
+    ctx.shadowColor = '#69b070';
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    ctx.moveTo(0, -6); ctx.lineTo(6, 0); ctx.lineTo(0, 6); ctx.lineTo(-6, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Enemies
+  for (const e of dungeon.enemies) {
+    const sx = e.x + camX, sy = e.y + camY;
+    ctx.fillStyle = e.flash > 0 ? '#ffffff' : e.color;
+    ctx.beginPath();
+    ctx.arc(sx, sy, e.r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    // Eyes for character
+    ctx.fillStyle = '#ffeacc';
+    ctx.beginPath();
+    ctx.arc(sx - e.r * 0.3, sy - e.r * 0.15, 1.8, 0, Math.PI * 2);
+    ctx.arc(sx + e.r * 0.3, sy - e.r * 0.15, 1.8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Projectiles
+  for (const pr of dungeon.projectiles) {
+    const sx = pr.x + camX, sy = pr.y + camY;
+    ctx.save();
+    ctx.shadowColor = pr.crit ? '#ff8030' : '#f0c84a';
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = pr.crit ? '#ff9050' : '#f0c84a';
+    ctx.beginPath();
+    ctx.arc(sx, sy, pr.crit ? 5 : 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Player (hooded mini figure — echoes Death)
+  drawPlayer(w / 2, h / 2);
+
+  // Pickup ring (faint)
+  ctx.save();
+  ctx.strokeStyle = 'rgba(105, 176, 112, 0.08)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.arc(w / 2, h / 2, stats.pickup, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+
+  // Floating hit numbers
+  for (const hN of dungeon.hits) {
+    const sx = hN.x + camX, sy = hN.y + camY;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, hN.life * 1.6);
+    ctx.fillStyle = hN.crit ? '#ff9050' : '#f0c84a';
+    ctx.font = `bold ${hN.crit ? 16 : 13}px Georgia`;
+    ctx.textAlign = 'center';
+    ctx.fillText(hN.text, sx, sy);
+    ctx.restore();
+  }
+
+  // Vignette
+  const vg = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.3, w / 2, h / 2, Math.max(w, h) * 0.7);
+  vg.addColorStop(0, 'rgba(0,0,0,0)');
+  vg.addColorStop(1, 'rgba(0,0,0,0.55)');
+  ctx.fillStyle = vg;
+  ctx.fillRect(0, 0, w, h);
 }
 
-// ============== Screens ==============
-const titleScreen = document.getElementById('title-screen');
-const gameScreen = document.getElementById('game-screen');
-const gameoverScreen = document.getElementById('gameover-screen');
-
-const hpValue = document.getElementById('hp-value');
-const goldValue = document.getElementById('gold-value');
-const spinsValue = document.getElementById('spins-value');
-const spinBtn = document.getElementById('spin-btn');
-
-function showScreen(el) {
-  [titleScreen, gameScreen, gameoverScreen].forEach(s => s.classList.remove('active'));
-  el.classList.add('active');
+function drawPlayer(x, y) {
+  const ctx = dctx;
+  // Cloak
+  ctx.fillStyle = '#1a1a26';
+  ctx.beginPath();
+  ctx.moveTo(x - 10, y - 14);
+  ctx.bezierCurveTo(x - 16, y - 4, x - 14, y + 12, x - 10, y + 16);
+  ctx.lineTo(x + 10, y + 16);
+  ctx.bezierCurveTo(x + 14, y + 12, x + 16, y - 4, x + 10, y - 14);
+  ctx.bezierCurveTo(x + 8, y - 18, x - 8, y - 18, x - 10, y - 14);
+  ctx.closePath();
+  ctx.fill();
+  // Hood face
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.ellipse(x, y - 9, 6, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Eyes
+  ctx.fillStyle = '#f0c84a';
+  ctx.beginPath();
+  ctx.arc(x - 2.4, y - 9, 1.2, 0, Math.PI * 2);
+  ctx.arc(x + 2.4, y - 9, 1.2, 0, Math.PI * 2);
+  ctx.fill();
 }
 
-function startGame() {
-  state.hp = 3;
-  state.gold = 0;
-  state.spins = 0;
-  state.bonusSpins = 0;
-  state.wheelAngle = 0;
-  state.spinning = false;
-  hpValue.textContent = state.hp;
-  goldValue.textContent = state.gold;
-  spinsValue.textContent = state.spins;
-  spinBtn.disabled = false;
-  spinBtn.textContent = 'Spin';
-  showScreen(gameScreen);
-  resizeCanvas();
-}
+/* =====================================================================
+ *  GAME OVER
+ * ===================================================================== */
 
 const EPITAPHS = [
   'Death always collects.',
-  'The wheel turns; the reaper waits.',
   'A poor wager.',
-  'You should have stopped at the gold.',
-  'The skull was always coming.',
+  'The wheel turns; the reaper waits.',
+  'You should have spun differently.',
+  'The dungeon swallowed you whole.',
 ];
 
-function endGame(killedBySkull) {
-  document.getElementById('final-spins').textContent = state.spins;
-  document.getElementById('final-gold').textContent = state.gold;
-  document.getElementById('epitaph').textContent =
-    killedBySkull ? 'You drew the skull.' : EPITAPHS[Math.floor(Math.random() * EPITAPHS.length)];
-  showScreen(gameoverScreen);
+function endGame() {
+  if (scene === 'gameover') return;
+  $('final-time').textContent = Math.floor((performance.now() - dungeon.startTime) / 1000) + 's';
+  $('final-kills').textContent = dungeon.kills;
+  $('final-lvl').textContent = dungeon.level;
+  $('epitaph').textContent = EPITAPHS[Math.floor(Math.random() * EPITAPHS.length)];
+  showScene('gameover');
 }
 
-// ============== Wire up ==============
-document.getElementById('start-btn').addEventListener('click', startGame);
-document.getElementById('retry-btn').addEventListener('click', startGame);
-spinBtn.addEventListener('click', startSpin);
+/* =====================================================================
+ *  TRANSITIONS
+ * ===================================================================== */
 
-// Spacebar to spin
-window.addEventListener('keydown', (e) => {
-  if (e.code === 'Space' && gameScreen.classList.contains('active') && !state.spinning) {
-    e.preventDefault();
-    startSpin();
+function startNewRun() {
+  // Reset stats
+  stats = { ...BASE_STATS };
+  // Reset wheels
+  wheels.buff.angle = 0; wheels.buff.spinning = false; wheels.buff.spun = false; wheels.buff.resultIdx = -1;
+  wheels.curse.angle = 0; wheels.curse.spinning = false; wheels.curse.spun = false; wheels.curse.resultIdx = -1;
+  // Reset UI
+  $('spin-buff-btn').disabled = false;
+  $('spin-curse-btn').disabled = false;
+  $('buff-result').textContent = '';  $('buff-result').classList.remove('shown');
+  $('curse-result').textContent = ''; $('curse-result').classList.remove('shown');
+  const ed = $('enter-dungeon-btn');
+  ed.disabled = true; ed.classList.remove('glow');
+  updateStatPreview(null, stats);
+  showScene('wheels');
+}
+
+function enterDungeon() {
+  dungeonStart();
+  showScene('dungeon');
+}
+
+/* =====================================================================
+ *  MAIN LOOP
+ * ===================================================================== */
+
+let lastTickTime = performance.now();
+function tick(now) {
+  const dt = Math.min(0.05, (now - lastTickTime) / 1000);
+  lastTickTime = now;
+
+  if (scene === 'wheels') {
+    updateSpin(now);
+    renderWheelsScene();
+  } else if (scene === 'dungeon') {
+    tickDungeon(dt, now);
+    renderDungeon();
   }
+
+  requestAnimationFrame(tick);
+}
+
+/* =====================================================================
+ *  WIRE UP
+ * ===================================================================== */
+
+$('start-btn').addEventListener('click', startNewRun);
+$('retry-btn').addEventListener('click', startNewRun);
+$('spin-buff-btn').addEventListener('click', () => startSpin('buff'));
+$('spin-curse-btn').addEventListener('click', () => startSpin('curse'));
+$('enter-dungeon-btn').addEventListener('click', enterDungeon);
+
+window.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (scene === 'dungeon') {
+    if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(k)) {
+      e.preventDefault();
+      dungeon.keys.add(k);
+    }
+  }
+});
+window.addEventListener('keyup', e => {
+  dungeon.keys.delete(e.key.toLowerCase());
 });
 
 // Boot
-resizeCanvas();
+resizeCanvas(wheelsCanvas, wctx);
+resizeCanvas(dungeonCanvas, dctx);
 requestAnimationFrame(tick);
 </script>
 </body>
