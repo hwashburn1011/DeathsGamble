@@ -3,7 +3,6 @@ import { Application } from 'pixi.js';
 import { GlassPanel } from '../ui/GlassPanel';
 import { useGameStore } from '../state/gameStore';
 import { useSettingsStore } from '../state/settingsStore';
-import { usePersistentStore } from '../state/persistentStore';
 import { DungeonGame } from '../engine/dungeon/DungeonGame';
 import { themeFor } from '../engine/pixi/manifest';
 import './dungeon.css';
@@ -34,7 +33,8 @@ export function DungeonScene() {
   const triggerWin = useGameStore((s) => s.triggerWin);
   const motionIntensity = useSettingsStore((s) => s.motionIntensity);
   const blood = useSettingsStore((s) => s.blood);
-  const greedLevel = usePersistentStore((s) => s.upgrades.cash);
+  const greedLevel = useGameStore((s) => s.run.upgrades.cash);
+  const addCashToRun = useGameStore((s) => s.addCashToRun);
   const cashMult = 1 + greedLevel * 0.25;
   const isBossRaid = isBossRaidFn();
 
@@ -111,21 +111,20 @@ export function DungeonScene() {
             if (cancelled) return;
             addCashEarned(gs.cash);
             addKills(gs.kills);
-            usePersistentStore.getState().addCash(gs.cash);
+            // No persistent cash — run-scoped only.
             showScene('gameover');
           },
           onRoundComplete: (gs) => {
             if (cancelled) return;
-            addCashEarned(gs.cash);
             addKills(gs.kills);
-            usePersistentStore.getState().addCash(gs.cash);
+            // Cash earned this round becomes spendable cash in the shop
+            addCashToRun(gs.cash);
             nextRound();
           },
           onBossDefeated: (gs) => {
             if (cancelled) return;
             addCashEarned(gs.cash);
             addKills(gs.kills);
-            usePersistentStore.getState().addCash(gs.cash);
             triggerWin();
           },
         });
@@ -152,7 +151,7 @@ export function DungeonScene() {
       }
       while (container.firstChild) container.removeChild(container.firstChild);
     };
-  }, [run.build, run.weapon, run.raid, run.endlessRound, stats, isBossRaid, motionIntensity, cashMult, addCashEarned, addKills, showScene, nextRound, triggerWin]);
+  }, [run.build, run.weapon, run.raid, run.endlessRound, stats, isBossRaid, motionIntensity, cashMult, addCashEarned, addCashToRun, addKills, showScene, nextRound, triggerWin]);
 
   const hpPct = Math.max(0, hud.hp / hud.hpMax) * 100;
   const xpPct = (hud.xp / hud.xpNext) * 100;

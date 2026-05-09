@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type {
   BuildDef,
   GameMode,
+  PersistentUpgrades,
   PlayerStats,
   RunState,
   SceneName,
@@ -10,7 +11,6 @@ import type {
 } from '../types';
 import { DIFFICULTY } from '../data/difficulty';
 import { useSettingsStore } from './settingsStore';
-import { usePersistentStore } from './persistentStore';
 import { baseStats } from '../engine/stats';
 import { spinMagnitude } from '../engine/luck';
 
@@ -22,6 +22,9 @@ interface GameActions {
   setRaid(raid: number): void;
   setEndlessRound(round: number): void;
   addCashEarned(amt: number): void;
+  addCashToRun(amt: number): void;            // cash earned this run, available to spend
+  spendRunCash(amt: number): boolean;
+  buyRunUpgrade(id: keyof PersistentUpgrades): void;
   addKills(n: number): void;
   resetRun(): void;
 
@@ -52,6 +55,8 @@ const blankRun = (): RunState => ({
   spells: [],
   cashEarned: 0,
   killsTotal: 0,
+  cash: 0,
+  upgrades: { hp: 0, dmg: 0, spd: 0, def: 0, crit: 0, luck: 0, cash: 0 },
 });
 
 export const useGameStore = create<GameStoreState & GameActions>((set, get) => ({
@@ -105,6 +110,25 @@ export const useGameStore = create<GameStoreState & GameActions>((set, get) => (
     set({ run: { ...get().run, cashEarned: get().run.cashEarned + amt } });
   },
 
+  addCashToRun(amt) {
+    const r = get().run;
+    set({ run: { ...r, cash: r.cash + amt, cashEarned: r.cashEarned + amt } });
+  },
+
+  spendRunCash(amt) {
+    const r = get().run;
+    if (r.cash < amt) return false;
+    set({ run: { ...r, cash: r.cash - amt } });
+    return true;
+  },
+
+  buyRunUpgrade(id) {
+    const r = get().run;
+    const u = { ...r.upgrades };
+    u[id] = (u[id] ?? 0) + 1;
+    set({ run: { ...r, upgrades: u } });
+  },
+
   addKills(n) {
     set({ run: { ...get().run, killsTotal: get().run.killsTotal + n } });
   },
@@ -114,10 +138,9 @@ export const useGameStore = create<GameStoreState & GameActions>((set, get) => (
   },
 
   initStatsForRaid() {
-    const { build, weapon, spells } = get().run;
+    const { build, weapon, spells, upgrades } = get().run;
     if (!build || !weapon) return;
     const diff = useSettingsStore.getState().difficulty;
-    const upgrades = usePersistentStore.getState().upgrades;
     set({ stats: baseStats(build, weapon, spells, diff, upgrades) });
   },
 

@@ -151,6 +151,11 @@ export interface RunState {
   spells: string[];
   cashEarned: number;
   killsTotal: number;
+  // Per-run shop economy — cash currently held + upgrade levels purchased
+  // this run. Reset to zero on startNewRun. No upgrade caps; cost scales
+  // exponentially per-level via SHOP_UPGRADES.costMult.
+  cash: number;
+  upgrades: PersistentUpgrades;
 }
 
 // ----- Persistent (localStorage) -----
