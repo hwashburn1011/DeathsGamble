@@ -36,6 +36,38 @@ export const ENEMY_SPRITE_BY_TYPE: Record<EnemySprite, string> = {
   boss:     `${BASE}assets/tiles/dungeon-crawl/dc-mon/undead/lich.png`,
 };
 
+// ----- Per-weapon projectile sprites -----
+// Map weapon.id → projectile sprite path. `null` = use the legacy
+// Pixi.Graphics slash arc (melee weapons that don't have a flying
+// projectile to depict).
+export const PROJECTILE_BY_WEAPON: Record<string, string | null> = {
+  // Melee — keep the slash arc
+  fists:  null,
+  club:   null,
+  sword:  null,
+  axe:    null,
+  spear:  null,
+  scythe: null,
+  // Bullets (Dungeon Crawl bolts)
+  pistol:  `${BASE}assets/tiles/dungeon-crawl/effect/bolt2.png`,
+  shotgun: `${BASE}assets/tiles/dungeon-crawl/effect/bolt0.png`,
+  smg:     `${BASE}assets/tiles/dungeon-crawl/effect/bolt1.png`,
+  sniper:  `${BASE}assets/tiles/dungeon-crawl/effect/bolt5.png`,
+  rifle:   `${BASE}assets/tiles/dungeon-crawl/effect/bolt3.png`,
+  minigun: `${BASE}assets/tiles/dungeon-crawl/effect/bolt0.png`,
+  // Bow / crossbow / thrown
+  bow:      `${BASE}assets/tiles/dungeon-crawl/effect/arrow0.png`,
+  crossbow: `${BASE}assets/tiles/dungeon-crawl/effect/arrow1.png`,
+  knives:   `${BASE}assets/tiles/dungeon-crawl/effect/arrow2.png`,
+  // Magic
+  staff: `${BASE}assets/tiles/dungeon-crawl/effect/cloud_magic_trail0.png`,
+  wand:  `${BASE}assets/tiles/dungeon-crawl/effect/cloud_magic_trail1.png`,
+  orb:   `${BASE}assets/tiles/dungeon-crawl/effect/cloud_magic_trail2.png`,
+  // Heavy
+  flamer: `${BASE}assets/tiles/dungeon-crawl/dc-misc/flame.png`,
+  rocket: `${BASE}assets/tiles/dungeon-crawl/effect/cloud_fire1.png`,
+};
+
 // ----- Floor / wall tiles (Kenney Tiny Dungeon) -----
 // We'll pick specific tile_NNNN.png in the renderer; manifest just lists
 // the base path.

@@ -15,7 +15,13 @@ import {
 } from 'pixi.js';
 import type { BuildDef, EnemyTypeDef, PlayerStats, SettingsState, WeaponDef } from '../../types';
 import { ENEMY_TYPES, FINAL_BOSS } from '../../data/enemies';
-import { PLAYER_SPRITE_BY_BUILD, ENEMY_SPRITE_BY_TYPE, THEMES, type ThemeKey } from '../pixi/manifest';
+import {
+  PLAYER_SPRITE_BY_BUILD,
+  ENEMY_SPRITE_BY_TYPE,
+  PROJECTILE_BY_WEAPON,
+  THEMES,
+  type ThemeKey,
+} from '../pixi/manifest';
 import { AudioManager } from '../audio/AudioManager';
 
 const ROUND_DURATION_S = 60;
@@ -75,7 +81,9 @@ interface ProjectileEntity {
   life: number;
   pierce: number;
   hit: Set<EnemyEntity>;
-  graphics: Graphics;
+  /** One of `graphics` (melee slash arc) or `sprite` (ranged/magic) is set. */
+  graphics?: Graphics;
+  sprite?: Sprite;
 }
 
 interface GemEntity {
@@ -316,11 +324,13 @@ export class DungeonGame {
   // ---------- Preload ----------
   private async preload(): Promise<void> {
     const theme = THEMES[this.opts.theme];
+    const projUrl = PROJECTILE_BY_WEAPON[this.opts.weapon.id];
     const urls = [
       PLAYER_SPRITE_BY_BUILD[this.opts.build.id] ?? PLAYER_SPRITE_BY_BUILD['gambler'],
       ...Object.values(ENEMY_SPRITE_BY_TYPE),
       theme.floor,
       ...theme.decorations,
+      ...(projUrl ? [projUrl] : []),
     ];
     let loaded = 0;
     const total = urls.length;
@@ -340,7 +350,7 @@ export class DungeonGame {
     const tex = Texture.from(url);
     const sprite = new Sprite(tex);
     sprite.anchor.set(0.5);
-    sprite.scale.set(1.4);
+    sprite.scale.set(2.0);
     this.worldLayer.addChild(sprite);
 
     this.player = {
@@ -519,7 +529,7 @@ export class DungeonGame {
       this.player.y += (my / m) * this.stats.spd * dt * 60;
     }
 
-    this.player.sprite.scale.x = 1.4 * this.player.facing;
+    this.player.sprite.scale.x = 2.0 * this.player.facing;
 
     if (this.player.flashTimer > 0) {
       this.player.flashTimer -= dt;
@@ -547,6 +557,9 @@ export class DungeonGame {
     const w = this.opts.weapon;
     const projCount = w.projectiles || 1;
     const spread = w.spread ?? (projCount > 1 ? 0.3 : 0);
+    const projUrl = PROJECTILE_BY_WEAPON[w.id];
+    const baseColor = parseInt(w.color.replace('#', ''), 16);
+
     for (let i = 0; i < projCount; i++) {
       const offset = projCount === 1 ? 0 : (i / (projCount - 1) - 0.5) * spread;
       const angle = baseAngle + offset;
@@ -554,14 +567,7 @@ export class DungeonGame {
       const speed = w.type === 'magic' ? 6 : 9;
       const dmg = (w.dmg + this.stats.dmg) * this.stats.dmgMult * (isCrit ? 2 : 1);
 
-      const g = new Graphics();
-      const color = parseInt(w.color.replace('#', ''), 16);
-      g.circle(0, 0, isCrit ? 6 : 4);
-      g.fill({ color: isCrit ? 0xff9050 : color });
-
-      this.projectileLayer.addChild(g);
-
-      this.projectiles.push({
+      const proj: ProjectileEntity = {
         x: px,
         y: py,
         vx: Math.cos(angle) * speed,
@@ -571,8 +577,30 @@ export class DungeonGame {
         life: w.type === 'melee' ? 0.15 : 1.5,
         pierce: this.stats.pierce,
         hit: new Set(),
-        graphics: g,
-      });
+      };
+
+      if (projUrl) {
+        // Real sprite — rotate to travel direction, tint by crit
+        const sprite = new Sprite(Texture.from(projUrl));
+        sprite.anchor.set(0.5);
+        // Source sprites are 32x32; scale down to ~16-22px screen size
+        sprite.scale.set(isCrit ? 1.3 : 1.0);
+        sprite.rotation = angle;
+        sprite.tint = isCrit ? 0xffd070 : 0xffffff;
+        // Magic projectiles get a subtle additive glow via the weapon color
+        if (w.type === 'magic') sprite.tint = isCrit ? 0xffd070 : baseColor;
+        this.projectileLayer.addChild(sprite);
+        proj.sprite = sprite;
+      } else {
+        // Melee — keep the slash-arc Graphics
+        const g = new Graphics();
+        g.circle(0, 0, isCrit ? 8 : 6);
+        g.fill({ color: isCrit ? 0xff9050 : baseColor, alpha: 0.85 });
+        this.projectileLayer.addChild(g);
+        proj.graphics = g;
+      }
+
+      this.projectiles.push(proj);
     }
   }
 
@@ -648,7 +676,9 @@ export class DungeonGame {
     const tex = Texture.from(url);
     const sprite = new Sprite(tex);
     sprite.anchor.set(0.5);
-    sprite.scale.set(proto.size / 22);
+    // Scale enemies up — old scale (size/22) read too small at typical viewports.
+    // size/14 makes a tier-1 zombie ~32px, tier-3 tank ~50px, tier-4 reaper ~55px.
+    sprite.scale.set(proto.size / 14);
     this.worldLayer.addChild(sprite);
 
     const hp = proto.hp * this.stats.enemyHpMult * (1 + elapsedS * 0.05);
@@ -680,7 +710,8 @@ export class DungeonGame {
     const tex = Texture.from(url);
     const sprite = new Sprite(tex);
     sprite.anchor.set(0.5);
-    sprite.scale.set(FINAL_BOSS.size / 18);
+    // Boss visibly larger than any tier-4 enemy (~110px)
+    sprite.scale.set(FINAL_BOSS.size / 12);
     this.worldLayer.addChild(sprite);
 
     const hp = FINAL_BOSS.hp * this.stats.enemyHpMult;
@@ -816,8 +847,11 @@ export class DungeonGame {
 
   private removeProjectile(i: number): void {
     const pr = this.projectiles[i];
-    this.projectileLayer.removeChild(pr.graphics);
-    pr.graphics.destroy();
+    const display = pr.sprite ?? pr.graphics;
+    if (display) {
+      this.projectileLayer.removeChild(display);
+      display.destroy();
+    }
     this.projectiles.splice(i, 1);
   }
 
@@ -1089,9 +1123,11 @@ export class DungeonGame {
     this.layoutLighting();
   }
 
-  /** Build a 256-px-square canvas texture with a radial gradient: clear → dark. */
+  /** Build a 512-px-square canvas texture with a radial gradient: clear → dark.
+   *  Larger source + more gradient stops give a noticeably smoother falloff
+   *  (no visible "ring" between bright and dark). */
   private makeRadialLightTexture(): Texture {
-    const SIZE = 256;
+    const SIZE = 512;
     const canvas = document.createElement('canvas');
     canvas.width = SIZE;
     canvas.height = SIZE;
@@ -1099,10 +1135,15 @@ export class DungeonGame {
     const cx = SIZE / 2;
     const grad = ctx.createRadialGradient(cx, cx, 0, cx, cx, cx);
     // Multiply blend: 0xFFFFFF leaves color unchanged, 0x000000 multiplies to black.
-    grad.addColorStop(0,    'rgba(255,255,255,1)');
-    grad.addColorStop(0.45, 'rgba(255,235,200,0.95)');
-    grad.addColorStop(0.7,  'rgba(60,40,20,1)');
-    grad.addColorStop(1,    'rgba(8,8,12,1)');
+    // Long, smooth tail: brightest core extends further, then a 35%-wide soft
+    // mid zone, then gradual fade to the corner darkness.
+    grad.addColorStop(0.00, 'rgba(255, 250, 235, 1.00)');
+    grad.addColorStop(0.20, 'rgba(255, 245, 220, 1.00)');
+    grad.addColorStop(0.40, 'rgba(230, 200, 160, 1.00)');
+    grad.addColorStop(0.55, 'rgba(170, 140, 100, 1.00)');
+    grad.addColorStop(0.70, 'rgba( 90,  70,  50, 1.00)');
+    grad.addColorStop(0.85, 'rgba( 35,  28,  20, 1.00)');
+    grad.addColorStop(1.00, 'rgba( 10,  10,  14, 1.00)');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, SIZE, SIZE);
     return Texture.from(canvas);
@@ -1116,11 +1157,12 @@ export class DungeonGame {
     // further into the dark.
     const baseRange = this.stats.range + this.stats.rangeBonus;
     const rangeBoost = Math.max(0.95, Math.min(1.45, baseRange / 320));
-    // Cover the viewport diagonal so the gradient's outer-dark region kisses
-    // the corners; scale up slightly for high-range builds.
-    const cover = Math.max(w, h) * 1.6 * rangeBoost;
+    // Cover the viewport diagonal generously — the long gradient tail needs
+    // room to breathe so the lit-to-dark transition reads smoothly.
+    const cover = Math.max(w, h) * 2.0 * rangeBoost;
     this.lightSprite.position.set(w / 2, h / 2);
-    this.lightSprite.scale.set(cover / 256);
+    // Texture is 512px now; divide accordingly.
+    this.lightSprite.scale.set(cover / 512);
     // Reset stored base scale so flicker recalculates from the new size on resize
     delete (this.lightSprite as unknown as { __baseScale?: number }).__baseScale;
   }
@@ -1284,7 +1326,10 @@ export class DungeonGame {
     // Sync sprite positions (they live in worldLayer, which is inside worldRoot)
     this.player.sprite.position.set(this.player.x, this.player.y);
     for (const e of this.enemies) e.sprite.position.set(e.x, e.y);
-    for (const pr of this.projectiles) pr.graphics.position.set(pr.x, pr.y);
+    for (const pr of this.projectiles) {
+      const display = pr.sprite ?? pr.graphics;
+      if (display) display.position.set(pr.x, pr.y);
+    }
     for (const g of this.gems) g.graphics.position.set(g.x, g.y);
   }
 }

@@ -15,6 +15,19 @@ interface SpinResult {
   magnitude: number;
 }
 
+const X = '×'; // multiplication sign for "x N.N" magnitude indicator
+
+function formatResultLabel(r: SpinResult): string {
+  if (r.label === 'JACKPOT') {
+    const m = r.magnitude;
+    const dmg = Math.round(10 * m);
+    const hp = Math.round(25 * m);
+    const atkspd = (0.3 * m).toFixed(1);
+    return `JACKPOT  +${dmg} DMG  +${hp} HP  +${atkspd} ATK`;
+  }
+  return r.magnitude !== 1 ? `${r.label}  ${X}${r.magnitude.toFixed(1)}` : r.label;
+}
+
 export function WheelsScene() {
   const containerRef = useRef<HTMLDivElement>(null);
   const wheelsRef = useRef<WheelsGame | null>(null);
@@ -128,9 +141,7 @@ export function WheelsScene() {
         </div>
         <div className="wheels-load-divider" />
         <div className="wheels-load-row">
-          <span className="lbl">
-            {run.mode === 'story' ? 'Raid' : 'Round'}
-          </span>
+          <span className="lbl">{run.mode === 'story' ? 'Raid' : 'Round'}</span>
           <span className="val">
             {run.mode === 'story'
               ? `${run.raid} of ${run.totalRaids}`
@@ -145,10 +156,10 @@ export function WheelsScene() {
           <h3 className="wheels-h3">Stats</h3>
           <StatRow icon="♥" iconColor="var(--blood-bright)" label="HP" value={Math.round(stats.hp)} />
           <StatRow icon="⚔" iconColor="var(--gold)" label="DMG" value={Math.round(stats.dmg + (run.weapon?.dmg ?? 0))} />
-          <StatRow icon="🛡" iconColor="var(--moss-bright)" label="DEF" value={stats.def} />
-          <StatRow icon="👟" iconColor="var(--ink)" label="SPD" value={stats.spd.toFixed(1)} />
+          <StatRow icon="\u{1F6E1}" iconColor="var(--moss-bright)" label="DEF" value={stats.def} />
+          <StatRow icon="\u{1F45F}" iconColor="var(--ink)" label="SPD" value={stats.spd.toFixed(1)} />
           <StatRow icon="⚡" iconColor="var(--candle)" label="ATK SPD" value={(stats.atkspd * stats.atkspdMult).toFixed(1)} />
-          <StatRow icon="🎯" iconColor="var(--arcane-bright)" label="RANGE" value={Math.round(stats.range + stats.rangeBonus)} />
+          <StatRow icon="\u{1F3AF}" iconColor="var(--arcane-bright)" label="RANGE" value={Math.round(stats.range + stats.rangeBonus)} />
           <StatRow icon="✦" iconColor="var(--candle)" label="CRIT" value={`${Math.round(stats.crit * 100)}%`} />
           <StatRow icon="☘" iconColor="var(--gold-bright)" label="LUCK" value={stats.luck.toFixed(1)} highlight />
         </GlassPanel>
@@ -165,12 +176,12 @@ export function WheelsScene() {
         >
           {spinningSide === 'buff' ? 'Spinning…' : 'Spin'}
         </GlassButton>
-        <div className={`wheel-result wheel-result--good ${buffResult ? 'shown' : ''}`}>
-          {buffResult
-            ? buffResult.magnitude !== 1
-              ? `${buffResult.label}  ×${buffResult.magnitude.toFixed(1)}`
-              : buffResult.label
-            : ' '}
+        <div
+          className={`wheel-result wheel-result--good ${buffResult ? 'shown' : ''} ${
+            buffResult?.label === 'JACKPOT' ? 'wheel-result--jackpot' : ''
+          }`}
+        >
+          {buffResult ? formatResultLabel(buffResult) : ' '}
         </div>
       </div>
 
@@ -186,11 +197,7 @@ export function WheelsScene() {
           {spinningSide === 'curse' ? 'Spinning…' : 'Spin'}
         </GlassButton>
         <div className={`wheel-result wheel-result--bad ${curseResult ? 'shown' : ''}`}>
-          {curseResult
-            ? curseResult.magnitude !== 1
-              ? `${curseResult.label}  ×${curseResult.magnitude.toFixed(1)}`
-              : curseResult.label
-            : ' '}
+          {curseResult ? formatResultLabel(curseResult) : ' '}
         </div>
       </div>
 

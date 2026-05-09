@@ -155,6 +155,30 @@
 .wheel-result--good { color: var(--moss-bright); }
 .wheel-result--bad  { color: var(--blood-bright); }
 
+/* JACKPOT result — bigger, gold, animated pulse */
+.wheel-result--jackpot {
+  color: var(--gold-bright) !important;
+  font-family: var(--font-display);
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 700;
+  text-shadow: 0 0 12px rgba(240, 200, 74, 0.6);
+  animation: jackpotPulse 1s ease-in-out infinite;
+  white-space: nowrap;
+}
+
+@keyframes jackpotPulse {
+  0%, 100% {
+    text-shadow: 0 0 10px rgba(240, 200, 74, 0.5);
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    text-shadow: 0 0 20px rgba(240, 200, 74, 0.85);
+    transform: translateY(0) scale(1.04);
+  }
+}
+
 /* Enter Dungeon — bottom right */
 .wheels-enter {
   position: absolute;
