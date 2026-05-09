@@ -268,10 +268,11 @@ export class DungeonGame {
     this.screenLayer.addChild(this.levelGlow);
     app.stage.addChild(this.screenLayer);
 
-    this.buildBackground();
     this.buildVignette();
     this.buildLighting();
     this.buildParticleTexture();
+    // buildBackground() is called in start() AFTER preload — its TilingSprite
+    // texture must already be loaded or it'll render as a blank placeholder.
   }
 
   // Single shared white circle texture — particles use this with tint+scale
@@ -292,6 +293,7 @@ export class DungeonGame {
 
   async start(): Promise<void> {
     await this.preload();
+    this.buildBackground();
     this.spawnPlayer();
     if (this.opts.isBossRaid) {
       this.spawnBoss();
@@ -1037,7 +1039,7 @@ export class DungeonGame {
   // ---------- Background tiles (real CC0 dungeon-crawl floor + decorations) ----------
   private buildBackground(): void {
     const theme = THEMES[this.opts.theme];
-    const SCALE = 2;       // upscale 32x32 source → 64x64 in world
+    const SCALE = 4;       // upscale 16x16 Kenney source → 64x64 in world
     const AREA = 4000;     // covers ±2000 px from origin in world space
 
     // Floor: single TilingSprite — Pixi tiles the texture across the whole
@@ -1052,13 +1054,8 @@ export class DungeonGame {
     floor.tileScale.set(SCALE);
     floor.tint = theme.floorTint;
     this.bgLayer.addChild(floor);
-
-    // Subtle dark vignette layer over the floor — gives the floor depth even
-    // before the dynamic torch lighting kicks in.
-    const tint = new Graphics();
-    tint.rect(-AREA / 2, -AREA / 2, AREA, AREA);
-    tint.fill({ color: 0x000000, alpha: 0.18 });
-    this.bgLayer.addChild(tint);
+    // (No darkening overlay here — the dynamic torch + screen-space vignette
+    // handle ambient darkness, and the source textures are already dim.)
 
     // Scatter decorations — deterministic seed so the same theme produces
     // the same arrangement every time (recognizable spaces).
@@ -1090,20 +1087,10 @@ export class DungeonGame {
   }
 
   private repaintVignette(): void {
-    const w = this.app.screen.width;
-    const h = this.app.screen.height;
-    const g = this.vignetteLayer;
-    g.clear();
-    // Four corner-darkening rects (cheap stand-in for radial gradient)
-    const t = Math.max(80, Math.min(w, h) * 0.18);
-    g.rect(0, 0, w, t);
-    g.fill({ color: 0x000000, alpha: 0.4 });
-    g.rect(0, h - t, w, t);
-    g.fill({ color: 0x000000, alpha: 0.4 });
-    g.rect(0, 0, t, h);
-    g.fill({ color: 0x000000, alpha: 0.4 });
-    g.rect(w - t, 0, t, h);
-    g.fill({ color: 0x000000, alpha: 0.4 });
+    // The dynamic torch already handles edge darkening with a smooth radial
+    // gradient — adding a static rect-band vignette on top produced a
+    // double-darkened look. Leave the layer empty (kept for hooks).
+    this.vignetteLayer.clear();
   }
 
   // ---------- Dynamic lighting (player torch) ----------
@@ -1124,8 +1111,10 @@ export class DungeonGame {
   }
 
   /** Build a 512-px-square canvas texture with a radial gradient: clear → dark.
-   *  Larger source + more gradient stops give a noticeably smoother falloff
-   *  (no visible "ring" between bright and dark). */
+   *  Bright zone stays nearly full-brightness for the inner 55% of the radius
+   *  so the dungeon is comfortably readable around the player; the outer 45%
+   *  is the long soft falloff into the dark corners.
+   *  Multiply blend: 0xFFFFFF leaves color unchanged, 0x000000 multiplies to black. */
   private makeRadialLightTexture(): Texture {
     const SIZE = 512;
     const canvas = document.createElement('canvas');
@@ -1134,16 +1123,12 @@ export class DungeonGame {
     const ctx = canvas.getContext('2d')!;
     const cx = SIZE / 2;
     const grad = ctx.createRadialGradient(cx, cx, 0, cx, cx, cx);
-    // Multiply blend: 0xFFFFFF leaves color unchanged, 0x000000 multiplies to black.
-    // Long, smooth tail: brightest core extends further, then a 35%-wide soft
-    // mid zone, then gradual fade to the corner darkness.
-    grad.addColorStop(0.00, 'rgba(255, 250, 235, 1.00)');
-    grad.addColorStop(0.20, 'rgba(255, 245, 220, 1.00)');
-    grad.addColorStop(0.40, 'rgba(230, 200, 160, 1.00)');
-    grad.addColorStop(0.55, 'rgba(170, 140, 100, 1.00)');
-    grad.addColorStop(0.70, 'rgba( 90,  70,  50, 1.00)');
-    grad.addColorStop(0.85, 'rgba( 35,  28,  20, 1.00)');
-    grad.addColorStop(1.00, 'rgba( 10,  10,  14, 1.00)');
+    grad.addColorStop(0.00, 'rgba(255, 252, 240, 1.00)');  // pure bright core
+    grad.addColorStop(0.45, 'rgba(252, 245, 225, 1.00)');  // still ~98% — broad lit area
+    grad.addColorStop(0.62, 'rgba(220, 195, 165, 1.00)');  // gentle warm dim begins
+    grad.addColorStop(0.78, 'rgba(140, 110,  80, 1.00)');  // moderate falloff
+    grad.addColorStop(0.92, 'rgba( 45,  35,  25, 1.00)');  // dark
+    grad.addColorStop(1.00, 'rgba( 14,  14,  18, 1.00)');  // near-black at corners
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, SIZE, SIZE);
     return Texture.from(canvas);
@@ -1157,9 +1142,9 @@ export class DungeonGame {
     // further into the dark.
     const baseRange = this.stats.range + this.stats.rangeBonus;
     const rangeBoost = Math.max(0.95, Math.min(1.45, baseRange / 320));
-    // Cover the viewport diagonal generously — the long gradient tail needs
-    // room to breathe so the lit-to-dark transition reads smoothly.
-    const cover = Math.max(w, h) * 2.0 * rangeBoost;
+    // Cover slightly larger than the viewport so the dark corners hit cleanly
+    // but the bright center fills most of the visible area.
+    const cover = Math.max(w, h) * 1.5 * rangeBoost;
     this.lightSprite.position.set(w / 2, h / 2);
     // Texture is 512px now; divide accordingly.
     this.lightSprite.scale.set(cover / 512);

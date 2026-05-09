@@ -8,6 +8,11 @@ dist-ssr/
 # TS incremental build cache
 *.tsbuildinfo
 
+# Playwright artifacts
+playwright-report/
+test-results/
+test-screenshots/
+
 # Editor / OS
 .DS_Store
 Thumbs.db

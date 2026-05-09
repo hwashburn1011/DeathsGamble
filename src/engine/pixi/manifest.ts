@@ -79,6 +79,7 @@ export const TINY_DUNGEON_BASE = `${BASE}assets/tiles/kenney-tiny-dungeon/tiles`
 export type ThemeKey = 'crypt' | 'catacomb' | 'hellscape' | 'cavern';
 
 const DC = `${BASE}assets/tiles/dungeon-crawl`;
+const KTD = `${BASE}assets/tiles/kenney-tiny-dungeon/tiles`;
 
 export interface ThemeDef {
   floor: string;
@@ -89,9 +90,9 @@ export interface ThemeDef {
 }
 
 export const THEMES: Record<ThemeKey, ThemeDef> = {
-  // Raid 1 — crypt (basic dungeon, dry stone)
+  // Raid 1 — crypt (light tan stone)
   crypt: {
-    floor: `${DC}/dc-dngn/floor/grey_dirt0.png`,
+    floor: `${KTD}/tile_0048.png`,    // Kenney — clean light tan stone
     decorations: [
       `${DC}/dc-dngn/crumbled_column.png`,
       `${DC}/dc-dngn/dngn_granite_statue.png`,
@@ -99,11 +100,11 @@ export const THEMES: Record<ThemeKey, ThemeDef> = {
       `${DC}/dc-dngn/dngn_dry_fountain.png`,
       `${DC}/dc-dngn/elephant_statue.png`,
     ],
-    floorTint: 0xa8a89c,
+    floorTint: 0xffffff,
   },
-  // Raid 2 — catacomb (tomb stone, mausoleum)
+  // Raid 2 — catacomb (tan sandstone)
   catacomb: {
-    floor: `${DC}/dc-dngn/floor/tomb0.png`,
+    floor: `${KTD}/tile_0048.png`,    // Kenney — light tan stone
     decorations: [
       `${DC}/dc-dngn/granite_stump.png`,
       `${DC}/dc-dngn/dngn_blue_fountain.png`,
@@ -111,11 +112,11 @@ export const THEMES: Record<ThemeKey, ThemeDef> = {
       `${DC}/dc-dngn/dngn_granite_statue.png`,
       `${DC}/dc-dngn/dngn_orcish_idol.png`,
     ],
-    floorTint: 0x9090a0,
+    floorTint: 0xe8d8b8,
   },
-  // Raid 3+ / boss — hellscape (bloody cobble, demonic accents)
+  // Raid 3+ / boss — hellscape (red-tinted floor + bloody decorations)
   hellscape: {
-    floor: `${DC}/dc-dngn/floor/cobble_blood1.png`,
+    floor: `${KTD}/tile_0040.png`,    // Same cobble, tinted red for hellfire
     decorations: [
       `${DC}/dc-dngn/dngn_blood_fountain.png`,
       `${DC}/dc-misc/blood_red1.png`,
@@ -124,17 +125,17 @@ export const THEMES: Record<ThemeKey, ThemeDef> = {
       `${DC}/dc-dngn/dngn_orcish_idol.png`,
       `${DC}/dc-dngn/crumbled_column.png`,
     ],
-    floorTint: 0xc06060,
+    floorTint: 0xc04848,
   },
-  // Endless variant — cavern (sandstone)
+  // Endless variant — cavern (warm tan)
   cavern: {
-    floor: `${DC}/dc-dngn/floor/sandstone_floor0.png`,
+    floor: `${KTD}/tile_0050.png`,    // Kenney — slightly darker tan
     decorations: [
       `${DC}/dc-dngn/crumbled_column.png`,
       `${DC}/dc-dngn/granite_stump.png`,
       `${DC}/dc-dngn/dngn_dry_fountain.png`,
     ],
-    floorTint: 0xb0a080,
+    floorTint: 0xeed8b8,
   },
 };
 
