@@ -529,6 +529,53 @@
     text-transform: uppercase;
   }
 
+  /* Round timer (top-center of dungeon) */
+  #round-timer {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(7, 7, 10, 0.78);
+    border: 1px solid #2a2a32;
+    padding: 8px 16px;
+    border-radius: 4px;
+    width: 240px;
+    text-align: center;
+    transition: border-color 0.2s;
+  }
+  #round-timer-bar {
+    height: 6px;
+    background: #1a1a22;
+    border-radius: 2px;
+    margin-bottom: 5px;
+    overflow: hidden;
+  }
+  #round-timer-fill {
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, #69b070, #c9a227);
+    transition: width 0.15s, background 0.2s;
+  }
+  #round-timer-text {
+    font-size: 13px;
+    letter-spacing: 0.18em;
+    color: var(--ink-dim);
+    transition: color 0.2s;
+    font-weight: bold;
+  }
+  #round-timer.warning #round-timer-fill { background: var(--accent); }
+  #round-timer.warning #round-timer-text { color: var(--accent); }
+  #round-timer.danger { border-color: var(--danger); }
+  #round-timer.danger #round-timer-fill { background: var(--danger-bright); }
+  #round-timer.danger #round-timer-text {
+    color: var(--danger-bright);
+    animation: timerPulse 0.6s ease-in-out infinite;
+  }
+  @keyframes timerPulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.55; }
+  }
+
   /* ---------- Shop ---------- */
   #shop-screen { gap: 14px; padding: 30px 0; }
   #shop-screen h2 {
@@ -728,6 +775,10 @@
       <span class="icon" id="wd-icon">✊</span><span class="wname" id="wd-name">Fists</span>
       <span id="wd-spells"></span>
     </div>
+    <div id="round-timer">
+      <div id="round-timer-bar"><div id="round-timer-fill" style="width:100%"></div></div>
+      <div id="round-timer-text">1:00</div>
+    </div>
     <div id="control-hint">WASD / Arrow keys to move — auto-attacks fire</div>
   </div>
 
@@ -807,7 +858,8 @@
         <span class="label">Blood / Gore</span>
         <div class="toggle on" id="set-blood"></div>
       </div>
-      <div class="modal-row">
+      <!-- Pet + Accessory pickers temporarily hidden — see FEATURE_FLAGS in script -->
+      <div class="modal-row" style="display:none">
         <span class="label">Pet</span>
         <div class="seg" id="set-pet">
           <button data-v="none" class="active">None</button>
@@ -816,7 +868,7 @@
           <button data-v="imp">Imp</button>
         </div>
       </div>
-      <div class="modal-row">
+      <div class="modal-row" style="display:none">
         <span class="label">Accessory</span>
         <div class="seg" id="set-accessory">
           <button data-v="none" class="active">None</button>
@@ -885,11 +937,11 @@ const BUILDS = [
     look:{ robe:'#3a3030', accent:'#a08080' }, desc:'Unmoving. Unkillable. Slow.' },
   { id:'arcanist', name:'The Arcanist', weapon:'staff',  spells:['pierce'],    baseHp:75,  baseSpd:3.0, baseDef:0, baseLuck:0.4,
     look:{ robe:'#1a2a4a', accent:'#5a8af0' }, desc:'Knowledge bends physics. Bones less so.' },
-  { id:'rogue',    name:'The Rogue',    weapon:'knives', spells:['lifesteal'], baseHp:85,  baseSpd:4.0, baseDef:0, baseLuck:0.6,
+  { id:'rogue',    name:'The Rogue',    weapon:'knives', spells:['haste'],     baseHp:85,  baseSpd:4.0, baseDef:0, baseLuck:0.6,
     look:{ robe:'#1a1a1a', accent:'#909090' }, desc:'Fast. Quiet. Never on the books.' },
   { id:'huntsman', name:'The Huntsman', weapon:'bow',    spells:['reach'],     baseHp:100, baseSpd:3.3, baseDef:1, baseLuck:0.3,
     look:{ robe:'#3a4030', accent:'#a0c080' }, desc:'A patient eye. A long arm.' },
-  { id:'witch',    name:'The Witch',    weapon:'wand',   spells:['haste'],     baseHp:80,  baseSpd:3.5, baseDef:0, baseLuck:0.4,
+  { id:'witch',    name:'The Witch',    weapon:'wand',   spells:['lifesteal'], baseHp:80,  baseSpd:3.5, baseDef:0, baseLuck:0.4,
     look:{ robe:'#2a1030', accent:'#c060ff' }, desc:'Fingers crackle with the unkind kind of magic.' },
   { id:'soldier',  name:'The Soldier',  weapon:'rifle',  spells:[],            baseHp:120, baseSpd:3.0, baseDef:2, baseLuck:0,
     look:{ robe:'#2a3a2a', accent:'#a0b0a0' }, desc:'Trained. Equipped. Tired.' },
@@ -958,6 +1010,13 @@ const DIFFICULTY = {
   easy:   { storyRaids: 2, curseMult: 0.5, enemyHpMult: 0.7, enemySpdMult: 0.9, enemySpawnMult: 0.7, enemyDmgMult: 0.7, cashMult: 1.5 },
   normal: { storyRaids: 3, curseMult: 1.0, enemyHpMult: 1.0, enemySpdMult: 1.0, enemySpawnMult: 1.0, enemyDmgMult: 1.0, cashMult: 1.0 },
   hard:   { storyRaids: 5, curseMult: 1.4, enemyHpMult: 1.4, enemySpdMult: 1.15, enemySpawnMult: 1.4, enemyDmgMult: 1.3, cashMult: 0.7 },
+};
+
+// Feature flags — used to temporarily hide systems that aren't ready yet.
+// Flip to true to re-enable; the underlying code stays in place.
+const FEATURE_FLAGS = {
+  pets: false,         // pet picker / pet drawing (task #38, returns later)
+  accessories: false,  // accessory picker / hat drawing (task #38, returns later)
 };
 
 // ============== Persistent state (localStorage) ==============
@@ -1770,10 +1829,13 @@ function showBuildPicker() {
     `;
     card.addEventListener('click', () => pickBuild(b));
     container.appendChild(card);
-    // Draw portrait
+    // Draw portrait via the per-build dispatcher (scale 3.5 fits the 100x120 card).
     const cv = card.querySelector('canvas');
     const cctx = cv.getContext('2d');
-    drawCharacterPortrait(cctx, 50, 60, b.look, settings.accessory);
+    drawCharacter(cctx, 50, 75, 3.5, b);
+    if (FEATURE_FLAGS.accessories) {
+      drawAccessory(cctx, 50, 75 - 17 * 3.5, settings.accessory, b.look.accent);
+    }
   }
 }
 
@@ -1782,30 +1844,6 @@ function pickBuild(b) {
   run.weapon = WEAPONS_BY_ID[b.weapon];
   run.spells = [...b.spells];
   beginRaid();
-}
-
-function drawCharacterPortrait(ctx, x, y, look, accessory) {
-  // Mini hooded figure
-  ctx.fillStyle = look.robe;
-  ctx.beginPath();
-  ctx.moveTo(x - 30, y + 60);
-  ctx.bezierCurveTo(x - 42, y + 10, x - 28, y - 32, x, y - 38);
-  ctx.bezierCurveTo(x + 28, y - 32, x + 42, y + 10, x + 30, y + 60);
-  ctx.closePath();
-  ctx.fill();
-  // Hood face void
-  ctx.fillStyle = '#000';
-  ctx.beginPath();
-  ctx.ellipse(x, y - 16, 13, 18, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // Eyes
-  ctx.fillStyle = look.accent;
-  ctx.beginPath();
-  ctx.arc(x - 5, y - 16, 2, 0, Math.PI * 2);
-  ctx.arc(x + 5, y - 16, 2, 0, Math.PI * 2);
-  ctx.fill();
-  // Accessory
-  drawAccessory(ctx, x, y - 32, accessory, look.accent);
 }
 
 function drawAccessory(ctx, x, y, kind, accent) {
@@ -1899,8 +1937,8 @@ function dungeonStart(isBossFight = false) {
   dungeon.bossKilled = false;
   dungeon.cashThisRun = 0;
 
-  // Pet
-  if (settings.pet !== 'none') {
+  // Pet (gated by feature flag)
+  if (FEATURE_FLAGS.pets && settings.pet !== 'none') {
     dungeon.pet = { x: 30, y: -20, kind: settings.pet, t: 0 };
   } else {
     dungeon.pet = null;
@@ -2218,7 +2256,24 @@ function tickDungeon(dt, now) {
     dungeon.pet.y += (targetY - dungeon.pet.y) * 0.08;
   }
 
-  $('d-time').textContent = Math.floor((now - dungeon.startTime) / 1000) + 's';
+  const elapsedS = Math.floor((now - dungeon.startTime) / 1000);
+  $('d-time').textContent = elapsedS + 's';
+
+  // Round timer (60s rounds; hidden during boss fight)
+  const timerEl = $('round-timer');
+  if (dungeon.bossSpawned) {
+    timerEl.style.display = 'none';
+  } else {
+    timerEl.style.display = '';
+    const remaining = Math.max(0, 60 - elapsedS);
+    $('round-timer-fill').style.width = (remaining / 60 * 100) + '%';
+    const mins = Math.floor(remaining / 60);
+    const secs = remaining % 60;
+    $('round-timer-text').textContent = mins + ':' + secs.toString().padStart(2, '0');
+    timerEl.classList.toggle('danger', remaining <= 10);
+    timerEl.classList.toggle('warning', remaining > 10 && remaining <= 20);
+  }
+
   syncHUD();
 
   if (p.hp <= 0) {
@@ -2334,8 +2389,8 @@ function renderDungeon() {
   // Player
   drawPlayer(w / 2, h / 2);
 
-  // Pet
-  if (dungeon.pet) {
+  // Pet (gated)
+  if (FEATURE_FLAGS.pets && dungeon.pet) {
     drawPet(ctx, dungeon.pet.x + camX, dungeon.pet.y + camY, dungeon.pet.kind, dungeon.pulse);
   }
 
@@ -2389,30 +2444,352 @@ function renderDungeon() {
 
 function drawPlayer(x, y) {
   const ctx = dctx;
-  const look = run.build ? run.build.look : { robe: '#1a1a26', accent: '#f0c84a' };
-  // Cloak
+  const build = run.build || BUILDS[0];
+  drawCharacter(ctx, x, y, 0.9, build);
+  // Accessory drawing is gated by FEATURE_FLAGS.accessories (#38)
+  if (FEATURE_FLAGS.accessories) {
+    drawAccessory(ctx, x, y - 17, settings.accessory, build.look.accent);
+  }
+}
+
+// Dispatches to a per-build draw function so each character looks distinct.
+// Used by both the dungeon player render (small scale) and the build-picker
+// portrait (large scale).
+function drawCharacter(ctx, x, y, s, build) {
+  const look = build.look;
+  switch (build.id) {
+    case 'gambler':  drawCharGambler(ctx, x, y, s, look);  break;
+    case 'duelist':  drawCharDuelist(ctx, x, y, s, look);  break;
+    case 'brute':    drawCharBrute(ctx, x, y, s, look);    break;
+    case 'arcanist': drawCharArcanist(ctx, x, y, s, look); break;
+    case 'rogue':    drawCharRogue(ctx, x, y, s, look);    break;
+    case 'huntsman': drawCharHuntsman(ctx, x, y, s, look); break;
+    case 'witch':    drawCharWitch(ctx, x, y, s, look);    break;
+    case 'soldier':  drawCharSoldier(ctx, x, y, s, look);  break;
+    default:         drawCharHooded(ctx, x, y, s, look);
+  }
+}
+
+function drawCharGambler(ctx, x, y, s, look) {
+  // Frock coat, white shirt, golden tie, top hat
+  ctx.fillStyle = look.robe;
+  ctx.fillRect(x - 7*s, y - 4*s, 14*s, 18*s);
+  // Shirt V
+  ctx.fillStyle = '#e8e0c0';
+  ctx.beginPath();
+  ctx.moveTo(x - 3*s, y - 4*s); ctx.lineTo(x, y); ctx.lineTo(x + 3*s, y - 4*s); ctx.closePath();
+  ctx.fill();
+  // Tie
+  ctx.fillStyle = look.accent;
+  ctx.fillRect(x - 1*s, y - 3*s, 2*s, 5*s);
+  // Head
+  ctx.fillStyle = '#d8c8a8';
+  ctx.beginPath();
+  ctx.arc(x, y - 9*s, 4.5*s, 0, Math.PI * 2);
+  ctx.fill();
+  // Eyes
+  ctx.fillStyle = '#1a1a22';
+  ctx.fillRect(x - 2.5*s, y - 9*s, 1.4*s, 1.2*s);
+  ctx.fillRect(x + 1.1*s, y - 9*s, 1.4*s, 1.2*s);
+  // Mustache
+  ctx.fillStyle = '#5a3a20';
+  ctx.fillRect(x - 2.5*s, y - 7*s, 5*s, 0.8*s);
+  // Top hat
+  ctx.fillStyle = '#0a0a0c';
+  ctx.fillRect(x - 6*s, y - 13*s, 12*s, 1.2*s);
+  ctx.fillRect(x - 4*s, y - 19*s, 8*s, 6*s);
+  ctx.fillStyle = look.accent;
+  ctx.fillRect(x - 4*s, y - 14.5*s, 8*s, 1*s);
+}
+
+function drawCharDuelist(ctx, x, y, s, look) {
+  // Body
+  ctx.fillStyle = look.robe;
+  ctx.fillRect(x - 6*s, y - 4*s, 12*s, 18*s);
+  // Cape
+  ctx.fillStyle = look.accent;
+  ctx.beginPath();
+  ctx.moveTo(x - 7*s, y - 6*s); ctx.lineTo(x - 11*s, y + 12*s); ctx.lineTo(x - 4*s, y + 4*s);
+  ctx.closePath(); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(x + 7*s, y - 6*s); ctx.lineTo(x + 11*s, y + 12*s); ctx.lineTo(x + 4*s, y + 4*s);
+  ctx.closePath(); ctx.fill();
+  // Sash across chest
+  ctx.fillStyle = look.accent;
+  ctx.fillRect(x - 6*s, y, 12*s, 2*s);
+  // Head
+  ctx.fillStyle = '#d0c0a0';
+  ctx.beginPath();
+  ctx.arc(x, y - 9*s, 4*s, 0, Math.PI * 2);
+  ctx.fill();
+  // Pointed helmet
+  ctx.fillStyle = '#a0a0b0';
+  ctx.beginPath();
+  ctx.moveTo(x - 5*s, y - 10*s);
+  ctx.lineTo(x, y - 18*s);
+  ctx.lineTo(x + 5*s, y - 10*s);
+  ctx.closePath();
+  ctx.fill();
+  // Visor slit
+  ctx.fillStyle = '#0a0a0c';
+  ctx.fillRect(x - 3*s, y - 9*s, 6*s, 1*s);
+  // Sword at side
+  ctx.strokeStyle = '#c0c0c0';
+  ctx.lineWidth = 1.4*s;
+  ctx.beginPath();
+  ctx.moveTo(x + 7*s, y);
+  ctx.lineTo(x + 7*s, y + 10*s);
+  ctx.stroke();
+  ctx.fillStyle = look.accent;
+  ctx.fillRect(x + 5.5*s, y - 1*s, 3*s, 1.2*s);
+}
+
+function drawCharBrute(ctx, x, y, s, look) {
+  // Massive shoulders / torso
+  ctx.fillStyle = '#d0b890';
+  ctx.beginPath();
+  ctx.ellipse(x, y, 9*s, 7*s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Loincloth
+  ctx.fillStyle = look.robe;
+  ctx.fillRect(x - 6*s, y + 4*s, 12*s, 10*s);
+  // Belt
+  ctx.fillStyle = look.accent;
+  ctx.fillRect(x - 7*s, y + 3*s, 14*s, 2*s);
+  // Bald head
+  ctx.fillStyle = '#d0b890';
+  ctx.beginPath();
+  ctx.arc(x, y - 8*s, 5*s, 0, Math.PI * 2);
+  ctx.fill();
+  // Angry brow
+  ctx.fillStyle = '#1a1a1a';
+  ctx.fillRect(x - 3*s, y - 10.5*s, 2.5*s, 0.8*s);
+  ctx.fillRect(x + 0.5*s, y - 10.5*s, 2.5*s, 0.8*s);
+  // Eyes (squinting)
+  ctx.fillRect(x - 2.5*s, y - 8.5*s, 1.5*s, 0.7*s);
+  ctx.fillRect(x + 1*s, y - 8.5*s, 1.5*s, 0.7*s);
+  // Scar
+  ctx.strokeStyle = '#8a3030';
+  ctx.lineWidth = 0.7*s;
+  ctx.beginPath();
+  ctx.moveTo(x - 4*s, y - 11*s);
+  ctx.lineTo(x + 4*s, y - 5*s);
+  ctx.stroke();
+}
+
+function drawCharArcanist(ctx, x, y, s, look) {
+  // Long robe
   ctx.fillStyle = look.robe;
   ctx.beginPath();
-  ctx.moveTo(x - 11, y - 14);
-  ctx.bezierCurveTo(x - 17, y - 4, x - 15, y + 12, x - 11, y + 16);
-  ctx.lineTo(x + 11, y + 16);
-  ctx.bezierCurveTo(x + 15, y + 12, x + 17, y - 4, x + 11, y - 14);
-  ctx.bezierCurveTo(x + 9, y - 18, x - 9, y - 18, x - 11, y - 14);
+  ctx.moveTo(x - 4*s, y - 4*s);
+  ctx.lineTo(x - 9*s, y + 14*s);
+  ctx.lineTo(x + 9*s, y + 14*s);
+  ctx.lineTo(x + 4*s, y - 4*s);
+  ctx.closePath();
+  ctx.fill();
+  // Belt
+  ctx.fillStyle = '#3a2a10';
+  ctx.fillRect(x - 5*s, y + 1*s, 10*s, 1.5*s);
+  ctx.fillStyle = look.accent;
+  ctx.fillRect(x - 1*s, y + 0.5*s, 2*s, 2.5*s);
+  // Beard
+  ctx.fillStyle = '#d8d0c0';
+  ctx.beginPath();
+  ctx.moveTo(x - 4*s, y - 7*s);
+  ctx.bezierCurveTo(x - 4*s, y - 1*s, x + 4*s, y - 1*s, x + 4*s, y - 7*s);
+  ctx.closePath();
+  ctx.fill();
+  // Head
+  ctx.fillStyle = '#d0c0a0';
+  ctx.beginPath();
+  ctx.arc(x, y - 9*s, 4*s, 0, Math.PI * 2);
+  ctx.fill();
+  // Eyes (glowy)
+  ctx.fillStyle = look.accent;
+  ctx.fillRect(x - 2.5*s, y - 9*s, 1.4*s, 1*s);
+  ctx.fillRect(x + 1.1*s, y - 9*s, 1.4*s, 1*s);
+  // Pointy wizard hat
+  ctx.fillStyle = look.robe;
+  ctx.beginPath();
+  ctx.moveTo(x - 6*s, y - 12*s);
+  ctx.lineTo(x + 6*s, y - 12*s);
+  ctx.lineTo(x + 1*s, y - 22*s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillRect(x - 7*s, y - 12.5*s, 14*s, 1.5*s);
+  // Star
+  ctx.fillStyle = look.accent;
+  ctx.fillRect(x - 0.6*s, y - 17*s, 1.2*s, 1.2*s);
+}
+
+function drawCharRogue(ctx, x, y, s, look) {
+  // Lean cloak
+  ctx.fillStyle = look.robe;
+  ctx.beginPath();
+  ctx.moveTo(x - 6*s, y + 14*s);
+  ctx.lineTo(x - 5*s, y - 6*s);
+  ctx.bezierCurveTo(x - 5*s, y - 13*s, x + 5*s, y - 13*s, x + 5*s, y - 6*s);
+  ctx.lineTo(x + 6*s, y + 14*s);
   ctx.closePath();
   ctx.fill();
   // Hood face void
   ctx.fillStyle = '#000';
   ctx.beginPath();
-  ctx.ellipse(x, y - 9, 6, 7, 0, 0, Math.PI * 2);
+  ctx.ellipse(x, y - 8*s, 3*s, 4*s, 0, 0, Math.PI * 2);
   ctx.fill();
-  // Eyes (build accent)
+  // Sharp eyes
+  ctx.fillStyle = look.accent;
+  ctx.fillRect(x - 1.7*s, y - 8*s, 1.1*s, 0.7*s);
+  ctx.fillRect(x + 0.6*s, y - 8*s, 1.1*s, 0.7*s);
+  // Crossed daggers at waist
+  ctx.strokeStyle = '#c0c0c0';
+  ctx.lineWidth = 1.2*s;
+  ctx.beginPath();
+  ctx.moveTo(x - 6*s, y + 1*s); ctx.lineTo(x - 1*s, y + 6*s);
+  ctx.moveTo(x + 6*s, y + 1*s); ctx.lineTo(x + 1*s, y + 6*s);
+  ctx.stroke();
+  // Dagger pommels
+  ctx.fillStyle = look.accent;
+  ctx.beginPath(); ctx.arc(x - 6*s, y + 1*s, 0.9*s, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x + 6*s, y + 1*s, 0.9*s, 0, Math.PI*2); ctx.fill();
+}
+
+function drawCharHuntsman(ctx, x, y, s, look) {
+  // Tunic
+  ctx.fillStyle = look.robe;
+  ctx.fillRect(x - 6*s, y - 3*s, 12*s, 17*s);
+  // Hood (over head, slumped back)
+  ctx.fillStyle = look.robe;
+  ctx.beginPath();
+  ctx.moveTo(x - 6*s, y - 4*s);
+  ctx.bezierCurveTo(x - 7*s, y - 14*s, x + 7*s, y - 14*s, x + 6*s, y - 4*s);
+  ctx.closePath();
+  ctx.fill();
+  // Face under hood
+  ctx.fillStyle = '#d8c0a0';
+  ctx.beginPath();
+  ctx.arc(x, y - 8*s, 3.5*s, 0, Math.PI * 2);
+  ctx.fill();
+  // Eyes
+  ctx.fillStyle = '#1a1a22';
+  ctx.fillRect(x - 2*s, y - 8*s, 1.2*s, 1*s);
+  ctx.fillRect(x + 0.8*s, y - 8*s, 1.2*s, 1*s);
+  // Belt
+  ctx.fillStyle = '#5a3010';
+  ctx.fillRect(x - 7*s, y + 3*s, 14*s, 1.5*s);
+  // Bow over shoulder
+  ctx.strokeStyle = look.accent;
+  ctx.lineWidth = 1.3*s;
+  ctx.beginPath();
+  ctx.arc(x + 9*s, y + 2*s, 8*s, -Math.PI * 0.32, Math.PI * 0.32);
+  ctx.stroke();
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 0.4*s;
+  const a1 = -0.32 * Math.PI, a2 = 0.32 * Math.PI;
+  ctx.beginPath();
+  ctx.moveTo(x + 9*s + Math.cos(a1) * 8*s, y + 2*s + Math.sin(a1) * 8*s);
+  ctx.lineTo(x + 9*s + Math.cos(a2) * 8*s, y + 2*s + Math.sin(a2) * 8*s);
+  ctx.stroke();
+}
+
+function drawCharWitch(ctx, x, y, s, look) {
+  // Robe (gathered triangular)
+  ctx.fillStyle = look.robe;
+  ctx.beginPath();
+  ctx.moveTo(x - 4*s, y - 4*s);
+  ctx.lineTo(x - 8*s, y + 14*s);
+  ctx.lineTo(x + 8*s, y + 14*s);
+  ctx.lineTo(x + 4*s, y - 4*s);
+  ctx.closePath();
+  ctx.fill();
+  // Star on robe
+  ctx.fillStyle = look.accent;
+  ctx.fillRect(x - 0.6*s, y + 4*s, 1.2*s, 1.2*s);
+  // Head
+  ctx.fillStyle = '#e8d0c8';
+  ctx.beginPath();
+  ctx.arc(x, y - 8*s, 3.8*s, 0, Math.PI * 2);
+  ctx.fill();
+  // Eyes
+  ctx.fillStyle = look.accent;
+  ctx.fillRect(x - 2*s, y - 8*s, 1.2*s, 1*s);
+  ctx.fillRect(x + 0.8*s, y - 8*s, 1.2*s, 1*s);
+  // Witch hat (tall, slightly crooked)
+  ctx.fillStyle = '#0a0a0c';
+  ctx.beginPath();
+  ctx.moveTo(x - 7*s, y - 11*s);
+  ctx.lineTo(x + 7*s, y - 11*s);
+  ctx.lineTo(x + 3*s, y - 23*s);
+  ctx.closePath();
+  ctx.fill();
+  // Hat band
+  ctx.fillStyle = look.accent;
+  ctx.fillRect(x - 6*s, y - 12.5*s, 12*s, 1.5*s);
+  // Brim
+  ctx.fillStyle = '#0a0a0c';
+  ctx.fillRect(x - 8.5*s, y - 11.2*s, 17*s, 1.4*s);
+}
+
+function drawCharSoldier(ctx, x, y, s, look) {
+  // Uniform jacket
+  ctx.fillStyle = look.robe;
+  ctx.fillRect(x - 6*s, y - 3*s, 12*s, 17*s);
+  // Vest / chest plate
+  ctx.fillStyle = '#1a2a1a';
+  ctx.fillRect(x - 5*s, y - 1*s, 10*s, 8*s);
+  // Shoulder pads
+  ctx.fillStyle = look.accent;
+  ctx.fillRect(x - 7*s, y - 3*s, 3*s, 2*s);
+  ctx.fillRect(x + 4*s, y - 3*s, 3*s, 2*s);
+  // Belt
+  ctx.fillStyle = '#3a2a10';
+  ctx.fillRect(x - 7*s, y + 6*s, 14*s, 1.5*s);
+  // Head
+  ctx.fillStyle = '#d0b890';
+  ctx.beginPath();
+  ctx.arc(x, y - 8*s, 4*s, 0, Math.PI * 2);
+  ctx.fill();
+  // Eyes (stoic)
+  ctx.fillStyle = '#1a1a22';
+  ctx.fillRect(x - 2*s, y - 8*s, 1.2*s, 1*s);
+  ctx.fillRect(x + 0.8*s, y - 8*s, 1.2*s, 1*s);
+  // Helmet (rounded)
   ctx.fillStyle = look.accent;
   ctx.beginPath();
-  ctx.arc(x - 2.4, y - 9, 1.2, 0, Math.PI * 2);
-  ctx.arc(x + 2.4, y - 9, 1.2, 0, Math.PI * 2);
+  ctx.ellipse(x, y - 11*s, 5.5*s, 3.8*s, 0, 0, Math.PI * 2);
   ctx.fill();
-  // Accessory
-  drawAccessory(ctx, x, y - 17, settings.accessory, look.accent);
+  // Helmet strap
+  ctx.fillStyle = '#3a2a10';
+  ctx.fillRect(x - 5*s, y - 8*s, 10*s, 0.6*s);
+  // Rifle slung
+  ctx.strokeStyle = '#5a3a10';
+  ctx.lineWidth = 1.2*s;
+  ctx.beginPath();
+  ctx.moveTo(x - 7*s, y - 1*s);
+  ctx.lineTo(x + 7*s, y + 11*s);
+  ctx.stroke();
+}
+
+// Fallback hooded silhouette (mini-Death) — kept for any unknown build id
+function drawCharHooded(ctx, x, y, s, look) {
+  ctx.fillStyle = look.robe;
+  ctx.beginPath();
+  ctx.moveTo(x - 11*s, y - 14*s);
+  ctx.bezierCurveTo(x - 17*s, y - 4*s, x - 15*s, y + 12*s, x - 11*s, y + 16*s);
+  ctx.lineTo(x + 11*s, y + 16*s);
+  ctx.bezierCurveTo(x + 15*s, y + 12*s, x + 17*s, y - 4*s, x + 11*s, y - 14*s);
+  ctx.bezierCurveTo(x + 9*s, y - 18*s, x - 9*s, y - 18*s, x - 11*s, y - 14*s);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.ellipse(x, y - 9*s, 6*s, 7*s, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = look.accent;
+  ctx.beginPath();
+  ctx.arc(x - 2.4*s, y - 9*s, 1.2*s, 0, Math.PI * 2);
+  ctx.arc(x + 2.4*s, y - 9*s, 1.2*s, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 function drawPet(ctx, x, y, kind, pulse) {
