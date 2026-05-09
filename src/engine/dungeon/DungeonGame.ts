@@ -92,9 +92,7 @@ interface Particle {
   vy: number;
   life: number;
   maxLife: number;
-  graphics: Graphics;
-  rot: number;
-  vrot: number;
+  sprite: Sprite;          // pooled — tinted instead of redrawn
   kind: ParticleKind;
   drag: number;
   gravity: number;
@@ -113,6 +111,7 @@ export interface DungeonGameOptions {
   stats: PlayerStats;
   isBossRaid: boolean;
   motionIntensity: SettingsState['motionIntensity'];
+  cashMult: number;        // 1 + greedLevel*0.25
   onPreloadProgress?: (loaded: number, total: number) => void;
   onStatsChange: (s: {
     hp: number;
@@ -185,6 +184,8 @@ export class DungeonGame {
   private lightSprite: Sprite | null = null;
   private lightTexture: Texture | null = null;
   private lightFlickerT = 0;
+  private particleTexture: Texture | null = null;
+  private particlePool: Sprite[] = [];
 
   private player!: PlayerEntity;
   private enemies: EnemyEntity[] = [];
@@ -248,6 +249,23 @@ export class DungeonGame {
     this.buildBackground();
     this.buildVignette();
     this.buildLighting();
+    this.buildParticleTexture();
+  }
+
+  // Single shared white circle texture — particles use this with tint+scale
+  // so we never have to clear+redraw a Graphics on recycle.
+  private buildParticleTexture(): void {
+    const SIZE = 16;
+    const c = document.createElement('canvas');
+    c.width = SIZE;
+    c.height = SIZE;
+    const ctx = c.getContext('2d')!;
+    const cx = SIZE / 2;
+    ctx.beginPath();
+    ctx.arc(cx, cx, cx - 1, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    this.particleTexture = Texture.from(c);
   }
 
   async start(): Promise<void> {
@@ -794,7 +812,7 @@ export class DungeonGame {
         continue;
       }
       this.kills++;
-      this.cashThisRun += e.cash;
+      this.cashThisRun += Math.max(1, Math.round(e.cash * this.opts.cashMult));
       // Drop XP gem
       const gemG = new Graphics();
       gemG.poly([0, -6, 6, 0, 0, 6, -6, 0]);
@@ -921,7 +939,9 @@ export class DungeonGame {
     }
   }
 
-  /** Internal — push a particle with kind-specific physics defaults. */
+  /** Internal — push a particle with kind-specific physics defaults.
+   *  Uses a shared white circle texture; pool sprites are recycled by tint+scale.
+   */
   private pushParticle(
     kind: ParticleKind,
     x: number,
@@ -932,10 +952,14 @@ export class DungeonGame {
     color: number,
     radius: number
   ): void {
-    const g = new Graphics();
-    g.circle(0, 0, radius);
-    g.fill({ color });
-    this.particleLayer.addChild(g);
+    const sprite = this.particlePool.pop() ?? new Sprite(this.particleTexture!);
+    sprite.anchor.set(0.5);
+    sprite.tint = color;
+    sprite.position.set(x, y);
+    // Texture is 16x16 — scale to desired diameter (radius*2 / 16 = radius/8)
+    sprite.scale.set(radius / 8);
+    sprite.alpha = 1;
+    if (!sprite.parent) this.particleLayer.addChild(sprite);
     let drag = 0.92;
     let gravity = 50;
     if (kind === 'ember') { drag = 0.99; gravity = -8; }
@@ -944,10 +968,19 @@ export class DungeonGame {
     this.particles.push({
       x, y, vx, vy,
       life, maxLife: life,
-      graphics: g,
-      rot: 0, vrot: 0,
+      sprite,
       kind, drag, gravity,
     });
+  }
+
+  private releaseParticle(p: Particle): void {
+    if (p.sprite.parent) p.sprite.parent.removeChild(p.sprite);
+    // Cap pool to avoid unbounded growth on long sessions
+    if (this.particlePool.length < 400) {
+      this.particlePool.push(p.sprite);
+    } else {
+      p.sprite.destroy();
+    }
   }
 
   // ---------- Background tiles (procedural stone) ----------
@@ -1123,17 +1156,16 @@ export class DungeonGame {
       p.vx *= p.drag;
       p.vy *= p.drag;
       p.vy += p.gravity * dt;
-      p.graphics.position.set(p.x, p.y);
+      p.sprite.position.set(p.x, p.y);
       // Ambient particles (ember/dust) use a softer fade curve
       if (p.kind === 'ember' || p.kind === 'dust') {
         const t = p.life / p.maxLife;
-        p.graphics.alpha = Math.max(0, Math.min(1, t < 0.2 ? t * 5 : 1) * 0.55);
+        p.sprite.alpha = Math.max(0, Math.min(1, t < 0.2 ? t * 5 : 1) * 0.55);
       } else {
-        p.graphics.alpha = Math.max(0, p.life / p.maxLife);
+        p.sprite.alpha = Math.max(0, p.life / p.maxLife);
       }
       if (p.life <= 0) {
-        this.particleLayer.removeChild(p.graphics);
-        p.graphics.destroy();
+        this.releaseParticle(p);
         this.particles.splice(i, 1);
       }
     }

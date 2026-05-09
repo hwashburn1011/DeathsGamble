@@ -3,28 +3,41 @@
 import type {
   BuildDef,
   Difficulty,
+  PersistentUpgrades,
   PlayerStats,
   WeaponDef,
 } from '../types';
 import { DIFFICULTY } from '../data/difficulty';
 import { SPELLS_BY_ID } from '../data/spells';
 
+const ZERO_UPGRADES: PersistentUpgrades = {
+  hp: 0,
+  dmg: 0,
+  spd: 0,
+  def: 0,
+  crit: 0,
+  luck: 0,
+  cash: 0,
+};
+
 export function baseStats(
   build: BuildDef,
   weapon: WeaponDef,
   spells: string[],
-  difficulty: Difficulty
+  difficulty: Difficulty,
+  upgrades: PersistentUpgrades = ZERO_UPGRADES
 ): PlayerStats {
+  const baseHp = build.baseHp + upgrades.hp * 20;
   const s: PlayerStats = {
-    hp: build.baseHp,
-    hpMax: build.baseHp,
-    dmg: 0, // additive bonus on top of weapon.dmg
-    def: build.baseDef,
-    spd: build.baseSpd,
+    hp: baseHp,
+    hpMax: baseHp,
+    dmg: upgrades.dmg * 5,                 // additive bonus on top of weapon.dmg
+    def: build.baseDef + upgrades.def * 2,
+    spd: build.baseSpd + upgrades.spd * 0.4,
     atkspd: weapon.atkspd,
     range: weapon.range,
-    crit: 0.05,
-    luck: build.baseLuck || 0,
+    crit: 0.05 + upgrades.crit * 0.05,
+    luck: (build.baseLuck || 0) + upgrades.luck * 0.2,
     pickup: 60,
     enemyHpMult: 1.0,
     enemySpdMult: 1.0,

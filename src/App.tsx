@@ -10,6 +10,7 @@ import { WheelsScene } from './scenes/WheelsScene';
 import { DungeonScene } from './scenes/DungeonScene';
 import { GameoverScene } from './scenes/GameoverScene';
 import { WinScene } from './scenes/WinScene';
+import { ShopScene } from './scenes/ShopScene';
 import { CreditsScene } from './scenes/CreditsScene';
 import { SettingsButton } from './ui/SettingsButton';
 import type { SceneName } from './types';
@@ -21,11 +22,10 @@ const SCENES: Record<SceneName, () => JSX.Element> = {
   buildpicker: BuildPickerScene,
   wheels: WheelsScene,
   dungeon: DungeonScene,
+  shop: ShopScene,
   gameover: GameoverScene,
   win: WinScene,
   credits: CreditsScene,
-  // Bridging to legacy/v0.5.html until shop/upgrades are ported
-  shop: WheelsScene,
 };
 
 // Per-(from→to) transition durations (ms). Falls back to default.

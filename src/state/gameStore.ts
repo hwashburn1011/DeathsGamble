@@ -10,6 +10,7 @@ import type {
 } from '../types';
 import { DIFFICULTY } from '../data/difficulty';
 import { useSettingsStore } from './settingsStore';
+import { usePersistentStore } from './persistentStore';
 import { baseStats } from '../engine/stats';
 import { spinMagnitude } from '../engine/luck';
 
@@ -31,6 +32,7 @@ interface GameActions {
   // Round/raid progression
   isBossRaid(): boolean;
   nextRound(): void;             // story: next raid OR boss; infinite: next round
+  continueAfterShop(): void;     // shop "Continue" → wheels for the next round
   triggerWin(): void;
 }
 
@@ -115,7 +117,8 @@ export const useGameStore = create<GameStoreState & GameActions>((set, get) => (
     const { build, weapon, spells } = get().run;
     if (!build || !weapon) return;
     const diff = useSettingsStore.getState().difficulty;
-    set({ stats: baseStats(build, weapon, spells, diff) });
+    const upgrades = usePersistentStore.getState().upgrades;
+    set({ stats: baseStats(build, weapon, spells, diff, upgrades) });
   },
 
   applyWheelSegment(side, segment) {
@@ -138,13 +141,18 @@ export const useGameStore = create<GameStoreState & GameActions>((set, get) => (
   nextRound() {
     const { run } = get();
     if (run.mode === 'story') {
-      // Advance to next raid (clamped at totalRaids — that's the boss)
       const nextRaid = Math.min(run.totalRaids, run.raid + 1);
       set({ run: { ...run, raid: nextRaid } });
     } else {
       set({ run: { ...run, endlessRound: run.endlessRound + 1 } });
     }
-    // Reset stats for the next bargain
+    // Stop in the shop first — player can spend cash before the next bargain.
+    set({ scene: 'shop' });
+  },
+
+  continueAfterShop() {
+    // Reset stats now (with any newly-purchased upgrades applied) and route
+    // to wheels for the next round's bargain.
     get().initStatsForRaid();
     set({ scene: 'wheels' });
   },
