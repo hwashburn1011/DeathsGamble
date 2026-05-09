@@ -143,14 +143,14 @@ export function WheelsScene() {
       {stats && (
         <GlassPanel padding="md" className="wheels-stats" variant="mid">
           <h3 className="wheels-h3">Stats</h3>
-          <StatRow label="HP" value={Math.round(stats.hp)} />
-          <StatRow label="DMG" value={Math.round(stats.dmg + (run.weapon?.dmg ?? 0))} />
-          <StatRow label="DEF" value={stats.def} />
-          <StatRow label="SPD" value={stats.spd.toFixed(1)} />
-          <StatRow label="ATK SPD" value={(stats.atkspd * stats.atkspdMult).toFixed(1)} />
-          <StatRow label="RANGE" value={Math.round(stats.range + stats.rangeBonus)} />
-          <StatRow label="CRIT" value={`${Math.round(stats.crit * 100)}%`} />
-          <StatRow label="LUCK" value={stats.luck.toFixed(1)} highlight />
+          <StatRow icon="♥" iconColor="var(--blood-bright)" label="HP" value={Math.round(stats.hp)} />
+          <StatRow icon="⚔" iconColor="var(--gold)" label="DMG" value={Math.round(stats.dmg + (run.weapon?.dmg ?? 0))} />
+          <StatRow icon="🛡" iconColor="var(--moss-bright)" label="DEF" value={stats.def} />
+          <StatRow icon="👟" iconColor="var(--ink)" label="SPD" value={stats.spd.toFixed(1)} />
+          <StatRow icon="⚡" iconColor="var(--candle)" label="ATK SPD" value={(stats.atkspd * stats.atkspdMult).toFixed(1)} />
+          <StatRow icon="🎯" iconColor="var(--arcane-bright)" label="RANGE" value={Math.round(stats.range + stats.rangeBonus)} />
+          <StatRow icon="✦" iconColor="var(--candle)" label="CRIT" value={`${Math.round(stats.crit * 100)}%`} />
+          <StatRow icon="☘" iconColor="var(--gold-bright)" label="LUCK" value={stats.luck.toFixed(1)} highlight />
         </GlassPanel>
       )}
 
@@ -218,15 +218,24 @@ export function WheelsScene() {
 }
 
 interface StatRowProps {
+  icon?: string;
+  iconColor?: string;
   label: string;
   value: string | number;
   highlight?: boolean;
 }
 
-function StatRow({ label, value, highlight = false }: StatRowProps) {
+function StatRow({ icon, iconColor, label, value, highlight = false }: StatRowProps) {
   return (
     <div className="wheels-stat-row">
-      <span className="lbl">{label}</span>
+      <span className="lbl">
+        {icon && (
+          <span className="wheels-stat-icon" style={{ color: iconColor ?? 'var(--ink)' }}>
+            {icon}
+          </span>
+        )}
+        {label}
+      </span>
       <span className={`val ${highlight ? 'val--gold' : ''}`}>{value}</span>
     </div>
   );

@@ -166,6 +166,17 @@
   text-transform: uppercase;
 }
 
+.hud-icon {
+  display: inline-block;
+  width: 14px;
+  text-align: center;
+  margin-right: 6px;
+  font-style: normal;
+  font-size: 12px;
+  text-shadow: 0 0 6px currentColor;
+  opacity: 0.85;
+}
+
 .hud-row span:last-child {
   color: var(--ink);
 }

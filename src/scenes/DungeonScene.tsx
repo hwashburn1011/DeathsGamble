@@ -227,13 +227,13 @@ export function DungeonScene() {
         <div className="hud-bar hud-bar--hp">
           <div className="hud-bar-fill hud-bar-fill--hp" style={{ width: `${hpPct}%` }} />
         </div>
-        <div className="hud-row"><span>HP</span><span>{Math.max(0, Math.ceil(hud.hp))} / {hud.hpMax}</span></div>
+        <div className="hud-row"><span><span className="hud-icon" style={{ color: 'var(--blood-bright)' }}>♥</span> HP</span><span>{Math.max(0, Math.ceil(hud.hp))} / {hud.hpMax}</span></div>
         {run.weapon && (
           <>
-            <div className="hud-row"><span>WPN</span><span style={{ color: 'var(--gold-bright)' }}>{run.weapon.icon} {run.weapon.name}</span></div>
-            <div className="hud-row"><span>DMG</span><span>{run.weapon.dmg}</span></div>
-            <div className="hud-row"><span>ATK SPD</span><span>{run.weapon.atkspd.toFixed(1)}</span></div>
-            <div className="hud-row"><span>RANGE</span><span>{run.weapon.range}</span></div>
+            <div className="hud-row"><span><span className="hud-icon">{run.weapon.icon}</span> WPN</span><span style={{ color: 'var(--gold-bright)' }}>{run.weapon.name}</span></div>
+            <div className="hud-row"><span><span className="hud-icon" style={{ color: 'var(--gold)' }}>⚔</span> DMG</span><span>{run.weapon.dmg}</span></div>
+            <div className="hud-row"><span><span className="hud-icon" style={{ color: 'var(--candle)' }}>⚡</span> ATK SPD</span><span>{run.weapon.atkspd.toFixed(1)}</span></div>
+            <div className="hud-row"><span><span className="hud-icon" style={{ color: 'var(--arcane-bright)' }}>🎯</span> RANGE</span><span>{run.weapon.range}</span></div>
           </>
         )}
         <div className="hud-bar hud-bar--xp">
