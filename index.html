@@ -655,7 +655,6 @@
     <h2>Choose Your Build</h2>
     <p class="subtitle">Death has dealt three. Pick one.</p>
     <div class="build-options" id="build-options"></div>
-    <button class="btn small" id="buildpicker-reroll">Reroll (costs 1 Part)</button>
   </div>
 
   <!-- WHEELS -->
@@ -739,19 +738,7 @@
     <div class="shop-cash">$ <span id="shop-cash-value">0</span></div>
     <div class="shop-grid" id="shop-grid"></div>
     <div class="shop-actions">
-      <button class="btn" id="shop-craft-btn">Craft Weapons</button>
       <button class="btn good large" id="shop-continue">Next Raid</button>
-    </div>
-  </div>
-
-  <!-- CRAFT -->
-  <div id="craft-screen" class="screen">
-    <h2>Crafting</h2>
-    <p class="subtitle">Forge weapons from the bones of the fallen.</p>
-    <div class="craft-parts">Parts: <span id="craft-parts-value">0</span></div>
-    <div class="shop-grid" id="craft-grid"></div>
-    <div class="shop-actions">
-      <button class="btn" id="craft-back">Back to Shop</button>
     </div>
   </div>
 
@@ -1797,16 +1784,6 @@ function pickBuild(b) {
   beginRaid();
 }
 
-$('buildpicker-reroll').addEventListener('click', () => {
-  if (persistent.parts < 1) {
-    flashBanner('Not enough parts', 'bad');
-    return;
-  }
-  persistent.parts -= 1;
-  saveSave();
-  showBuildPicker();
-});
-
 function drawCharacterPortrait(ctx, x, y, look, accessory) {
   // Mini hooded figure
   ctx.fillStyle = look.robe;
@@ -2179,10 +2156,6 @@ function tickDungeon(dt, now) {
       // Cash drop
       const cashAmt = Math.floor(e.cash * (1 + persistent.upgrades.cash * 0.25));
       dungeon.cashThisRun += cashAmt;
-      // Part drop
-      if (Math.random() < e.partChance) {
-        run.partsEarned++;
-      }
       if (e.isBoss) {
         dungeon.bossKilled = true;
         // Win raid → next phase
@@ -2883,47 +2856,9 @@ function showShop() {
   showScene('shop');
 }
 
-$('shop-craft-btn').addEventListener('click', showCraft);
 $('shop-continue').addEventListener('click', () => {
   beginRaid();
 });
-
-/* =====================================================================
- *  CRAFTING
- * ===================================================================== */
-
-function showCraft() {
-  $('craft-parts-value').textContent = persistent.parts;
-  const grid = $('craft-grid');
-  grid.innerHTML = '';
-  // Show all weapons; locked ones are buyable with parts
-  const COST_PER_WEAPON = 3;
-  for (const w of WEAPONS) {
-    const owned = persistent.unlockedWeapons.includes(w.id);
-    const card = document.createElement('div');
-    card.className = 'shop-item';
-    card.innerHTML = `
-      <h4>${w.icon} ${w.name}</h4>
-      <div class="desc">${w.type.toUpperCase()} · ${w.dmg} dmg · ${w.atkspd.toFixed(1)} atk/s · ${w.range} range${w.projectiles > 1 ? ` · x${w.projectiles}` : ''}${w.aoe ? ` · AOE` : ''}</div>
-      <div class="row">
-        <span class="level">${owned ? 'Unlocked' : 'Locked'}</span>
-        <button class="btn small ${owned ? '' : 'magic'}" ${owned || persistent.parts < COST_PER_WEAPON ? 'disabled' : ''}>${owned ? 'OWNED' : COST_PER_WEAPON + ' parts'}</button>
-      </div>
-    `;
-    if (!owned && persistent.parts >= COST_PER_WEAPON) {
-      card.querySelector('button').addEventListener('click', () => {
-        persistent.parts -= COST_PER_WEAPON;
-        persistent.unlockedWeapons.push(w.id);
-        saveSave();
-        showCraft();
-      });
-    }
-    grid.appendChild(card);
-  }
-  showScene('craft');
-}
-
-$('craft-back').addEventListener('click', showShop);
 
 /* =====================================================================
  *  TRANSITIONS / FLOW
