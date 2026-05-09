@@ -182,6 +182,9 @@ export class DungeonGame {
   private levelGlow: Graphics = new Graphics();
   private levelGlowAlpha = 0;
   private lastAmbientSpawnMs = 0;
+  private lightSprite: Sprite | null = null;
+  private lightTexture: Texture | null = null;
+  private lightFlickerT = 0;
 
   private player!: PlayerEntity;
   private enemies: EnemyEntity[] = [];
@@ -244,6 +247,7 @@ export class DungeonGame {
 
     this.buildBackground();
     this.buildVignette();
+    this.buildLighting();
   }
 
   async start(): Promise<void> {
@@ -259,7 +263,10 @@ export class DungeonGame {
     this.app.ticker.add(this.tickerCb);
   }
 
-  private onResize = () => this.repaintVignette();
+  private onResize = () => {
+    this.repaintVignette();
+    this.layoutLighting();
+  };
 
   destroy(): void {
     if (this.tickerCb) this.app.ticker.remove(this.tickerCb);
@@ -363,6 +370,7 @@ export class DungeonGame {
       this.maybeSpawn(now, elapsedS);
     }
     this.maybeAmbient(now);
+    this.tickLightFlicker(realDt);
     this.updateEnemies(dt);
     this.updateProjectiles(dt);
     this.cullDeadEnemies();
@@ -546,6 +554,23 @@ export class DungeonGame {
       }
     }
     return best;
+  }
+
+  // ---------- Torch flicker ----------
+  private tickLightFlicker(dt: number): void {
+    if (!this.lightSprite) return;
+    this.lightFlickerT += dt;
+    // 1.0 ± ~6% flicker via two stacked sin waves
+    const flick =
+      1 + Math.sin(this.lightFlickerT * 7.3) * 0.04 + Math.sin(this.lightFlickerT * 3.1) * 0.02;
+    const baseScale = this.lightSprite.scale.x;
+    // Use a distinct field on the sprite so flicker doesn't compound; layoutLighting
+    // sets the underlying scale, flicker just oscillates around it.
+    if (!('__baseScale' in (this.lightSprite as unknown as { __baseScale?: number }))) {
+      (this.lightSprite as unknown as { __baseScale: number }).__baseScale = baseScale;
+    }
+    const base = (this.lightSprite as unknown as { __baseScale: number }).__baseScale;
+    this.lightSprite.scale.set(base * flick);
   }
 
   // ---------- Ambient particle spawning ----------
@@ -983,6 +1008,59 @@ export class DungeonGame {
     g.fill({ color: 0x000000, alpha: 0.4 });
     g.rect(w - t, 0, t, h);
     g.fill({ color: 0x000000, alpha: 0.4 });
+  }
+
+  // ---------- Dynamic lighting (player torch) ----------
+  // Render a single radial-gradient sprite at screen center with multiply
+  // blend mode. The sprite's transparent center keeps the world bright;
+  // its dark edges multiply down to ~black, simulating a torch.
+  private buildLighting(): void {
+    const tex = this.makeRadialLightTexture();
+    this.lightTexture = tex;
+    const sp = new Sprite(tex);
+    sp.anchor.set(0.5);
+    sp.blendMode = 'multiply';
+    this.lightSprite = sp;
+    // Sits above world but BELOW screen overlays (vignette, flash, glow)
+    // so the dynamic light is the base layer of darkness.
+    this.app.stage.addChildAt(sp, this.app.stage.getChildIndex(this.screenLayer));
+    this.layoutLighting();
+  }
+
+  /** Build a 256-px-square canvas texture with a radial gradient: clear → dark. */
+  private makeRadialLightTexture(): Texture {
+    const SIZE = 256;
+    const canvas = document.createElement('canvas');
+    canvas.width = SIZE;
+    canvas.height = SIZE;
+    const ctx = canvas.getContext('2d')!;
+    const cx = SIZE / 2;
+    const grad = ctx.createRadialGradient(cx, cx, 0, cx, cx, cx);
+    // Multiply blend: 0xFFFFFF leaves color unchanged, 0x000000 multiplies to black.
+    grad.addColorStop(0,    'rgba(255,255,255,1)');
+    grad.addColorStop(0.45, 'rgba(255,235,200,0.95)');
+    grad.addColorStop(0.7,  'rgba(60,40,20,1)');
+    grad.addColorStop(1,    'rgba(8,8,12,1)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, SIZE, SIZE);
+    return Texture.from(canvas);
+  }
+
+  private layoutLighting(): void {
+    if (!this.lightSprite) return;
+    const w = this.app.screen.width;
+    const h = this.app.screen.height;
+    // Light radius scales subtly with weapon range — long-range builds see
+    // further into the dark.
+    const baseRange = this.stats.range + this.stats.rangeBonus;
+    const rangeBoost = Math.max(0.95, Math.min(1.45, baseRange / 320));
+    // Cover the viewport diagonal so the gradient's outer-dark region kisses
+    // the corners; scale up slightly for high-range builds.
+    const cover = Math.max(w, h) * 1.6 * rangeBoost;
+    this.lightSprite.position.set(w / 2, h / 2);
+    this.lightSprite.scale.set(cover / 256);
+    // Reset stored base scale so flicker recalculates from the new size on resize
+    delete (this.lightSprite as unknown as { __baseScale?: number }).__baseScale;
   }
 
   private spawnHit(x: number, y: number, txt: string, kind: HitKind): void {
