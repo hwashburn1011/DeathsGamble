@@ -173,12 +173,15 @@
   margin-right: 6px;
   font-style: normal;
   font-size: 12px;
-  text-shadow: 0 0 6px currentColor;
-  opacity: 0.85;
+  /* Subtle glow only — too much was bleeding into adjacent text */
+  text-shadow: 0 0 3px currentColor;
+  opacity: 0.75;
 }
 
 .hud-row span:last-child {
   color: var(--ink);
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
 
 .dungeon-hint {

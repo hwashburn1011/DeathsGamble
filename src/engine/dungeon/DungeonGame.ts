@@ -208,6 +208,9 @@ export class DungeonGame {
   private lightFlickerT = 0;
   private particleTexture: Texture | null = null;
   private particlePool: Sprite[] = [];
+  private floorSprite: TilingSprite | null = null;
+  /** Solid decorations the player + enemies bump into. */
+  private obstacles: { x: number; y: number; r: number }[] = [];
 
   private player!: PlayerEntity;
   private enemies: EnemyEntity[] = [];
@@ -529,6 +532,7 @@ export class DungeonGame {
       const m = Math.hypot(mx, my);
       this.player.x += (mx / m) * this.stats.spd * dt * 60;
       this.player.y += (my / m) * this.stats.spd * dt * 60;
+      this.resolveObstacleCollision(this.player, 18);
     }
 
     this.player.sprite.scale.x = 2.0 * this.player.facing;
@@ -678,9 +682,11 @@ export class DungeonGame {
     const tex = Texture.from(url);
     const sprite = new Sprite(tex);
     sprite.anchor.set(0.5);
-    // Scale enemies up — old scale (size/22) read too small at typical viewports.
-    // size/14 makes a tier-1 zombie ~32px, tier-3 tank ~50px, tier-4 reaper ~55px.
-    sprite.scale.set(proto.size / 14);
+    // Enemies should be at least player-size at tier 1, larger at higher tiers.
+    // Player renders at ~64px (32 source * 2.0 scale). proto.size / 7 gives
+    // zombie ~64px (player size), tank ~100px, reaper ~110px, all visibly
+    // smaller than the boss (~147px).
+    sprite.scale.set(proto.size / 7);
     this.worldLayer.addChild(sprite);
 
     const hp = proto.hp * this.stats.enemyHpMult * (1 + elapsedS * 0.05);
@@ -759,6 +765,7 @@ export class DungeonGame {
       const d = Math.hypot(dx, dy) || 1;
       e.x += (dx / d) * e.spd * dt * 60;
       e.y += (dy / d) * e.spd * dt * 60;
+      this.resolveObstacleCollision(e, e.r);
 
       e.sprite.scale.x = Math.abs(e.sprite.scale.x) * (dx > 0 ? 1 : -1);
 
@@ -1040,44 +1047,69 @@ export class DungeonGame {
   private buildBackground(): void {
     const theme = THEMES[this.opts.theme];
     const SCALE = 4;       // upscale 16x16 Kenney source → 64x64 in world
-    const AREA = 4000;     // covers ±2000 px from origin in world space
+    const AREA = 4000;     // floor TilingSprite size — repositioned each
+                           // frame to follow the player so the map feels
+                           // endless (player never sees the edge).
 
-    // Floor: single TilingSprite — Pixi tiles the texture across the whole
-    // area in one draw call, no thousands-of-sprites overhead.
+    // Floor: a single TilingSprite that we re-position each frame to stay
+    // centered on the player. Because it tiles its source texture across
+    // its bounds, the player always sees a continuous floor.
     const floorTex = Texture.from(theme.floor);
     const floor = new TilingSprite({
       texture: floorTex,
       width: AREA,
       height: AREA,
     });
-    floor.position.set(-AREA / 2, -AREA / 2);
     floor.tileScale.set(SCALE);
     floor.tint = theme.floorTint;
     this.bgLayer.addChild(floor);
-    // (No darkening overlay here — the dynamic torch + screen-space vignette
-    // handle ambient darkness, and the source textures are already dim.)
+    this.floorSprite = floor;
 
-    // Scatter decorations — deterministic seed so the same theme produces
-    // the same arrangement every time (recognizable spaces).
+    // Scatter decorations — fewer, smaller, and tracked so they collide.
+    // Deterministic seed so the same theme produces the same arrangement.
     const rng = mulberry32(0x9e3779b1 ^ this.opts.theme.charCodeAt(0));
-    const COUNT = 90;
+    const COUNT = 28;
+    this.obstacles.length = 0;
     for (let i = 0; i < COUNT; i++) {
       const url = theme.decorations[Math.floor(rng() * theme.decorations.length)];
+      // Skip blood splat decorations for collision — they're flat ground markings
+      const isFlat = /blood_/.test(url);
       const tex = Texture.from(url);
       const sprite = new Sprite(tex);
       sprite.anchor.set(0.5, 1.0); // bottom-center for grounded objects
-      // Scatter in a smaller radius around origin so player encounters them
-      // near where they spawn / move
-      const r = 200 + rng() * 1600;
+      const r = 240 + rng() * 1500;
       const a = rng() * Math.PI * 2;
-      sprite.position.set(Math.cos(a) * r, Math.sin(a) * r);
-      // Per-instance scale variance + slight tint variation for visual life
-      const scale = SCALE * (0.85 + rng() * 0.5);
+      const x = Math.cos(a) * r;
+      const y = Math.sin(a) * r;
+      sprite.position.set(x, y);
+      // Modestly smaller than before — fewer + tighter gives the dungeon more breathing room.
+      const scale = SCALE * (0.65 + rng() * 0.25);
       sprite.scale.set(scale);
-      // Random horizontal flip for a chance of mirroring
       if (rng() < 0.5) sprite.scale.x = -scale;
-      sprite.alpha = 0.75 + rng() * 0.25;
+      sprite.alpha = 0.85 + rng() * 0.15;
       this.bgLayer.addChild(sprite);
+      if (!isFlat) {
+        // Solid obstacle. Radius tuned to the rendered decoration footprint
+        // (~28-40 px depending on tex + scale).
+        const collisionR = 18 + scale * 4;
+        this.obstacles.push({ x, y, r: collisionR });
+      }
+    }
+  }
+
+  /** Move solid bodies (player + enemies) out of decoration obstacles. */
+  private resolveObstacleCollision(body: { x: number; y: number }, bodyR: number): void {
+    for (const o of this.obstacles) {
+      const dx = body.x - o.x;
+      const dy = body.y - o.y;
+      const minD = bodyR + o.r;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < minD * minD && d2 > 0) {
+        const d = Math.sqrt(d2);
+        const push = (minD - d) / d;
+        body.x += dx * push;
+        body.y += dy * push;
+      }
     }
   }
 
@@ -1276,6 +1308,16 @@ export class DungeonGame {
   private updateCamera(dt: number): void {
     const w = this.app.screen.width;
     const h = this.app.screen.height;
+
+    // Endless map — re-center the floor TilingSprite on the player so they
+    // never see the edge. Position is in WORLD coords (worldRoot's child).
+    if (this.floorSprite) {
+      const half = this.floorSprite.width / 2;
+      this.floorSprite.position.set(this.player.x - half, this.player.y - half);
+      // Counter-shift the tile offset so the world tiles appear stationary
+      // (otherwise the floor pattern would drag along with the player).
+      this.floorSprite.tilePosition.set(-this.player.x, -this.player.y);
+    }
 
     // Target = player position translated to screen center
     this.targetCamX = w / 2 - this.player.x;
