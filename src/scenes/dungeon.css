@@ -23,17 +23,49 @@
   align-items: center;
   justify-content: center;
   z-index: 20;
-  color: var(--gold);
+  background: rgba(7, 7, 10, 0.85);
+}
+
+.dungeon-preload-card {
+  min-width: 320px;
+  text-align: center;
+}
+
+.preload-title {
   font-size: 18px;
   letter-spacing: 0.3em;
-  background: rgba(7, 7, 10, 0.85);
   text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 14px;
   animation: loadingPulse 1.5s ease-in-out infinite;
 }
 
 @keyframes loadingPulse {
-  0%, 100% { opacity: 0.6; }
+  0%, 100% { opacity: 0.7; }
   50%      { opacity: 1; }
+}
+
+.preload-bar {
+  height: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid var(--glass-border);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.preload-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--gold-bright), var(--gold));
+  transition: width 200ms ease-out;
+  box-shadow: 0 0 10px rgba(201, 162, 39, 0.5);
+}
+
+.preload-count {
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--ink-dim);
 }
 
 .dungeon-error {

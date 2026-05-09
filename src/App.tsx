@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useGameStore } from './state/gameStore';
 import { useSettingsStore } from './state/settingsStore';
 import { TitleScene } from './scenes/TitleScene';
@@ -11,6 +11,7 @@ import { WinScene } from './scenes/WinScene';
 import { CreditsScene } from './scenes/CreditsScene';
 import { SettingsButton } from './ui/SettingsButton';
 import type { SceneName } from './types';
+import './app.css';
 
 const SCENES: Record<SceneName, () => JSX.Element> = {
   title: TitleScene,
@@ -21,25 +22,65 @@ const SCENES: Record<SceneName, () => JSX.Element> = {
   gameover: GameoverScene,
   win: WinScene,
   credits: CreditsScene,
-  // Still bridging to legacy/v0.5.html (shop coming with crafting/upgrades)
+  // Bridging to legacy/v0.5.html until shop/upgrades are ported
   shop: WheelsScene,
 };
 
+// Per-(from→to) transition durations (ms). Falls back to default.
+const TRANSITION_DEFAULT_MS = 280;
+const TRANSITION_LONG_MS = 600;
+function transitionFor(from: SceneName, to: SceneName): number {
+  // Slower transition into combat / dungeon and on death/win
+  if (to === 'dungeon')  return TRANSITION_LONG_MS;
+  if (to === 'gameover') return TRANSITION_LONG_MS;
+  if (to === 'win')      return TRANSITION_LONG_MS;
+  if (from === 'dungeon') return TRANSITION_LONG_MS;
+  return TRANSITION_DEFAULT_MS;
+}
+
 export function App() {
-  const scene = useGameStore((s) => s.scene);
+  const target = useGameStore((s) => s.scene);
   const brightness = useSettingsStore((s) => s.brightness);
+  const motion = useSettingsStore((s) => s.motionIntensity);
+  const [active, setActive] = useState<SceneName>(target);
+  const [phase, setPhase] = useState<'in' | 'out'>('in');
+  const [transitionMs, setTransitionMs] = useState(TRANSITION_DEFAULT_MS);
 
   // Apply brightness as CSS var on root
   useEffect(() => {
     document.documentElement.style.setProperty('--brightness', String(brightness));
   }, [brightness]);
 
-  const Scene = SCENES[scene] ?? TitleScene;
+  // Drive crossfade: when target diverges from active, start an out-fade,
+  // swap, then fade back in. Skip the fade entirely on motion=off so
+  // accessibility users get instant scene swaps.
+  useEffect(() => {
+    if (target === active) return;
+    if (motion === 'off') {
+      setActive(target);
+      return;
+    }
+    const dur = transitionFor(active, target);
+    setTransitionMs(dur);
+    setPhase('out');
+    const t = setTimeout(() => {
+      setActive(target);
+      setPhase('in');
+    }, dur / 2);
+    return () => clearTimeout(t);
+  }, [target, active, motion]);
+
+  const Scene = SCENES[active] ?? TitleScene;
 
   return (
     <>
       <div className="atmosphere" />
-      <Scene />
+      <div
+        className={`scene-transition scene-transition--${phase}`}
+        style={{ transitionDuration: `${Math.max(50, transitionMs / 2)}ms` }}
+      >
+        <Scene />
+      </div>
       <SettingsButton />
     </>
   );

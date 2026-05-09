@@ -112,6 +112,7 @@ export interface DungeonGameOptions {
   stats: PlayerStats;
   isBossRaid: boolean;
   motionIntensity: SettingsState['motionIntensity'];
+  onPreloadProgress?: (loaded: number, total: number) => void;
   onStatsChange: (s: {
     hp: number;
     hpMax: number;
@@ -278,7 +279,16 @@ export class DungeonGame {
       PLAYER_SPRITE_BY_BUILD[this.opts.build.id] ?? PLAYER_SPRITE_BY_BUILD['gambler'],
       ...Object.values(ENEMY_SPRITE_BY_TYPE),
     ];
-    await Promise.all(urls.map((u) => Assets.load(u)));
+    let loaded = 0;
+    const total = urls.length;
+    this.opts.onPreloadProgress?.(0, total);
+    await Promise.all(
+      urls.map(async (u) => {
+        await Assets.load(u);
+        loaded++;
+        this.opts.onPreloadProgress?.(loaded, total);
+      })
+    );
   }
 
   // ---------- Player ----------

@@ -55,6 +55,7 @@ export function DungeonScene() {
   });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadProgress, setLoadProgress] = useState({ loaded: 0, total: 1 });
 
   useEffect(() => {
     const container = containerRef.current;
@@ -86,6 +87,10 @@ export function DungeonScene() {
           stats: stats!,
           isBossRaid,
           motionIntensity,
+          onPreloadProgress: (loaded, total) => {
+            if (cancelled) return;
+            setLoadProgress({ loaded, total });
+          },
           onStatsChange: (s) => {
             if (cancelled) return;
             setHud(s);
@@ -148,9 +153,20 @@ export function DungeonScene() {
 
       {loading && !loadError && (
         <div className="dungeon-loading">
-          <span className="display">
-            {isBossRaid ? 'Death approaches…' : 'Death is preparing…'}
-          </span>
+          <GlassPanel padding="lg" className="dungeon-preload-card">
+            <h3 className="display preload-title">
+              {isBossRaid ? 'Death Approaches' : 'Death is Preparing'}
+            </h3>
+            <div className="preload-bar">
+              <div
+                className="preload-fill"
+                style={{ width: `${(loadProgress.loaded / loadProgress.total) * 100}%` }}
+              />
+            </div>
+            <div className="preload-count">
+              {loadProgress.loaded} / {loadProgress.total}
+            </div>
+          </GlassPanel>
         </div>
       )}
 
