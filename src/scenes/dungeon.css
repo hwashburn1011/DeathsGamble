@@ -429,6 +429,26 @@
     0 0 60px rgba(224, 72, 72, 0.4),
     0 2px 8px rgba(0, 0, 0, 0.85);
 }
+/* Mini-boss intro (#186) — smaller cinematic than the final boss card. */
+.dungeon-intro--miniboss {
+  background: rgba(20, 6, 8, 0.40);
+  animation: miniBossIntroCard 3s ease-in-out forwards;
+}
+.dungeon-intro--miniboss .dungeon-intro-heading {
+  color: #ffb060;
+  font-size: clamp(38px, 5vw, 68px);
+  letter-spacing: 0.22em;
+  text-shadow:
+    0 0 18px rgba(255, 176, 96, 0.7),
+    0 0 36px rgba(255, 100, 60, 0.35),
+    0 2px 6px rgba(0, 0, 0, 0.85);
+}
+@keyframes miniBossIntroCard {
+  0%   { opacity: 0; transform: scale(0.95); background: rgba(20, 6, 8, 0); }
+  20%  { opacity: 1; transform: scale(1.0); background: rgba(20, 6, 8, 0.40); }
+  80%  { opacity: 1; transform: scale(1.0); background: rgba(20, 6, 8, 0.40); }
+  100% { opacity: 0; transform: scale(1.02); background: rgba(20, 6, 8, 0); }
+}
 @keyframes introCard {
   0%   { opacity: 0; transform: scale(0.95); }
   20%  { opacity: 1; transform: scale(1.0); }

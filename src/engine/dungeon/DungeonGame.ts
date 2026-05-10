@@ -76,6 +76,12 @@ interface EnemyEntity {
   slowUntilMs: number;      // 0 = not slowed
   /** Zone index this enemy was spawned for (story-mode room layout, #145). */
   spawnZoneIdx?: number;
+  /** Mini-boss elite (#183/#184) — gets cleave AOE (BoneKnight) or summons (Lich). */
+  isElite?: boolean;
+  /** Next cleave timestamp for BoneKnight elite. */
+  nextCleaveMs?: number;
+  /** Next add-summon timestamp for Lich elite. */
+  nextSummonMs?: number;
 }
 
 interface EnemyProjectile {
@@ -186,6 +192,9 @@ export interface DungeonGameOptions {
     roomIdx: number;        // current zone index (0-based)
     roomCount: number;      // total zones (0 = no room layout)
     roomLabel: string;      // e.g. "Room 2" / "Mini-Boss" / "Final Room"
+    /** Mini-boss intro card pulse (#186) — true for ~3s after entering the
+     *  mini-boss zone, then false. The HUD reads this to show the cinematic. */
+    miniBossIntroActive: boolean;
   }) => void;
   onGameOver: (stats: DungeonRunSummary) => void;
   onRoundComplete: (stats: DungeonRunSummary) => void; // round timer ran out (non-boss)
@@ -258,6 +267,11 @@ export class DungeonGame {
   private floorOverlay: TilingSprite | null = null;
   /** Solid decorations the player + enemies bump into. */
   private obstacles: { x: number; y: number; r: number }[] = [];
+  // Story-mode (#146/#147) — axis-aligned wall rectangles. `doorOpen` lets
+  // the segment skip collision (used for door gaps that open when a zone
+  // clears). x/y are world-space top-left.
+  private walls: { x: number; y: number; w: number; h: number; doorOpen: boolean; zoneIdx: number; isDoor: boolean }[] = [];
+  private wallGfx: Graphics | null = null;
 
   private player!: PlayerEntity;
   private enemies: EnemyEntity[] = [];
@@ -299,6 +313,8 @@ export class DungeonGame {
   private zones: Zone[] = [];
   private activeZoneIdx = -1;
   private allZonesCleared = false;
+  /** Timestamp when the player entered the mini-boss zone (#186). 0 = never. */
+  private miniBossIntroAt = 0;
   // Post-death summary tracking (#180/#181)
   private lastDamageSource = '—';
   private biggestHit = 0;
@@ -398,6 +414,7 @@ export class DungeonGame {
     if (this.opts.useRoomLayout && !this.opts.isBossRaid) {
       this.zones = buildZones(this.opts.raidNumber ?? 1, this.opts.totalStoryRaids ?? 3);
       this.drawZoneOverlays();
+      this.buildWalls();
     }
     this.spawnPlayer();
     if (this.opts.isBossRaid) {
@@ -591,6 +608,7 @@ export class DungeonGame {
       roomIdx,
       roomCount: this.zones.length,
       roomLabel,
+      miniBossIntroActive: this.miniBossIntroAt > 0 && performance.now() - this.miniBossIntroAt < 3000,
     });
 
     // Player death takes priority
@@ -679,6 +697,7 @@ export class DungeonGame {
       this.player.x += (mx / m) * this.stats.spd * dt * 60;
       this.player.y += (my / m) * this.stats.spd * dt * 60;
       this.resolveObstacleCollision(this.player, 18);
+      this.resolveWallCollision(this.player, 18);
     }
 
     this.player.sprite.scale.x = 2.0 * this.player.facing;
@@ -1012,6 +1031,13 @@ export class DungeonGame {
         z.triggered = true;
         z.aliveCount = 0;
         this.activeZoneIdx = i;
+        this.refreshDoorState();
+        if (z.isMiniBoss) {
+          this.miniBossIntroAt = now;
+          this.applyShake(6, 0.4);
+          this.applyScreenFlash(0.45);
+          AudioManager.play('boss_intro', { volume: 0.5 });
+        }
         break;
       }
     }
@@ -1019,15 +1045,15 @@ export class DungeonGame {
     if (this.activeZoneIdx >= 0) {
       const z = this.zones[this.activeZoneIdx];
       if (!z.cleared) {
-        const totalSpawned = this.enemies.filter((e) => e.spawnZoneIdx === this.activeZoneIdx).length;
-        const remaining = z.spawnCount - totalSpawned;
+        const remaining = z.spawnCount - z.spawnedTotal;
         if (remaining > 0 && now - this.lastSpawnMs > 350) {
           this.spawnEnemy(elapsedS, this.activeZoneIdx);
           this.lastSpawnMs = now;
           z.aliveCount++;
+          z.spawnedTotal++;
         }
         // Clear check — wave fully spawned AND none alive in this zone.
-        if (totalSpawned >= z.spawnCount && this.enemies.every((e) => e.spawnZoneIdx !== this.activeZoneIdx)) {
+        if (z.spawnedTotal >= z.spawnCount && this.enemies.every((e) => e.spawnZoneIdx !== this.activeZoneIdx)) {
           z.cleared = true;
           AudioManager.play('boss_defeat', { volume: 0.6 });
           this.applyScreenFlash(0.3);
@@ -1036,6 +1062,7 @@ export class DungeonGame {
             this.allZonesCleared = true;
           }
           this.activeZoneIdx = -1;
+          this.refreshDoorState();
         }
       }
     }
@@ -1065,16 +1092,26 @@ export class DungeonGame {
 
     let availTier: number;
     let proto: EnemyTypeDef;
+    let forceElite = false;
     if (zoneIdx !== undefined && this.zones[zoneIdx]) {
       // Story-mode tier picked by zone, not elapsed time.
       availTier = this.zones[zoneIdx].maxTier;
-      const eliteChance = availTier >= 4 ? 0.10 : 0;
-      if (Math.random() < eliteChance) {
-        const elites = ENEMY_TYPES.filter((e) => e.tier === 5);
-        proto = elites[Math.floor(Math.random() * elites.length)];
+      const z = this.zones[zoneIdx];
+      if (z.isMiniBoss) {
+        // Mini-boss zone (#185) — alternate the elite by raid number so
+        // raid 2 fights the BoneKnight, raid 3 fights the Lich.
+        const eliteId = ((this.opts.raidNumber ?? 1) % 2 === 0) ? 'boneKnight' : 'lichAcolyte';
+        proto = ENEMY_TYPES.find((e) => e.id === eliteId)!;
+        forceElite = true;
       } else {
-        const choices = ENEMY_TYPES.filter((e) => e.tier <= availTier && e.tier !== 5);
-        proto = choices[Math.floor(Math.random() * choices.length)];
+        const eliteChance = availTier >= 4 ? 0.10 : 0;
+        if (Math.random() < eliteChance) {
+          const elites = ENEMY_TYPES.filter((e) => e.tier === 5);
+          proto = elites[Math.floor(Math.random() * elites.length)];
+        } else {
+          const choices = ENEMY_TYPES.filter((e) => e.tier <= availTier && e.tier !== 5);
+          proto = choices[Math.floor(Math.random() * choices.length)];
+        }
       }
     } else {
       availTier = 1;
@@ -1102,8 +1139,12 @@ export class DungeonGame {
     sprite.scale.set(proto.size / 7);
     this.worldLayer.addChild(sprite);
 
-    const hp = proto.hp * this.stats.enemyHpMult * (1 + elapsedS * 0.05);
+    // Mini-boss (#185) — beefier hp + bigger sprite + cash bonus.
+    const eliteMult = forceElite ? 1.6 : 1;
+    if (forceElite) sprite.scale.set((proto.size / 7) * 1.25);
+    const hp = proto.hp * this.stats.enemyHpMult * (1 + elapsedS * 0.05) * eliteMult;
     const enemySpd = proto.spd * this.stats.enemySpdMult;
+    const now = performance.now();
     this.enemies.push({
       x: px,
       y: py,
@@ -1112,8 +1153,8 @@ export class DungeonGame {
       spd: enemySpd,
       baseSpd: enemySpd,
       dmg: proto.dmg + this.stats.enemyDmgBonus,
-      r: proto.size,
-      cash: 1 + Math.floor(proto.tier * 1.5),
+      r: proto.size * (forceElite ? 1.15 : 1),
+      cash: forceElite ? 25 : 1 + Math.floor(proto.tier * 1.5),
       sprite,
       flashTimer: 0,
       proto,
@@ -1121,6 +1162,9 @@ export class DungeonGame {
       lastShotMs: 0,
       slowUntilMs: 0,
       spawnZoneIdx: zoneIdx,
+      isElite: forceElite,
+      nextCleaveMs: forceElite && proto.id === 'boneKnight' ? now + 2500 : undefined,
+      nextSummonMs: forceElite && proto.id === 'lichAcolyte' ? now + 4000 : undefined,
     });
   }
 
@@ -1200,6 +1244,7 @@ export class DungeonGame {
       e.x += (dx / d) * e.spd * dt * 60 * moveMult;
       e.y += (dy / d) * e.spd * dt * 60 * moveMult;
       this.resolveObstacleCollision(e, e.r);
+      this.resolveWallCollision(e, e.r);
 
       e.sprite.scale.x = Math.abs(e.sprite.scale.x) * (dx > 0 ? 1 : -1);
 
@@ -1239,7 +1284,127 @@ export class DungeonGame {
           }
         }
       }
+
+      // Elite AI ticks (#183/#184) — only fire for mini-boss elites.
+      if (e.isElite) {
+        if (e.proto.id === 'boneKnight' && e.nextCleaveMs !== undefined && now >= e.nextCleaveMs) {
+          this.eliteCleave(e);
+          e.nextCleaveMs = now + 4500;
+        }
+        if (e.proto.id === 'lichAcolyte' && e.nextSummonMs !== undefined && now >= e.nextSummonMs) {
+          this.eliteSummon(e);
+          e.nextSummonMs = now + 6000;
+        }
+      }
     }
+  }
+
+  /**
+   * BoneKnight cleave (#183) — telegraph red ring for 700ms, then deal AOE
+   * damage to player if still inside. Smaller radius than boss pulse so the
+   * player has room to dodge sideways.
+   */
+  private eliteCleave(elite: EnemyEntity): void {
+    const RADIUS = 130;
+    const TELEGRAPH_MS = 700;
+    const startedAt = performance.now();
+    // Telegraph ring (red, fills slowly).
+    const ring = new Graphics();
+    ring.position.set(elite.x, elite.y);
+    this.particleLayer.addChild(ring);
+    const animate = () => {
+      const t = (performance.now() - startedAt) / TELEGRAPH_MS;
+      if (t >= 1) {
+        ring.clear();
+        ring.parent?.removeChild(ring);
+        ring.destroy();
+        return;
+      }
+      ring.clear();
+      ring.circle(0, 0, RADIUS);
+      ring.fill({ color: 0xc02020, alpha: 0.18 + t * 0.18 });
+      ring.circle(0, 0, RADIUS);
+      ring.stroke({ color: 0xff4040, width: 3, alpha: 0.85 });
+      requestAnimationFrame(animate);
+    };
+    animate();
+    // Resolve damage at the END of the telegraph window — gives the player
+    // time to walk out before impact.
+    setTimeout(() => {
+      if (elite.hp <= 0) return;
+      const dx = this.player.x - elite.x;
+      const dy = this.player.y - elite.y;
+      if (dx * dx + dy * dy < RADIUS * RADIUS) {
+        const taken = Math.max(1, elite.dmg * 1.4 - this.effectiveDef());
+        this.player.hp -= taken;
+        this.reachKillBonus = 0;
+        this.lastDamageSource = 'Bone Knight Cleave';
+        this.player.flashTimer = 0.15;
+        this.applyShake(7, 0.35);
+        this.applyScreenFlash(0.55);
+        AudioManager.play('player_hurt');
+        this.spawnHit(this.player.x, this.player.y - 18, `-${Math.ceil(taken)}`, 'player-damage');
+      }
+      // Impact ring (white flash).
+      const impact = new Graphics();
+      impact.circle(0, 0, RADIUS);
+      impact.stroke({ color: 0xffffff, width: 5, alpha: 0.9 });
+      impact.position.set(elite.x, elite.y);
+      this.particleLayer.addChild(impact);
+      const t0 = performance.now();
+      const fade = () => {
+        const t = (performance.now() - t0) / 250;
+        if (t >= 1) { impact.parent?.removeChild(impact); impact.destroy(); return; }
+        impact.alpha = 0.9 * (1 - t);
+        requestAnimationFrame(fade);
+      };
+      fade();
+    }, TELEGRAPH_MS);
+  }
+
+  /**
+   * Lich summon (#184) — spawn 1-2 small adds (skeleton/bat) near the elite,
+   * inheriting its zone so they count toward zone clear.
+   */
+  private eliteSummon(elite: EnemyEntity): void {
+    const count = 1 + (Math.random() < 0.5 ? 1 : 0);
+    const addId = Math.random() < 0.5 ? 'skeleton' : 'bat';
+    const proto = ENEMY_TYPES.find((e) => e.id === addId)!;
+    for (let n = 0; n < count; n++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 60 + Math.random() * 40;
+      const sx = elite.x + Math.cos(angle) * dist;
+      const sy = elite.y + Math.sin(angle) * dist;
+      const url = ENEMY_SPRITE_BY_TYPE[proto.sprite];
+      const sprite = new Sprite(Texture.from(url));
+      sprite.anchor.set(0.5);
+      sprite.scale.set(proto.size / 7);
+      this.worldLayer.addChild(sprite);
+      const hp = proto.hp * this.stats.enemyHpMult;
+      const spd = proto.spd * this.stats.enemySpdMult;
+      this.enemies.push({
+        x: sx, y: sy, hp, hpMax: hp, spd, baseSpd: spd,
+        dmg: proto.dmg + this.stats.enemyDmgBonus,
+        r: proto.size, cash: 1, sprite, flashTimer: 0, proto,
+        isBoss: false, lastShotMs: 0, slowUntilMs: 0,
+        spawnZoneIdx: elite.spawnZoneIdx,
+      });
+    }
+    // Purple summon flash on the elite.
+    const flash = new Graphics();
+    flash.circle(0, 0, 50);
+    flash.fill({ color: 0x8060ff, alpha: 0.4 });
+    flash.position.set(elite.x, elite.y);
+    this.particleLayer.addChild(flash);
+    const t0 = performance.now();
+    const fade = () => {
+      const t = (performance.now() - t0) / 350;
+      if (t >= 1) { flash.parent?.removeChild(flash); flash.destroy(); return; }
+      flash.alpha = 0.4 * (1 - t);
+      flash.scale.set(1 + t * 0.5);
+      requestAnimationFrame(fade);
+    };
+    fade();
   }
 
   /**
@@ -2130,6 +2295,140 @@ export class DungeonGame {
       }
       corners.stroke({ color: 0xc9a227, width: 5, alpha: 0.85 });
       this.bgLayer.addChild(corners);
+    }
+  }
+
+  /**
+   * Story-mode (#147) — wrap each zone in 4 walls + leave door gaps on the
+   * east/west edges connecting to adjacent zones. End zones get sealed sides.
+   * Door segments default to closed; they swing open when the zone clears.
+   */
+  private buildWalls(): void {
+    this.walls.length = 0;
+    if (this.zones.length === 0) return;
+    const T = 16;            // wall thickness
+    const DOOR = 110;        // door gap width
+    for (let i = 0; i < this.zones.length; i++) {
+      const z = this.zones[i];
+      const left = z.cx - z.hw;
+      const right = z.cx + z.hw;
+      const top = z.cy - z.hh;
+      const bottom = z.cy + z.hh;
+      // North + South walls (full width).
+      this.walls.push({ x: left, y: top - T, w: z.hw * 2, h: T, doorOpen: true, zoneIdx: i, isDoor: false });
+      this.walls.push({ x: left, y: bottom, w: z.hw * 2, h: T, doorOpen: true, zoneIdx: i, isDoor: false });
+      // West edge — wall above + below the door gap; door spans the gap.
+      const hasWest = i > 0;
+      const doorY = z.cy - DOOR / 2;
+      if (hasWest) {
+        this.walls.push({ x: left - T, y: top - T, w: T, h: doorY - top + T, doorOpen: true, zoneIdx: i, isDoor: false });
+        this.walls.push({ x: left - T, y: doorY + DOOR, w: T, h: bottom - (doorY + DOOR) + T, doorOpen: true, zoneIdx: i, isDoor: false });
+        // West door segment — closed by default; opens after zone is cleared.
+        this.walls.push({ x: left - T, y: doorY, w: T, h: DOOR, doorOpen: true, zoneIdx: i, isDoor: true });
+      } else {
+        this.walls.push({ x: left - T, y: top - T, w: T, h: z.hh * 2 + T * 2, doorOpen: true, zoneIdx: i, isDoor: false });
+      }
+      // East edge — same construction; door connects to next zone.
+      const hasEast = i < this.zones.length - 1;
+      if (hasEast) {
+        this.walls.push({ x: right, y: top - T, w: T, h: doorY - top + T, doorOpen: true, zoneIdx: i, isDoor: false });
+        this.walls.push({ x: right, y: doorY + DOOR, w: T, h: bottom - (doorY + DOOR) + T, doorOpen: true, zoneIdx: i, isDoor: false });
+        this.walls.push({ x: right, y: doorY, w: T, h: DOOR, doorOpen: true, zoneIdx: i, isDoor: true });
+      } else {
+        this.walls.push({ x: right, y: top - T, w: T, h: z.hh * 2 + T * 2, doorOpen: true, zoneIdx: i, isDoor: false });
+      }
+    }
+    this.refreshDoorState();
+  }
+
+  /**
+   * Door state (#149) — the active uncleared zone gets its doors closed
+   * (locking the player inside until the wave is dead). Cleared zones reopen.
+   */
+  private refreshDoorState(): void {
+    for (const w of this.walls) {
+      if (!w.isDoor) continue;
+      const z = this.zones[w.zoneIdx];
+      // Doors close when the zone is triggered but not cleared.
+      const closed = z.triggered && !z.cleared;
+      w.doorOpen = !closed;
+    }
+    this.repaintWalls();
+  }
+
+  /**
+   * Render all walls into bgLayer. Theme-tinted (#150). Cleared zones fade
+   * to lower alpha (#151). Doors render distinctly so the player reads them.
+   */
+  private repaintWalls(): void {
+    if (!this.wallGfx) {
+      this.wallGfx = new Graphics();
+      this.bgLayer.addChild(this.wallGfx);
+    }
+    const g = this.wallGfx;
+    g.clear();
+    const tint = this.themeWallTint();
+    for (const w of this.walls) {
+      const z = this.zones[w.zoneIdx];
+      const cleared = z.cleared;
+      const baseAlpha = cleared ? 0.35 : 0.95;
+      if (w.isDoor && w.doorOpen) {
+        // Open door — thin glow line so the gap reads visually.
+        g.rect(w.x, w.y, w.w, w.h);
+        g.fill({ color: 0xc9a227, alpha: cleared ? 0.18 : 0.32 });
+        continue;
+      }
+      g.rect(w.x, w.y, w.w, w.h);
+      g.fill({ color: tint, alpha: baseAlpha });
+      // Subtle highlight strip on top edge for readability.
+      g.rect(w.x, w.y, w.w, Math.min(3, w.h));
+      g.fill({ color: 0xffffff, alpha: cleared ? 0.04 : 0.10 });
+    }
+  }
+
+  /** Per-theme wall stone tint (#150). */
+  private themeWallTint(): number {
+    switch (this.opts.theme) {
+      case 'crypt':     return 0x4a4654;
+      case 'catacomb':  return 0x6a4e30;
+      case 'hellscape': return 0x4a1818;
+      case 'cavern':    return 0x3a4438;
+      default:          return 0x404040;
+    }
+  }
+
+  /**
+   * Push a circular body out of any solid wall rect (#146). AABB-vs-circle:
+   * find the nearest point on the rect, push along the vector from that
+   * point back to the body center if overlapping. Doors with doorOpen skip.
+   */
+  private resolveWallCollision(body: { x: number; y: number }, bodyR: number): void {
+    for (const w of this.walls) {
+      if (w.doorOpen && w.isDoor) continue;
+      const cx = Math.max(w.x, Math.min(body.x, w.x + w.w));
+      const cy = Math.max(w.y, Math.min(body.y, w.y + w.h));
+      const dx = body.x - cx;
+      const dy = body.y - cy;
+      const d2 = dx * dx + dy * dy;
+      if (d2 < bodyR * bodyR) {
+        if (d2 < 0.0001) {
+          // Body sitting exactly on the rect — push along whichever axis
+          // has the shorter escape distance.
+          const left = body.x - w.x;
+          const right = (w.x + w.w) - body.x;
+          const top = body.y - w.y;
+          const bot = (w.y + w.h) - body.y;
+          const minH = Math.min(left, right);
+          const minV = Math.min(top, bot);
+          if (minH < minV) body.x += (left < right ? -1 : 1) * (minH + bodyR);
+          else body.y += (top < bot ? -1 : 1) * (minV + bodyR);
+        } else {
+          const d = Math.sqrt(d2);
+          const push = (bodyR - d) / d;
+          body.x += dx * push;
+          body.y += dy * push;
+        }
+      }
     }
   }
 

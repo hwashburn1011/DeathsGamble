@@ -20,10 +20,15 @@ export interface Zone {
   cleared: boolean;
   /** Number of enemies tracked alive in this zone (decrement on kill). */
   aliveCount: number;
+  /** Total spawned via wave logic — used for the spawn cap so Lich summons
+   *  (which create extra enemies) don't reset the zone-clear count. */
+  spawnedTotal: number;
   /** Tint applied to the zone's floor patch (multiplicative). */
   tint: number;
   /** Display label for HUD ("Room 1", "Mini-Boss", etc.). */
   label: string;
+  /** Mini-boss zone (#185) — spawns one named elite instead of a wave. */
+  isMiniBoss: boolean;
 }
 
 /**
@@ -48,7 +53,8 @@ export function buildZones(raid: number, totalRaids: number): Zone[] {
     const isMiniBoss = isLateStory && i === baseRoomCount - 2;
     const tier = isLast ? 4 : isMiniBoss ? 4 : Math.min(3, 1 + Math.floor(i * 0.7));
     // Wave size grows with raid + zone index. Final room is the biggest.
-    const baseSpawn = isLast ? 14 : isMiniBoss ? 10 : 6 + i * 2;
+    // Mini-boss zone (#185) spawns ONE named elite — not a wave.
+    const baseSpawn = isLast ? 14 : isMiniBoss ? 1 : 6 + i * 2;
     zones.push({
       cx: i * SPACING,
       cy: 0,
@@ -59,6 +65,7 @@ export function buildZones(raid: number, totalRaids: number): Zone[] {
       triggered: false,
       cleared: false,
       aliveCount: 0,
+      spawnedTotal: 0,
       // Cycle through subtle tints so adjacent rooms read as distinct.
       tint: [0xc8b890, 0x90a0c8, 0xb098a8, 0xa0c098][i % 4],
       label: isLast
@@ -66,6 +73,7 @@ export function buildZones(raid: number, totalRaids: number): Zone[] {
         : isMiniBoss
           ? `Mini-Boss`
           : `Room ${i + 1}`,
+      isMiniBoss,
     });
   }
   return zones;

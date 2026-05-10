@@ -30,6 +30,7 @@ interface HudStats {
   roomIdx: number;
   roomCount: number;
   roomLabel: string;
+  miniBossIntroActive: boolean;
 }
 
 export function DungeonScene() {
@@ -90,6 +91,7 @@ export function DungeonScene() {
     roomIdx: -1,
     roomCount: 0,
     roomLabel: '',
+    miniBossIntroActive: false,
   });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -387,6 +389,19 @@ export function DungeonScene() {
           <div className="active-spell-cd-fill" style={{ width: `${activeReady * 100}%` }} />
         </div>
       </div>
+
+      {hud.miniBossIntroActive && (() => {
+        // Pick the elite name based on raid number — matches the engine's
+        // alternation in spawnEnemy (#185).
+        const eliteName = (run.raid % 2 === 0) ? 'BONE KNIGHT' : 'LICH ACOLYTE';
+        const tag = (run.raid % 2 === 0) ? 'Heavy cleave. Telegraphed.' : 'Summons adds. Strike fast.';
+        return (
+          <div className="dungeon-intro dungeon-intro--miniboss">
+            <div className="dungeon-intro-heading display">{eliteName}</div>
+            <div className="dungeon-intro-sub">{tag}</div>
+          </div>
+        );
+      })()}
 
       {showIntro && (() => {
         const themeKey = themeFor({
