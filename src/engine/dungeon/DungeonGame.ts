@@ -553,7 +553,11 @@ export class DungeonGame {
   private tick(realDt: number): void {
     if (this.paused) return;
 
-    if (this.gameOver || this.finished) {
+    // Once the death animation begins (or the run has otherwise ended) skip
+    // the gameplay tick and only advance the death sequence + screen fx.
+    // Without `deathPlaying` here the death anim never gets ticked — hp sits
+    // at 0 indefinitely and onGameOver never fires (#188/#195).
+    if (this.deathPlaying || this.gameOver || this.finished) {
       if (this.deathPlaying) this.tickDeathAnim(realDt);
       this.updateScreenFx(realDt);
       this.updateCamera(realDt);
@@ -831,6 +835,7 @@ export class DungeonGame {
     const start = performance.now();
     const dur = 200;
     const animate = () => {
+      if (slash.destroyed) return; // scene unmount can null sprite props (#187)
       const t = (performance.now() - start) / dur;
       if (t >= 1) {
         slash.parent?.removeChild(slash);
@@ -1327,6 +1332,7 @@ export class DungeonGame {
     ring.position.set(elite.x, elite.y);
     this.particleLayer.addChild(ring);
     const animate = () => {
+      if (ring.destroyed) return; // (#187)
       const t = (performance.now() - startedAt) / TELEGRAPH_MS;
       if (t >= 1) {
         ring.clear();
@@ -1367,6 +1373,7 @@ export class DungeonGame {
       this.particleLayer.addChild(impact);
       const t0 = performance.now();
       const fade = () => {
+        if (impact.destroyed) return; // (#187)
         const t = (performance.now() - t0) / 250;
         if (t >= 1) { impact.parent?.removeChild(impact); impact.destroy(); return; }
         impact.alpha = 0.9 * (1 - t);
@@ -1412,6 +1419,7 @@ export class DungeonGame {
     this.particleLayer.addChild(flash);
     const t0 = performance.now();
     const fade = () => {
+      if (flash.destroyed) return; // (#187)
       const t = (performance.now() - t0) / 350;
       if (t >= 1) { flash.parent?.removeChild(flash); flash.destroy(); return; }
       flash.alpha = 0.4 * (1 - t);
@@ -1632,6 +1640,7 @@ export class DungeonGame {
     const t0 = performance.now();
     const dur = 350;
     const animate = () => {
+      if (beam.destroyed) return; // (#187)
       const t = (performance.now() - t0) / dur;
       if (t >= 1) {
         beam.parent?.removeChild(beam);
@@ -1653,6 +1662,7 @@ export class DungeonGame {
     this.particleLayer.addChild(ring);
     const t0 = performance.now();
     const animate = () => {
+      if (ring.destroyed) return; // (#187)
       const t = (performance.now() - t0) / durationMs;
       if (t >= 1) {
         ring.parent?.removeChild(ring);
@@ -1730,6 +1740,7 @@ export class DungeonGame {
     const ringStart = performance.now();
     const ringDur = 600;
     const animate = () => {
+      if (ring.destroyed) return; // (#187)
       const t = (performance.now() - ringStart) / ringDur;
       if (t >= 1) {
         ring.parent?.removeChild(ring);
