@@ -222,6 +222,8 @@ export interface RunState {
     biggestHit: number;
     favoriteKill: string;
     timeAlive: number;
+    /** Souls awarded for this run (#173) — shown on gameover/win scenes. */
+    soulsEarned?: number;
   } | null;
   /** Bargains taken this raid (#167) — IDs from BARGAINS. Reset per raid so
    *  the player gets a fresh pool of options each time. */

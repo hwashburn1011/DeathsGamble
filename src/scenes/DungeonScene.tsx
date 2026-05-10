@@ -7,6 +7,8 @@ import { useStatsStore } from '../state/statsStore';
 import { DungeonGame } from '../engine/dungeon/DungeonGame';
 import { themeFor } from '../engine/pixi/manifest';
 import { rollBargainChoices, type BargainDef } from '../data/bargains';
+import { calcSoulsForRun } from '../data/unlocks';
+import { useSoulsStore } from '../state/soulsStore';
 import { GlassButton } from '../ui/GlassButton';
 import './dungeon.css';
 
@@ -231,12 +233,23 @@ export function DungeonScene() {
             addCashEarned(gs.cash);
             addKills(gs.kills);
             useStatsStore.getState().recordDeath(gs.kills, gs.cash);
+            // (#169) Award souls for the run — death still pays out so first
+            // attempts feel rewarding.
+            const souls = useSoulsStore.getState();
+            const earned = calcSoulsForRun({
+              kills: gs.kills,
+              raidsCleared: Math.max(0, run.raid - 1),
+              bossDefeated: false,
+            });
+            souls.addSouls(earned);
+            souls.markPlayed();
             // (#180-#182) capture post-death summary for the gameover screen.
             setLastRunSummary({
               lastDamageSource: gs.lastDamageSource,
               biggestHit: gs.biggestHit,
               favoriteKill: gs.favoriteKill,
               timeAlive: gs.time,
+              soulsEarned: earned,
             });
             // No persistent cash — run-scoped only.
             showScene('gameover');
@@ -264,11 +277,21 @@ export function DungeonScene() {
             addCashEarned(gs.cash);
             addKills(gs.kills);
             useStatsStore.getState().recordWin(gs.kills, gs.cash);
+            // (#169) Award souls for full clear — base + perRaid + bossWin.
+            const souls = useSoulsStore.getState();
+            const earned = calcSoulsForRun({
+              kills: gs.kills,
+              raidsCleared: run.totalRaids - 1,
+              bossDefeated: true,
+            });
+            souls.addSouls(earned);
+            souls.markPlayed();
             setLastRunSummary({
               lastDamageSource: gs.lastDamageSource,
               biggestHit: gs.biggestHit,
               favoriteKill: gs.favoriteKill,
               timeAlive: gs.time,
+              soulsEarned: earned,
             });
             triggerWin();
           },

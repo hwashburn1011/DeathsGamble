@@ -81,6 +81,50 @@
   color: var(--ink-dim);
 }
 
+/* First-run souls welcome toast (#173). */
+.souls-welcome-toast {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  max-width: 280px;
+  padding: 14px 18px;
+  background: linear-gradient(180deg, rgba(35, 22, 50, 0.95), rgba(20, 12, 30, 0.95));
+  border: 1px solid rgba(201, 162, 39, 0.55);
+  border-radius: 10px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5), 0 0 18px rgba(201, 162, 39, 0.18);
+  z-index: 50;
+  animation: soulsToastIn 320ms ease-out;
+}
+.souls-welcome-title {
+  font-family: var(--font-display, Cinzel, Georgia, serif);
+  font-size: 16px;
+  color: #ffd070;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+.souls-welcome-body {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: #f0e6c0;
+  line-height: 1.45;
+  margin-bottom: 8px;
+}
+.souls-welcome-cta {
+  background: transparent;
+  color: #ffd070;
+  border: none;
+  padding: 0;
+  font-family: var(--font-display, Cinzel, Georgia, serif);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  text-decoration: underline;
+}
+@keyframes soulsToastIn {
+  from { opacity: 0; transform: translate(20px, -8px); }
+  to   { opacity: 1; transform: translate(0, 0); }
+}
+
 /* Touch-device "play on desktop" notice */
 .touch-notice-backdrop {
   position: fixed;

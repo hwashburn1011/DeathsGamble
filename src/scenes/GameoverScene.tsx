@@ -54,6 +54,12 @@ export function GameoverScene() {
                 {String(run.lastRunSummary.timeAlive % 60).padStart(2, '0')}
               </span>
             </div>
+            {run.lastRunSummary.soulsEarned !== undefined && run.lastRunSummary.soulsEarned > 0 && (
+              <div className="gameover-postmortem-row gameover-postmortem-souls">
+                <span className="gameover-postmortem-label">Souls Earned</span>
+                <span className="gameover-postmortem-value">+{run.lastRunSummary.soulsEarned}</span>
+              </div>
+            )}
           </div>
         )}
 

@@ -2,9 +2,12 @@ import { useMemo, useState } from 'react';
 import { GlassPanel } from '../ui/GlassPanel';
 import { GlassButton } from '../ui/GlassButton';
 import { useGameStore } from '../state/gameStore';
+import { useSoulsStore } from '../state/soulsStore';
+import { UnlocksModal } from '../ui/UnlocksModal';
 import { BUILDS } from '../data/builds';
 import { WEAPONS, WEAPONS_BY_ID } from '../data/weapons';
 import { SPELLS_BY_ID } from '../data/spells';
+import { isBuildUnlocked, UNLOCKS } from '../data/unlocks';
 import { PLAYER_SPRITE_BY_BUILD, WEAPON_ICON_SPRITE } from '../engine/pixi/manifest';
 import type { BuildDef, WeaponDef } from '../types';
 import './buildpicker.css';
@@ -12,10 +15,19 @@ import './buildpicker.css';
 export function BuildPickerScene() {
   const pickBuild = useGameStore((s) => s.pickBuild);
   const showScene = useGameStore((s) => s.showScene);
-  // Show all 8 builds — players shouldn't have to roll runs to find their
-  // preferred build. The grid wraps; portrait + sprite art still keeps each
-  // option scannable.
-  const builds = useMemo(() => BUILDS, []);
+  const [showUnlocks, setShowUnlocks] = useState(false);
+  // Show all 8 builds — locked ones render as silhouettes (#172) with a
+  // souls cost. Sort unlocked builds first so the player's pickable options
+  // sit at the top of the grid.
+  const purchased = useSoulsStore((s) => s.unlocked);
+  const builds = useMemo(() => {
+    return [...BUILDS].sort((a, b) => {
+      const au = isBuildUnlocked(a.id, purchased);
+      const bu = isBuildUnlocked(b.id, purchased);
+      if (au === bu) return 0;
+      return au ? -1 : 1;
+    });
+  }, [purchased]);
 
   return (
     <div className="scene buildpicker-scene">
@@ -23,16 +35,30 @@ export function BuildPickerScene() {
       <p className="subtitle buildpicker-sub">Pick a build. Each carries a unique weapon and spell.</p>
 
       <div className="build-options">
-        {builds.map((b) => (
-          <BuildCard key={b.id} build={b} onPick={(weapon) => pickBuild(b, weapon)} />
-        ))}
+        {builds.map((b) => {
+          const unlocked = isBuildUnlocked(b.id, purchased);
+          const cost = UNLOCKS.find((u) => u.refId === b.id)?.cost;
+          return (
+            <BuildCard
+              key={b.id}
+              build={b}
+              locked={!unlocked}
+              cost={cost}
+              onPick={(weapon) => pickBuild(b, weapon)}
+            />
+          );
+        })}
       </div>
 
       <div className="buildpicker-actions">
         <GlassButton variant="ghost" size="sm" onClick={() => showScene('modeselect')}>
           Back
         </GlassButton>
+        <GlassButton variant="ghost" size="sm" onClick={() => setShowUnlocks(true)}>
+          Souls / Unlocks
+        </GlassButton>
       </div>
+      {showUnlocks && <UnlocksModal onClose={() => setShowUnlocks(false)} />}
     </div>
   );
 }
@@ -40,9 +66,13 @@ export function BuildPickerScene() {
 interface BuildCardProps {
   build: BuildDef;
   onPick: (weapon: WeaponDef) => void;
+  /** Locked builds (#172) render as silhouettes with a cost badge — clicking
+   *  routes to the unlocks modal instead of selecting. */
+  locked?: boolean;
+  cost?: number;
 }
 
-function BuildCard({ build, onPick }: BuildCardProps) {
+function BuildCard({ build, onPick, locked = false, cost }: BuildCardProps) {
   const defaultWeapon = WEAPONS_BY_ID[build.weapon];
   const [selectedWeapon, setSelectedWeapon] = useState<WeaponDef>(defaultWeapon);
   const [picking, setPicking] = useState(false);
@@ -52,10 +82,17 @@ function BuildCard({ build, onPick }: BuildCardProps) {
   return (
     <GlassPanel
       padding="md"
-      hoverable={!picking}
-      onClick={picking ? undefined : () => onPick(selectedWeapon)}
-      className="build-card"
+      hoverable={!picking && !locked}
+      onClick={locked || picking ? undefined : () => onPick(selectedWeapon)}
+      className={`build-card ${locked ? 'build-card--locked' : ''}`}
     >
+      {locked && (
+        <div className="build-locked-overlay">
+          <div className="build-locked-icon">🔒</div>
+          <div className="build-locked-cost">{cost ?? '—'} souls</div>
+          <div className="build-locked-hint">Unlock from title screen</div>
+        </div>
+      )}
       <div className="build-portrait">
         <img src={portraitUrl} alt={build.name} className="build-portrait-img" />
       </div>

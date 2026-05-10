@@ -86,6 +86,17 @@
   font-weight: 600;
 }
 
+/* Souls earned row (#173) — gold accent so it reads as the meta-progression payoff. */
+.gameover-postmortem-souls {
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(201, 162, 39, 0.35);
+}
+.gameover-postmortem-souls .gameover-postmortem-label,
+.gameover-postmortem-souls .gameover-postmortem-value {
+  color: #ffd070;
+}
+
 .gameover-actions {
   display: flex;
   justify-content: center;

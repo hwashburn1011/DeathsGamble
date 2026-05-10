@@ -40,7 +40,7 @@ interface GameActions {
   applyBargain(bargainId: string): void;
   buyPotion(cost: number): boolean;
   /** Record post-death summary fields from a DungeonRunSummary (#180-#182). */
-  setLastRunSummary(s: { lastDamageSource: string; biggestHit: number; favoriteKill: string; timeAlive: number }): void;
+  setLastRunSummary(s: { lastDamageSource: string; biggestHit: number; favoriteKill: string; timeAlive: number; soulsEarned?: number }): void;
 
   // Round/raid progression
   isBossRaid(): boolean;

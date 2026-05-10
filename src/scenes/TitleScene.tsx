@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { GlassButton } from '../ui/GlassButton';
 import { StatsModal } from '../ui/StatsModal';
+import { UnlocksModal } from '../ui/UnlocksModal';
 import { useGameStore } from '../state/gameStore';
+import { useSoulsStore } from '../state/soulsStore';
 import { shouldShowIntro } from './IntroScene';
 import './title.css';
 
@@ -21,6 +23,12 @@ export function TitleScene() {
   const showScene = useGameStore((s) => s.showScene);
   const [showTouchNotice, setShowTouchNotice] = useState(false);
   const [showStats, setShowStats] = useState(false);
+  const [showUnlocks, setShowUnlocks] = useState(false);
+  const souls = useSoulsStore((s) => s.souls);
+  const hasPlayed = useSoulsStore((s) => s.hasPlayed);
+  // First-time welcome toast (#173) — fires once per save: souls=0 + never
+  // played. Sticks until user opens the unlocks modal or starts a run.
+  const showSoulsWelcome = !hasPlayed && souls === 0;
 
   useEffect(() => {
     if (isTouchOnlyDevice() && !localStorage.getItem(TOUCH_NOTICE_KEY)) {
@@ -49,6 +57,9 @@ export function TitleScene() {
           >
             Start Game
           </GlassButton>
+          <GlassButton size="md" variant="ghost" onClick={() => setShowUnlocks(true)}>
+            Souls / Unlocks {souls > 0 ? `· ${souls}` : ''}
+          </GlassButton>
           <GlassButton size="md" variant="ghost" onClick={() => setShowStats(true)}>
             Stats
           </GlassButton>
@@ -60,6 +71,23 @@ export function TitleScene() {
       <div className="title-version">v0.6 · React + PixiJS migration in progress</div>
 
       {showStats && <StatsModal onClose={() => setShowStats(false)} />}
+      {showUnlocks && <UnlocksModal onClose={() => setShowUnlocks(false)} />}
+
+      {showSoulsWelcome && !showUnlocks && !showStats && (
+        <div className="souls-welcome-toast">
+          <div className="souls-welcome-title">New: Souls &amp; Unlocks</div>
+          <div className="souls-welcome-body">
+            Earn souls every run. Spend them on permanent build unlocks.
+          </div>
+          <button
+            type="button"
+            className="souls-welcome-cta"
+            onClick={() => setShowUnlocks(true)}
+          >
+            See unlocks →
+          </button>
+        </div>
+      )}
 
       {showTouchNotice && (
         <div className="touch-notice-backdrop">
