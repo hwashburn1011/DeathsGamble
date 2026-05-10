@@ -35,6 +35,8 @@ export interface BuildDef {
   desc: string;
   /** Concrete gameplay one-liner — what this build actually does (#178). */
   mechanicalHook: string;
+  /** Build-defined active ability cast on Q (#152). */
+  active: ActiveSpellDef;
 }
 
 export type WeaponType = 'melee' | 'ranged' | 'magic';
@@ -54,16 +56,43 @@ export interface WeaponDef {
 }
 
 export interface SpellEffect {
+  // Flat-stat fields (legacy / still used by Tank for hp bonus baseline).
   dmgMult?: number;
   atkspdMult?: number;
   rangeBonus?: number;
   hpBonus?: number;
   critBonus?: number;
-  lifesteal?: number;
+  lifesteal?: number;       // % of dmg dealt healed per hit
   pierce?: number;
+  // Conditional / playstyle effects (#157/#158) — engine reads these at the
+  // matching trigger point. All optional; spells set the few they care about.
+  /** Overkill: multiplier when hitting an enemy at FULL HP (e.g. 3 = ×3 dmg). */
+  fullHpHitMult?: number;
+  /** Tank: defense multiplier when player HP < 30% (e.g. 1.8 = +80% def). */
+  defLowHpMult?: number;
+  /** Crit: when a crit hits, also deal `crit * critChainPct` to nearest other enemy. */
+  critChainPct?: number;
+  /** Pierce: pierce N enemies for 0.5s after a kill (kill streak). */
+  killStreakPierce?: number;
+  /** Haste: max bonus atkspd from sustained continuous fire (e.g. 0.5 = +50%). */
+  sustainedFireRamp?: number;
+  /** Reach: range bonus per kill (e.g. 10 px), capped at 200; resets on player hit. */
+  killStreakRange?: number;
+  /** Lifesteal: % of MAX HP healed on kill (e.g. 0.05 = 5%). */
+  killHealPct?: number;
 }
 
-export type ActiveSpellId = 'frostNova' | 'shadowstep';
+// Build-defined active abilities cast on Q (#152). Each build gets one
+// signature ability; `frostNova` becomes the Witch's, all others are new.
+export type ActiveSpellId =
+  | 'coinFlip'      // Gambler
+  | 'riposte'       // Duelist
+  | 'earthquake'    // Brute
+  | 'arcaneBolt'    // Arcanist
+  | 'smokeBomb'     // Rogue
+  | 'huntersMark'   // Huntsman
+  | 'frostNova'     // Witch
+  | 'suppression';  // Soldier
 
 export interface ActiveSpellDef {
   id: ActiveSpellId;

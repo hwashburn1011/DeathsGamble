@@ -375,12 +375,14 @@ export function DungeonScene() {
         </div>
       </GlassPanel>
 
-      <div className="dungeon-hint">WASD / Arrow keys — auto-attacks fire · Q for Frost Nova</div>
+      <div className="dungeon-hint">
+        WASD / Arrow keys — auto-attacks fire · Q for {run.build?.active.name ?? 'active'}
+      </div>
 
       {/* Active spell cooldown pip — bottom-right */}
       <div className={`active-spell ${activeReady >= 1 ? 'active-spell--ready' : ''}`}>
-        <div className="active-spell-key">Q</div>
-        <div className="active-spell-name">Frost Nova</div>
+        <div className="active-spell-key">{run.build?.active.key ?? 'Q'}</div>
+        <div className="active-spell-name">{run.build?.active.name ?? 'Active'}</div>
         <div className="active-spell-cd">
           <div className="active-spell-cd-fill" style={{ width: `${activeReady * 100}%` }} />
         </div>

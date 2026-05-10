@@ -1,26 +1,59 @@
 import type { SpellDef } from '../types';
 
-// Iter8: spell power compression. Overkill (+50% DPS) was strictly best,
-// Reach (+10% range marginal) was strictly worst. Targets all spells at
-// +25-35% effective combat value so build choice = playstyle, not min-max.
+// Spells (#157/#158) — playstyle conditionals, not flat stat sticks.
+// Each spell triggers on a specific gameplay moment, so picking a spell
+// shapes HOW you fight, not just your stat sheet.
+
 export const SPELLS: SpellDef[] = [
-  // Overkill: was +50% (dominant) → tried +35% but Hard ranged builds
-  // started dying. Settled on +40% — still strongest single-buff DPS but
-  // not so dominant that other spells feel pointless.
-  { id: 'overkill',  name: 'Overkill',  desc: '+40% weapon damage',           effect: { dmgMult: 1.40 } },
-  // Lifesteal: kept 8% — strongest sustain after iter7 wheel nerf.
-  { id: 'lifesteal', name: 'Lifesteal', desc: 'Heal 8% of damage dealt',      effect: { lifesteal: 0.08 } },
-  // Tank: was +40 → +60 (Brute now 240 base HP, more "Unkillable").
-  { id: 'tank',      name: 'Tank',      desc: '+60 Max HP',                   effect: { hpBonus: 60 } },
-  // Crit: was +20% → +25% (slight bump to compete with Overkill).
-  { id: 'crit',      name: 'Critical',  desc: '+25% crit chance',             effect: { critBonus: 0.25 } },
-  // Pierce: kept +2 (already strong in clusters; no change).
-  { id: 'pierce',    name: 'Pierce',    desc: 'Projectiles hit 2 extra foes', effect: { pierce: 2 } },
-  // Haste: was +30% → kept (matches Overkill DPS-equivalent now).
-  { id: 'haste',     name: 'Haste',     desc: '+30% attack speed',            effect: { atkspdMult: 1.3 } },
-  // Reach: was +50 range only → +80 range AND +10% atkspd (was strictly
-  // worst spell — now gives sniper builds two synergistic layers).
-  { id: 'reach',     name: 'Far Reach', desc: '+80 range, +10% attack speed', effect: { rangeBonus: 80, atkspdMult: 1.10 } },
+  // Overkill — opener punisher. First strike on a fresh enemy lands like a truck.
+  {
+    id: 'overkill',
+    name: 'Overkill',
+    desc: 'First hit on a full-HP enemy deals 3× damage.',
+    effect: { fullHpHitMult: 3 },
+  },
+  // Lifesteal — sustain spell. Smaller per-hit + big on-kill burst.
+  {
+    id: 'lifesteal',
+    name: 'Lifesteal',
+    desc: 'Heal 4% of damage dealt + 5% of max HP on kill.',
+    effect: { lifesteal: 0.04, killHealPct: 0.05 },
+  },
+  // Tank — comeback spell. Defense surges when you're nearly dead.
+  {
+    id: 'tank',
+    name: 'Last Stand',
+    desc: '+40 max HP. Defense doubles when below 30% HP.',
+    effect: { hpBonus: 40, defLowHpMult: 2.0 },
+  },
+  // Crit — chain spell. Crits ricochet for follow-up damage.
+  {
+    id: 'crit',
+    name: 'Critical Chain',
+    desc: '+15% crit. Crits chain to a nearby enemy for 50% damage.',
+    effect: { critBonus: 0.15, critChainPct: 0.5 },
+  },
+  // Pierce — kill-streak spell. Bullets cut through after a kill.
+  {
+    id: 'pierce',
+    name: 'Momentum',
+    desc: 'After a kill, your shots pierce 3 extra enemies for 0.6 seconds.',
+    effect: { killStreakPierce: 3 },
+  },
+  // Haste — sustained-fire spell. Ramps with continuous attacking.
+  {
+    id: 'haste',
+    name: 'Haste',
+    desc: 'Attack speed ramps up to +50% from sustained fire. Resets when you stop.',
+    effect: { sustainedFireRamp: 0.5 },
+  },
+  // Reach — patient kiter spell. Range grows on each kill, resets on damage taken.
+  {
+    id: 'reach',
+    name: 'Far Reach',
+    desc: '+50 range. Each kill extends range +10 (cap +200). Resets on damage taken.',
+    effect: { rangeBonus: 50, killStreakRange: 10 },
+  },
 ];
 
 export const SPELLS_BY_ID: Record<string, SpellDef> = Object.fromEntries(

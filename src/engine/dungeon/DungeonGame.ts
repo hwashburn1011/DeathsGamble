@@ -24,6 +24,7 @@ import {
 } from '../pixi/manifest';
 import { AudioManager } from '../audio/AudioManager';
 import { buildZones, isPlayerInZone, type Zone } from './zones';
+import { SPELLS_BY_ID } from '../../data/spells';
 
 const ROUND_DURATION_S = 60;
 
@@ -303,9 +304,41 @@ export class DungeonGame {
   private biggestHit = 0;
   private killCounts: Record<string, number> = {};
   private hitStopT = 0;            // time-scale freeze remaining (real seconds)
-  // Active spell — Frost Nova on Q. ~12s cooldown, damages + slows nearby enemies.
+  // Build-defined active spell on Q (#152/#153). Cooldown comes from
+  // build.active.cooldownSec; per-active state below.
   private activeSpellLastCastMs = -Infinity;
-  private readonly ACTIVE_CD_MS = 12_000;
+  // Buff-window actives (timer-driven):
+  private coinFlipUntilMs = 0;
+  private coinFlipHeads = false;     // true = atkspd buff, false = range buff
+  private smokeBombUntilMs = 0;      // invuln + atkspd window
+  private riposteArmedUntilMs = 0;   // next melee/shot deals ×5 dmg
+  private riposteUsed = false;
+  // Hunter's Mark: marked enemy ref + remaining shots that home in on it
+  private markedEnemy: EnemyEntity | null = null;
+  private huntersMarkShotsLeft = 0;
+  // Aggregated spell effects (#157/#158) — built once from build.spells.
+  private spellFx: {
+    fullHpHitMult: number;
+    defLowHpMult: number;
+    critChainPct: number;
+    killStreakPierce: number;
+    sustainedFireRamp: number;
+    killStreakRange: number;
+    killHealPct: number;
+  } = {
+    fullHpHitMult: 1,
+    defLowHpMult: 1,
+    critChainPct: 0,
+    killStreakPierce: 0,
+    sustainedFireRamp: 0,
+    killStreakRange: 0,
+    killHealPct: 0,
+  };
+  // Runtime spell state — kill streak / sustained fire counters.
+  private streakPierceUntilMs = 0;     // Pierce — recent kill window
+  private sustainedFireStreak = 0;     // Haste — consecutive shot count
+  private lastShotForRampMs = 0;
+  private reachKillBonus = 0;          // Reach — bonus range from kills
   private motionMult = 1;          // multiplier from settings (0/0.5/1/1.5)
   private paused = false;
   private pauseStartedAt = 0;      // performance.now() when pause began
@@ -358,6 +391,7 @@ export class DungeonGame {
   }
 
   async start(): Promise<void> {
+    this.aggregateSpellFx();
     await this.preload();
     this.buildBackground();
     // Story-mode room chain (#145) — visible zone tints + state machine.
@@ -462,7 +496,7 @@ export class DungeonGame {
     }
     if (k === 'q' && !this.paused && !this.gameOver && !this.finished) {
       e.preventDefault();
-      this.tryCastFrostNova();
+      this.tryCastActive();
     }
   };
   private keyup = (e: KeyboardEvent): void => {
@@ -658,26 +692,52 @@ export class DungeonGame {
   }
 
   private maybeShoot(now: number): void {
-    const interval = 1000 / (this.stats.atkspd * this.stats.atkspdMult);
+    // Active-spell modifiers (#154/#155) — Coin Flip atkspd buff, Smoke Bomb
+    // atkspd burst stack with the base interval calc.
+    let atkspdMod = 1;
+    if (this.coinFlipUntilMs > now && this.coinFlipHeads) atkspdMod *= 1.5;
+    if (this.smokeBombUntilMs > now) atkspdMod *= 2.0;
+    // Haste (#158) — sustained-fire ramp. Streak counts consecutive shots
+    // taken within 500ms of each other; bonus = ramp × min(1, streak/8).
+    if (this.spellFx.sustainedFireRamp > 0) {
+      if (now - this.lastShotForRampMs > 500) this.sustainedFireStreak = 0;
+      const t = Math.min(1, this.sustainedFireStreak / 8);
+      atkspdMod *= 1 + this.spellFx.sustainedFireRamp * t;
+    }
+    const interval = 1000 / (this.stats.atkspd * this.stats.atkspdMult * atkspdMod);
     if (now - this.lastShotMs < interval) return;
-    const range = this.stats.range + this.stats.rangeBonus;
+
+    // Range can be extended by Coin Flip Tails or Hunter's Mark (auto-aim).
+    // Reach (#158) — kill streak adds to range until the player takes damage.
+    let range = this.stats.range + this.stats.rangeBonus + this.reachKillBonus;
+    if (this.coinFlipUntilMs > now && !this.coinFlipHeads) range *= 1.5;
+
     const w = this.opts.weapon;
 
     if (w.type === 'melee') {
-      // Melee swing — damage every enemy within `range` in a full circle
-      // around the player. Compensates for the contact tax and gives slow
-      // melee builds (Brute) actual crowd-clear capability. Telemetry
-      // showed Brute at 0.24 kills/sec vs ranged 0.84/sec because melee
-      // could only single-target enemies that arrived in 75-px range.
       const hit = this.swingMelee(range);
-      if (hit) this.lastShotMs = now;
+      if (hit) {
+        this.lastShotMs = now;
+        this.sustainedFireStreak++;
+        this.lastShotForRampMs = now;
+      }
       return;
     }
 
-    const target = this.findNearestEnemy(range);
+    // Hunter's Mark — auto-aim at marked enemy if it's still alive + has shots left.
+    let target: EnemyEntity | null = null;
+    if (this.huntersMarkShotsLeft > 0 && this.markedEnemy && this.markedEnemy.hp > 0) {
+      target = this.markedEnemy;
+      this.huntersMarkShotsLeft--;
+      if (this.huntersMarkShotsLeft === 0) this.markedEnemy = null;
+    } else {
+      target = this.findNearestEnemy(range);
+    }
     if (!target) return;
     this.fireProjectile(target);
     this.lastShotMs = now;
+    this.sustainedFireStreak++;
+    this.lastShotForRampMs = now;
   }
 
   /**
@@ -692,8 +752,17 @@ export class DungeonGame {
     const w = this.opts.weapon;
     const baseColor = parseInt(w.color.replace('#', ''), 16);
     const r2 = range * range;
-    const isCrit = Math.random() < this.stats.crit;
-    const dmg = (w.dmg + this.stats.dmg) * this.stats.dmgMult * (isCrit ? 2 : 1);
+    const now = performance.now();
+    let isCrit = Math.random() < this.stats.crit;
+    let dmgMultActive = 1;
+    // Riposte (#154 — Duelist) — armed → next swing deals ×5 + always crits.
+    if (!this.riposteUsed && this.riposteArmedUntilMs > now) {
+      dmgMultActive = 5;
+      isCrit = true;
+      this.riposteUsed = true;
+      this.riposteArmedUntilMs = 0;
+    }
+    const dmg = (w.dmg + this.stats.dmg) * this.stats.dmgMult * dmgMultActive * (isCrit ? 2 : 1);
     // Forward arc threshold — facing=1 (right): hit dx >= -tol, facing=-1: hit dx <= tol.
     const facing = this.player.facing;
     const arcTol = range * 0.15;
@@ -706,11 +775,14 @@ export class DungeonGame {
       // Forward-arc gate.
       if (facing === 1 && dx < -arcTol) continue;
       if (facing === -1 && dx > arcTol) continue;
-      e.hp -= dmg;
-      if (dmg > this.biggestHit) this.biggestHit = dmg; // (#181)
+      // Overkill (#157) — full-HP enemy gets the multiplier on first contact.
+      const overkill = e.hp >= e.hpMax && this.spellFx.fullHpHitMult > 1;
+      const finalDmg = overkill ? dmg * this.spellFx.fullHpHitMult : dmg;
+      e.hp -= finalDmg;
+      if (finalDmg > this.biggestHit) this.biggestHit = finalDmg; // (#181)
       e.flashTimer = 0.12;
       e.sprite.tint = isCrit ? 0xffd070 : 0xffffff;
-      this.spawnHit(e.x, e.y - 10, Math.round(dmg).toString(), isCrit ? 'crit' : 'damage');
+      this.spawnHit(e.x, e.y - 10, Math.round(finalDmg).toString(), overkill ? 'crit' : isCrit ? 'crit' : 'damage');
       this.spawnBloodSplash(e.x, e.y);
       anyHit = true;
     }
@@ -759,13 +831,30 @@ export class DungeonGame {
     const projUrl = PROJECTILE_BY_WEAPON[w.id];
     const baseColor = parseInt(w.color.replace('#', ''), 16);
 
+    const now = performance.now();
+    // Riposte (#154 — Duelist) + Hunter's Mark (#155) — buffed-shot mults.
+    let activeMult = 1;
+    let forceCrit = false;
+    if (!this.riposteUsed && this.riposteArmedUntilMs > now) {
+      activeMult *= 5;
+      forceCrit = true;
+      this.riposteUsed = true;
+      this.riposteArmedUntilMs = 0;
+    }
+    // If this shot is a Hunter's Mark auto-aim shot at the marked enemy, add +50%.
+    if (this.markedEnemy && target === this.markedEnemy) activeMult *= 1.5;
+
     for (let i = 0; i < projCount; i++) {
       const offset = projCount === 1 ? 0 : (i / (projCount - 1) - 0.5) * spread;
       const angle = baseAngle + offset;
-      const isCrit = Math.random() < this.stats.crit;
+      const isCrit = forceCrit || Math.random() < this.stats.crit;
       const speed = w.type === 'magic' ? 6 : 9;
-      const dmg = (w.dmg + this.stats.dmg) * this.stats.dmgMult * (isCrit ? 2 : 1);
+      const dmg = (w.dmg + this.stats.dmg) * this.stats.dmgMult * activeMult * (isCrit ? 2 : 1);
 
+      // Pierce kill streak (#158 — Momentum) — within window after a kill,
+      // shots get +killStreakPierce extra pierces.
+      const streakPierce =
+        this.streakPierceUntilMs > now ? this.spellFx.killStreakPierce : 0;
       const proj: ProjectileEntity = {
         x: px,
         y: py,
@@ -774,7 +863,7 @@ export class DungeonGame {
         dmg,
         crit: isCrit,
         life: w.type === 'melee' ? 0.15 : 1.5,
-        pierce: this.stats.pierce,
+        pierce: this.stats.pierce + streakPierce,
         hit: new Set(),
       };
 
@@ -812,6 +901,37 @@ export class DungeonGame {
 
       this.projectiles.push(proj);
     }
+  }
+
+  /**
+   * Critical Chain (#157) — when a crit lands, deal critChainPct × dealt to the
+   * nearest other living enemy within 200px. Pure damage tick, no projectile.
+   */
+  private tryCritChain(source: EnemyEntity, dealt: number): void {
+    const maxD2 = 200 * 200;
+    let best: EnemyEntity | null = null;
+    let bestD = maxD2;
+    for (const e of this.enemies) {
+      if (e === source || e.hp <= 0) continue;
+      const dx = e.x - source.x;
+      const dy = e.y - source.y;
+      const d = dx * dx + dy * dy;
+      if (d < bestD) { bestD = d; best = e; }
+    }
+    if (!best) return;
+    const chainDmg = dealt * this.spellFx.critChainPct;
+    best.hp -= chainDmg;
+    best.flashTimer = 0.1;
+    best.sprite.tint = 0xff80ff;
+    this.spawnHit(best.x, best.y - 10, Math.round(chainDmg).toString(), 'crit');
+    this.spawnBloodSplash(best.x, best.y);
+    // Visual zap line from source to chained target.
+    const zap = new Graphics();
+    zap.moveTo(source.x, source.y);
+    zap.lineTo(best.x, best.y);
+    zap.stroke({ color: 0xff80ff, width: 2, alpha: 0.85 });
+    this.projectileLayer.addChild(zap);
+    setTimeout(() => { zap.parent?.removeChild(zap); zap.destroy(); }, 110);
   }
 
   private findNearestEnemy(maxDist: number): EnemyEntity | null {
@@ -1095,9 +1215,14 @@ export class DungeonGame {
 
       const r = e.r + 12;
       if (dx * dx + dy * dy < r * r) {
-        const taken = Math.max(1, e.dmg - this.stats.def) * dt;
+        // Smoke Bomb (#155 — Rogue): first 2s of the 4s buff window grant invuln.
+        // smokeBombUntilMs = castTime + 4000; invuln window = castTime..castTime+2000.
+        const buffStart = this.smokeBombUntilMs - 4000;
+        if (this.smokeBombUntilMs > now && now < buffStart + 2000) continue;
+        const taken = Math.max(1, e.dmg - this.effectiveDef()) * dt;
         const wasHp = this.player.hp;
         this.player.hp -= taken;
+        if (Math.floor(wasHp) !== Math.floor(this.player.hp)) this.reachKillBonus = 0;
         // (#180) Track most recent damage source for the gameover screen.
         this.lastDamageSource = e.isBoss ? 'Death Itself' : this.enemyDisplayName(e.proto.id);
         // Player damage juice — only spawn the popup on a meaningful hit chunk
@@ -1117,54 +1242,245 @@ export class DungeonGame {
     }
   }
 
-  /** Player-cast Frost Nova — damages + slows nearby enemies if off cooldown. */
-  private tryCastFrostNova(): void {
+  /**
+   * Aggregate every spell's conditional flags into a single object so engine
+   * code reads from this.spellFx instead of iterating spells per frame (#157/#158).
+   */
+  private aggregateSpellFx(): void {
+    for (const id of this.opts.build.spells) {
+      const sp = SPELLS_BY_ID[id];
+      if (!sp) continue;
+      const e = sp.effect;
+      if (e.fullHpHitMult)     this.spellFx.fullHpHitMult     = Math.max(this.spellFx.fullHpHitMult, e.fullHpHitMult);
+      if (e.defLowHpMult)      this.spellFx.defLowHpMult      = Math.max(this.spellFx.defLowHpMult, e.defLowHpMult);
+      if (e.critChainPct)      this.spellFx.critChainPct      += e.critChainPct;
+      if (e.killStreakPierce)  this.spellFx.killStreakPierce  += e.killStreakPierce;
+      if (e.sustainedFireRamp) this.spellFx.sustainedFireRamp += e.sustainedFireRamp;
+      if (e.killStreakRange)   this.spellFx.killStreakRange   += e.killStreakRange;
+      if (e.killHealPct)       this.spellFx.killHealPct       += e.killHealPct;
+    }
+  }
+
+  /** Effective defense including Tank's <30% HP surge (#157). */
+  private effectiveDef(): number {
+    const lowHp = this.player.hp < this.player.hpMax * 0.3;
+    return lowHp ? this.stats.def * this.spellFx.defLowHpMult : this.stats.def;
+  }
+
+  /**
+   * Player-cast active spell — dispatches to the build's signature ability.
+   * Cooldown comes from `build.active.cooldownSec` (#152/#153).
+   */
+  private tryCastActive(): void {
     const now = performance.now();
-    if (now - this.activeSpellLastCastMs < this.ACTIVE_CD_MS) return;
+    const cd = this.opts.build.active.cooldownSec * 1000;
+    if (now - this.activeSpellLastCastMs < cd) return;
     this.activeSpellLastCastMs = now;
+    switch (this.opts.build.active.id) {
+      case 'coinFlip':    return this.castCoinFlip();
+      case 'riposte':     return this.castRiposte();
+      case 'earthquake':  return this.castEarthquake();
+      case 'arcaneBolt':  return this.castArcaneBolt();
+      case 'smokeBomb':   return this.castSmokeBomb();
+      case 'huntersMark': return this.castHuntersMark();
+      case 'frostNova':   return this.castFrostNova();
+      case 'suppression': return this.castSuppression();
+    }
+  }
+
+  /** Cooldown progress 0..1 (1 = ready). Read by HUD. */
+  public getActiveSpellReady(): number {
+    const cd = this.opts.build.active.cooldownSec * 1000;
+    const elapsed = performance.now() - this.activeSpellLastCastMs;
+    return Math.min(1, elapsed / cd);
+  }
+
+  // -------- Build-defined active spells (#154/#155) ----------
+
+  /** Gambler — Coin Flip: 50/50. Heads = +50% atkspd 8s; Tails = +50% range 8s. */
+  private castCoinFlip(): void {
+    const now = performance.now();
+    this.coinFlipHeads = Math.random() < 0.5;
+    this.coinFlipUntilMs = now + 8000;
+    const label = this.coinFlipHeads ? 'HEADS — atkspd ↑' : 'TAILS — range ↑';
+    this.spawnHit(this.player.x, this.player.y - 30, label, 'crit');
+    this.applyScreenFlash(0.35);
+    AudioManager.play('level_up', { volume: 0.7, pitch: this.coinFlipHeads ? 1.2 : 0.8 });
+  }
+
+  /** Duelist — Riposte: arms a 5× damage multiplier on the next hit. */
+  private castRiposte(): void {
+    const now = performance.now();
+    this.riposteArmedUntilMs = now + 5000;
+    this.riposteUsed = false;
+    this.spawnHit(this.player.x, this.player.y - 30, 'RIPOSTE READY', 'crit');
+    AudioManager.play('hit_heavy', { volume: 0.6 });
+  }
+
+  /** Brute — Earthquake: 200px AOE, 25 dmg + 2s stun on every enemy hit. */
+  private castEarthquake(): void {
+    const now = performance.now();
     const RADIUS = 200;
-    const dmg = 15 + this.stats.dmg * 0.5;
-    const slowDuration = 3000;
-    // Damage + slow every enemy in radius.
+    const dmg = 25 + this.stats.dmg * 0.5;
     for (const e of this.enemies) {
       const dx = e.x - this.player.x;
       const dy = e.y - this.player.y;
       if (dx * dx + dy * dy < RADIUS * RADIUS) {
         e.hp -= dmg;
+        if (dmg > this.biggestHit) this.biggestHit = dmg;
+        e.flashTimer = 0.2;
+        e.spd = 0;
+        e.slowUntilMs = now + 2000;
+        this.spawnHit(e.x, e.y - 10, Math.round(dmg).toString(), 'damage');
+      }
+    }
+    this.spawnExpandingRing(this.player.x, this.player.y, RADIUS, 0xa86028, 600);
+    this.applyShake(12, 0.5);
+    this.applyScreenFlash(0.5);
+    AudioManager.play('hit_heavy', { volume: 0.9, pitch: 0.6 });
+  }
+
+  /** Arcanist — Arcane Bolt: single high-dmg projectile that pierces all in a line. */
+  private castArcaneBolt(): void {
+    // Fire forward in player's facing direction.
+    const angle = this.player.facing === 1 ? 0 : Math.PI;
+    const speed = 12;
+    const dmg = 60 + this.stats.dmg;
+    const g = new Graphics();
+    g.circle(0, 0, 14);
+    g.fill({ color: 0x80b0ff, alpha: 0.4 });
+    g.circle(0, 0, 8);
+    g.fill({ color: 0xeaf0ff, alpha: 1 });
+    this.projectileLayer.addChild(g);
+    this.projectiles.push({
+      x: this.player.x,
+      y: this.player.y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      dmg,
+      crit: true,
+      life: 1.5,
+      pierce: 99,
+      hit: new Set(),
+      graphics: g,
+    });
+    this.applyScreenFlash(0.3);
+    AudioManager.play('level_up', { volume: 0.8, pitch: 1.4 });
+  }
+
+  /** Rogue — Smoke Bomb: 2s untargetable + 4s atkspd ramp. */
+  private castSmokeBomb(): void {
+    const now = performance.now();
+    this.smokeBombUntilMs = now + 4000;
+    this.spawnHit(this.player.x, this.player.y - 30, 'VANISHED', 'heal');
+    this.spawnExpandingRing(this.player.x, this.player.y, 90, 0x808080, 500);
+    AudioManager.play('gem_pickup', { volume: 0.7, pitch: 0.6 });
+  }
+
+  /** Huntsman — Hunter's Mark: marks nearest enemy; next 3 shots auto-aim + bonus dmg. */
+  private castHuntersMark(): void {
+    const target = this.findNearestEnemy(800);
+    if (!target) {
+      this.activeSpellLastCastMs = -Infinity; // refund — no enemy to mark
+      return;
+    }
+    this.markedEnemy = target;
+    this.huntersMarkShotsLeft = 3;
+    this.spawnHit(target.x, target.y - 30, 'MARKED', 'crit');
+    AudioManager.play('hit_heavy', { volume: 0.5, pitch: 1.3 });
+  }
+
+  /** Witch — Frost Nova: 200px AOE damage + slow (signature-since-iter1 spell). */
+  private castFrostNova(): void {
+    const now = performance.now();
+    const RADIUS = 200;
+    const dmg = 15 + this.stats.dmg * 0.5;
+    const slowDuration = 3000;
+    for (const e of this.enemies) {
+      const dx = e.x - this.player.x;
+      const dy = e.y - this.player.y;
+      if (dx * dx + dy * dy < RADIUS * RADIUS) {
+        e.hp -= dmg;
+        if (dmg > this.biggestHit) this.biggestHit = dmg;
         e.flashTimer = 0.18;
         e.spd = e.baseSpd * 0.4;
         e.slowUntilMs = now + slowDuration;
         this.spawnHit(e.x, e.y - 10, Math.round(dmg).toString(), 'damage');
       }
     }
-    // Visual ring — expanding white-blue circle.
-    const ring = new Graphics();
-    ring.position.set(this.player.x, this.player.y);
-    this.particleLayer.addChild(ring);
-    const ringStart = now;
-    const ringDur = 500;
+    this.spawnExpandingRing(this.player.x, this.player.y, RADIUS, 0x80c8ff, 500);
+    this.applyShake(5, 0.25);
+    this.applyScreenFlash(0.3);
+    AudioManager.play('level_up', { volume: 0.7, pitch: 0.85 });
+  }
+
+  /** Soldier — Suppression: 300px forward cone, 30 dmg + 50% slow 3s. */
+  private castSuppression(): void {
+    const now = performance.now();
+    const RANGE = 300;
+    const dmg = 30 + this.stats.dmg * 0.7;
+    const facing = this.player.facing;
+    for (const e of this.enemies) {
+      const dx = e.x - this.player.x;
+      const dy = e.y - this.player.y;
+      const inFront = (facing === 1 && dx >= -20) || (facing === -1 && dx <= 20);
+      if (!inFront) continue;
+      if (Math.abs(dy) > 80) continue; // narrow horizontal cone
+      if (dx * dx + dy * dy > RANGE * RANGE) continue;
+      e.hp -= dmg;
+      if (dmg > this.biggestHit) this.biggestHit = dmg;
+      e.flashTimer = 0.15;
+      e.spd = e.baseSpd * 0.5;
+      e.slowUntilMs = now + 3000;
+      this.spawnHit(e.x, e.y - 10, Math.round(dmg).toString(), 'crit');
+    }
+    // Visual: forward beam line
+    const beam = new Graphics();
+    const x0 = this.player.x;
+    const x1 = this.player.x + facing * RANGE;
+    beam.moveTo(x0, this.player.y);
+    beam.lineTo(x1, this.player.y);
+    beam.stroke({ color: 0xffd070, width: 14, alpha: 0.85 });
+    beam.moveTo(x0, this.player.y);
+    beam.lineTo(x1, this.player.y);
+    beam.stroke({ color: 0xfffce0, width: 4, alpha: 1 });
+    this.projectileLayer.addChild(beam);
+    const t0 = performance.now();
+    const dur = 350;
     const animate = () => {
-      const t = (performance.now() - ringStart) / ringDur;
+      const t = (performance.now() - t0) / dur;
+      if (t >= 1) {
+        beam.parent?.removeChild(beam);
+        beam.destroy();
+        return;
+      }
+      beam.alpha = 1 - t;
+      requestAnimationFrame(animate);
+    };
+    animate();
+    this.applyShake(6, 0.3);
+    AudioManager.play('hit_heavy', { volume: 0.7, pitch: 1.1 });
+  }
+
+  /** Helper — animated expanding ring at world position, used by AOE actives. */
+  private spawnExpandingRing(x: number, y: number, radius: number, color: number, durationMs: number): void {
+    const ring = new Graphics();
+    ring.position.set(x, y);
+    this.particleLayer.addChild(ring);
+    const t0 = performance.now();
+    const animate = () => {
+      const t = (performance.now() - t0) / durationMs;
       if (t >= 1) {
         ring.parent?.removeChild(ring);
         ring.destroy();
         return;
       }
       ring.clear();
-      ring.circle(0, 0, 30 + (RADIUS - 30) * t);
-      ring.stroke({ color: 0x80c8ff, width: 5 * (1 - t * 0.5), alpha: 0.85 * (1 - t) });
+      ring.circle(0, 0, 30 + (radius - 30) * t);
+      ring.stroke({ color, width: 5 * (1 - t * 0.5), alpha: 0.85 * (1 - t) });
       requestAnimationFrame(animate);
     };
     animate();
-    this.applyShake(5, 0.25);
-    this.applyScreenFlash(0.3);
-    AudioManager.play('level_up', { volume: 0.7, pitch: 0.85 });
-  }
-
-  /** Cooldown progress 0..1 (1 = ready). Read by HUD. */
-  public getActiveSpellReady(): number {
-    const elapsed = performance.now() - this.activeSpellLastCastMs;
-    return Math.min(1, elapsed / this.ACTIVE_CD_MS);
   }
 
   /**
@@ -1246,8 +1562,9 @@ export class DungeonGame {
     const dx = this.player.x - boss.x;
     const dy = this.player.y - boss.y;
     if (dx * dx + dy * dy < RADIUS * RADIUS) {
-      const taken = Math.max(1, boss.dmg * 1.2 - this.stats.def);
+      const taken = Math.max(1, boss.dmg * 1.2 - this.effectiveDef());
       this.player.hp -= taken;
+      this.reachKillBonus = 0;
       this.lastDamageSource = "Death's Shadow Pulse";
       this.player.flashTimer = 0.18;
       this.applyShake(10, 0.5);
@@ -1344,8 +1661,19 @@ export class DungeonGame {
       const dy = py - p.y;
       const hitR = 18;
       if (dx * dx + dy * dy < hitR * hitR) {
-        const taken = Math.max(1, p.dmg - this.stats.def);
+        // Smoke Bomb invuln window (first 2s of 4s buff) — projectiles vanish.
+        const now = performance.now();
+        const buffStart = this.smokeBombUntilMs - 4000;
+        const isInvuln = this.smokeBombUntilMs > now && now < buffStart + 2000;
+        if (isInvuln) {
+          this.projectileLayer.removeChild(p.graphics);
+          p.graphics.destroy();
+          this.enemyProjectiles.splice(i, 1);
+          continue;
+        }
+        const taken = Math.max(1, p.dmg - this.effectiveDef());
         this.player.hp -= taken;
+        this.reachKillBonus = 0;
         this.lastDamageSource = p.sourceName;
         this.player.flashTimer = 0.12;
         this.applyShake(4, 0.25);
@@ -1384,12 +1712,17 @@ export class DungeonGame {
         const dx = e.x - pr.x;
         const dy = e.y - pr.y;
         if (dx * dx + dy * dy < (e.r + 4) * (e.r + 4)) {
-          e.hp -= pr.dmg;
-          if (pr.dmg > this.biggestHit) this.biggestHit = pr.dmg; // (#181)
+          // Overkill (#157) — full-HP enemy gets the multiplier on first hit.
+          const overkill = e.hp >= e.hpMax && this.spellFx.fullHpHitMult > 1;
+          const dealt = overkill ? pr.dmg * this.spellFx.fullHpHitMult : pr.dmg;
+          e.hp -= dealt;
+          if (dealt > this.biggestHit) this.biggestHit = dealt; // (#181)
           e.flashTimer = 0.12;
           e.sprite.tint = pr.crit ? 0xffd070 : 0xffffff;
-          this.spawnHit(e.x, e.y - 10, Math.round(pr.dmg).toString(), pr.crit ? 'crit' : 'damage');
+          this.spawnHit(e.x, e.y - 10, Math.round(dealt).toString(), pr.crit || overkill ? 'crit' : 'damage');
           this.spawnBloodSplash(e.x, e.y);
+          // Critical Chain (#157) — crits ricochet to nearest other enemy.
+          if (pr.crit && this.spellFx.critChainPct > 0) this.tryCritChain(e, dealt);
           // SFX
           AudioManager.play(
             e.isBoss ? 'hit_heavy' : pr.crit ? 'hit_heavy' : pr.dmg > 15 ? 'hit_med' : 'hit_light'
@@ -1404,7 +1737,7 @@ export class DungeonGame {
             this.applyHitStop(0.05);
           }
           if (this.stats.lifesteal > 0) {
-            const heal = pr.dmg * this.stats.lifesteal;
+            const heal = dealt * this.stats.lifesteal;
             const next = Math.min(this.player.hpMax, this.player.hp + heal);
             const actual = next - this.player.hp;
             this.player.hp = next;
@@ -1447,6 +1780,23 @@ export class DungeonGame {
       // (#181) Track per-enemy-type kill count for "favorite kill" stat.
       const killKey = e.isBoss ? 'death' : e.proto.id;
       this.killCounts[killKey] = (this.killCounts[killKey] ?? 0) + 1;
+      // Conditional spell on-kill triggers (#158).
+      if (this.spellFx.killStreakPierce > 0) {
+        this.streakPierceUntilMs = performance.now() + 600;
+      }
+      if (this.spellFx.killStreakRange > 0) {
+        const cap = 200;
+        this.reachKillBonus = Math.min(cap, this.reachKillBonus + this.spellFx.killStreakRange);
+      }
+      if (this.spellFx.killHealPct > 0) {
+        const heal = this.player.hpMax * this.spellFx.killHealPct;
+        const next = Math.min(this.player.hpMax, this.player.hp + heal);
+        const actual = next - this.player.hp;
+        this.player.hp = next;
+        if (actual >= 1) {
+          this.spawnHit(this.player.x, this.player.y - 18, `+${Math.ceil(actual)}`, 'heal');
+        }
+      }
       const cashGain = Math.max(1, Math.round(e.cash * this.opts.cashMult));
       this.cashThisRun += cashGain;
       // Visible feedback for the cash drop — a small gold "+$N" floats up
