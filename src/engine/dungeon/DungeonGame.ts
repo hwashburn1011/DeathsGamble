@@ -361,11 +361,21 @@ export class DungeonGame {
   private async preload(): Promise<void> {
     const theme = THEMES[this.opts.theme];
     const projUrl = PROJECTILE_BY_WEAPON[this.opts.weapon.id];
+    const BASE = import.meta.env.BASE_URL;
+    // Flat ground props (#144) — also preloaded so they don't pop in.
+    const propUrls = [
+      `${BASE}assets/tiles/dungeon-crawl/dc-misc/blood_red1.png`,
+      `${BASE}assets/tiles/dungeon-crawl/dc-misc/blood_red2.png`,
+      `${BASE}assets/tiles/dungeon-crawl/dc-misc/blood_red3.png`,
+      `${BASE}assets/tiles/dungeon-crawl/dc-misc/demon_pentagram1.png`,
+      `${BASE}assets/tiles/dungeon-crawl/dc-misc/demon_pentagram3.png`,
+    ];
     const urls = [
       PLAYER_SPRITE_BY_BUILD[this.opts.build.id] ?? PLAYER_SPRITE_BY_BUILD['gambler'],
       ...Object.values(ENEMY_SPRITE_BY_TYPE),
       theme.floor,
       ...theme.decorations,
+      ...propUrls,
       ...(projUrl ? [projUrl] : []),
     ];
     let loaded = 0;
@@ -1404,7 +1414,10 @@ export class DungeonGame {
     // Scatter decorations — fewer, smaller, and tracked so they collide.
     // Deterministic seed so the same theme produces the same arrangement.
     const rng = mulberry32(0x9e3779b1 ^ this.opts.theme.charCodeAt(0));
-    const COUNT = 28;
+    // #143: was 28 — reduced to 14 so the map breathes; scale dropped from
+    // 0.65-0.9 to 0.4-0.6; collision radius tightened from 18+s*4 to 11+s*2.5
+    // so it matches the actual visible footprint.
+    const COUNT = 14;
     this.obstacles.length = 0;
     for (let i = 0; i < COUNT; i++) {
       const url = theme.decorations[Math.floor(rng() * theme.decorations.length)];
@@ -1413,23 +1426,78 @@ export class DungeonGame {
       const tex = Texture.from(url);
       const sprite = new Sprite(tex);
       sprite.anchor.set(0.5, 1.0); // bottom-center for grounded objects
-      const r = 240 + rng() * 1500;
+      const r = 280 + rng() * 1600;
       const a = rng() * Math.PI * 2;
       const x = Math.cos(a) * r;
       const y = Math.sin(a) * r;
       sprite.position.set(x, y);
-      // Modestly smaller than before — fewer + tighter gives the dungeon more breathing room.
-      const scale = SCALE * (0.65 + rng() * 0.25);
+      const scale = SCALE * (0.4 + rng() * 0.2);
       sprite.scale.set(scale);
       if (rng() < 0.5) sprite.scale.x = -scale;
       sprite.alpha = 0.85 + rng() * 0.15;
       this.bgLayer.addChild(sprite);
       if (!isFlat) {
-        // Solid obstacle. Radius tuned to the rendered decoration footprint
-        // (~28-40 px depending on tex + scale).
-        const collisionR = 18 + scale * 4;
+        const collisionR = 11 + scale * 2.5;
         this.obstacles.push({ x, y, r: collisionR });
       }
+    }
+
+    // #144: scatter a second non-collision "prop" layer — small flat
+    // ground markings that liven up the floor without blocking movement.
+    // Mix of pentagrams, blood, and procedural moss/dust patches with
+    // per-theme color tinting so the floor reads as inhabited, not empty.
+    const propRng = mulberry32(0xb5297a4d ^ this.opts.theme.charCodeAt(1));
+    const PROP_COUNT = 80;
+    const themePropTint = this.themePropTint();
+    const propPaths = [
+      `${import.meta.env.BASE_URL}assets/tiles/dungeon-crawl/dc-misc/blood_red1.png`,
+      `${import.meta.env.BASE_URL}assets/tiles/dungeon-crawl/dc-misc/blood_red2.png`,
+      `${import.meta.env.BASE_URL}assets/tiles/dungeon-crawl/dc-misc/blood_red3.png`,
+      `${import.meta.env.BASE_URL}assets/tiles/dungeon-crawl/dc-misc/demon_pentagram1.png`,
+      `${import.meta.env.BASE_URL}assets/tiles/dungeon-crawl/dc-misc/demon_pentagram3.png`,
+    ];
+    for (let i = 0; i < PROP_COUNT; i++) {
+      const useSprite = propRng() < 0.55;
+      const r = 200 + propRng() * 2200;
+      const a = propRng() * Math.PI * 2;
+      const x = Math.cos(a) * r;
+      const y = Math.sin(a) * r;
+      if (useSprite) {
+        // Sprite prop — blood splat or pentagram, tinted to theme.
+        const url = propPaths[Math.floor(propRng() * propPaths.length)];
+        const tex = Texture.from(url);
+        const sprite = new Sprite(tex);
+        sprite.anchor.set(0.5);
+        sprite.position.set(x, y);
+        const scale = SCALE * (0.25 + propRng() * 0.3);
+        sprite.scale.set(scale);
+        sprite.rotation = propRng() * Math.PI * 2;
+        sprite.alpha = 0.20 + propRng() * 0.25;
+        sprite.tint = themePropTint;
+        this.bgLayer.addChild(sprite);
+      } else {
+        // Procedural moss / dust patch — Graphics circle blob.
+        const patch = new Graphics();
+        const blobR = 8 + propRng() * 14;
+        patch.circle(0, 0, blobR);
+        patch.fill({ color: themePropTint, alpha: 0.18 + propRng() * 0.18 });
+        // Soft inner highlight
+        patch.circle(propRng() * 4 - 2, propRng() * 4 - 2, blobR * 0.55);
+        patch.fill({ color: 0xffffff, alpha: 0.06 });
+        patch.position.set(x, y);
+        this.bgLayer.addChild(patch);
+      }
+    }
+  }
+
+  /** Per-theme tint for the flat prop layer (matches the floor mood). */
+  private themePropTint(): number {
+    switch (this.opts.theme) {
+      case 'crypt':     return 0x40404a;  // cool grey
+      case 'catacomb':  return 0x8a6438;  // warm tan
+      case 'hellscape': return 0x602020;  // dried blood
+      case 'cavern':    return 0x405030;  // moss
+      default:          return 0x404040;
     }
   }
 

@@ -40,6 +40,7 @@ export function WheelsScene() {
   const showScene = useGameStore((s) => s.showScene);
   const applyWheelSegment = useGameStore((s) => s.applyWheelSegment);
   const renderQuality = useSettingsStore((s) => s.renderQuality);
+  const wheelMode = useSettingsStore((s) => s.wheelMode);
 
   const [buffResult, setBuffResult] = useState<SpinResult | null>(null);
   const [curseResult, setCurseResult] = useState<SpinResult | null>(null);
@@ -78,7 +79,9 @@ export function WheelsScene() {
       );
       container.appendChild(app.canvas);
 
+      const wheelMode = useSettingsStore.getState().wheelMode;
       game = new WheelsGame(app, BUFF_SEGMENTS, CURSE_SEGMENTS, {
+        mode: wheelMode,
         getLuck: () => useGameStore.getState().stats?.luck ?? 0,
         onSpinComplete: (side, segIdx) => {
           if (cancelled) return;
@@ -116,7 +119,7 @@ export function WheelsScene() {
       }
       while (container.firstChild) container.removeChild(container.firstChild);
     };
-  }, [applyWheelSegment, renderQuality]);
+  }, [applyWheelSegment, renderQuality, wheelMode]);
 
   function spin(side: 'buff' | 'curse') {
     const game = wheelsRef.current;

@@ -34,7 +34,7 @@ export const CURSE_SEGMENTS: WheelSegment[] = [
   { label: '-3 DEF',         luckScore: 5, color: '#7a3030', apply: (s, m = 1) => { s.def -= 3 * m; } },
   { label: '+2 ENEMY DMG',   luckScore: 4, color: '#9a3030', apply: (s, m = 1) => { s.enemyDmgBonus += 2 * m; } },
   { label: '-10% CRIT',      luckScore: 6, color: '#7a3030', apply: (s, m = 1) => { s.crit = Math.max(0, s.crit - 0.10 * m); } },
-  { label: 'CURSE',          luckScore: 1, color: '#1a0a0a', apply: (s, m = 1) => { s.enemyHpMult *= 1 + 0.3 * m; s.enemySpawnMult *= 1 + 0.2 * m; s.hp = Math.max(20, s.hp - 10 * m); } },
+  { label: '-30 PICKUP',     luckScore: 5, color: '#9a3030', apply: (s, m = 1) => { s.pickup = Math.max(20, s.pickup - 30 * m); } },
 ];
 
 export const SEG_COUNT = 12;

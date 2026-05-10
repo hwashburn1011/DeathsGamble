@@ -9,7 +9,7 @@ import {
   Text,
   TextStyle,
 } from 'pixi.js';
-import type { WheelSegment } from '../../types';
+import type { WheelSegment, WheelMode } from '../../types';
 import { SEG_ANGLE, SEG_COUNT } from '../../data/wheels';
 import { pickSegmentWithLuck } from '../luck';
 import { AudioManager } from '../audio/AudioManager';
@@ -45,11 +45,14 @@ interface Geometry {
 export interface WheelsGameOptions {
   getLuck: () => number;
   onSpinComplete: (side: 'buff' | 'curse', segmentIdx: number) => void;
+  /** 'wheel' (default) renders pie wheels; 'slot' renders vertical reels. */
+  mode?: WheelMode;
 }
 
 export class WheelsGame {
   private app: Application;
   private opts: WheelsGameOptions;
+  private mode: WheelMode;
 
   // Layers (stage children, rebuilt on resize)
   private bgLayer: Container = new Container();
@@ -77,6 +80,7 @@ export class WheelsGame {
   ) {
     this.app = app;
     this.opts = opts;
+    this.mode = opts.mode ?? 'wheel';
     this.buffSegments = buffSegments;
     this.curseSegments = curseSegments;
 
@@ -114,15 +118,29 @@ export class WheelsGame {
     const target = pickSegmentWithLuck(segs, luck);
     w.resultIdx = target;
 
-    // Wheel rotation that lands segment center under top pointer (-PI/2)
-    const baseTarget = -Math.PI / 2 - target * SEG_ANGLE;
-    const fullRotations = 5 + Math.floor(Math.random() * 3);
-    const jitter = (Math.random() - 0.5) * SEG_ANGLE * 0.6;
-    let goal = baseTarget + fullRotations * Math.PI * 2 + jitter;
-    while (goal < w.angle + Math.PI * 4) goal += Math.PI * 2;
-
-    w.spinStart = w.angle;
-    w.spinTarget = goal;
+    if (this.mode === 'slot') {
+      // Slot mode — w.angle is a y-offset (px) of the reel strip.
+      // Strip layout: each segment occupies SLOT_ROW_H. Centering segment 0
+      // at the win line means the strip's y-offset is 0; segment N centered
+      // means strip y = -N * SLOT_ROW_H. Add full strip-rotations for spin feel.
+      const rowH = w.radius * 0.32;
+      const baseTarget = -target * rowH;
+      const fullCycles = 5 + Math.floor(Math.random() * 3);
+      const jitter = (Math.random() - 0.5) * rowH * 0.4;
+      let goal = baseTarget - fullCycles * SEG_COUNT * rowH + jitter;
+      while (goal > w.angle - rowH * SEG_COUNT * 4) goal -= SEG_COUNT * rowH;
+      w.spinStart = w.angle;
+      w.spinTarget = goal;
+    } else {
+      // Wheel rotation that lands segment center under top pointer (-PI/2)
+      const baseTarget = -Math.PI / 2 - target * SEG_ANGLE;
+      const fullRotations = 5 + Math.floor(Math.random() * 3);
+      const jitter = (Math.random() - 0.5) * SEG_ANGLE * 0.6;
+      let goal = baseTarget + fullRotations * Math.PI * 2 + jitter;
+      while (goal < w.angle + Math.PI * 4) goal += Math.PI * 2;
+      w.spinStart = w.angle;
+      w.spinTarget = goal;
+    }
     w.t0 = performance.now();
     w.durMs = 3800 + Math.random() * 600;
   }
@@ -192,6 +210,8 @@ export class WheelsGame {
   }
 
   // ============== Death back (cloak, hood, eyes) ==============
+  // Layered silhouette + sculpted skull + gold-trimmed cloak + backlight halo.
+  // All Pixi Graphics primitives — no external assets required.
   private drawDeathBack(g: Geometry): void {
     const { deathCx, cy, wheelR, h } = g;
     const headTopY    = cy - wheelR * 2.35;
@@ -204,69 +224,215 @@ export class WheelsGame {
     const robeMidHalf      = wheelR * 2.7;
     const robeShoulderHalf = wheelR * 2.1;
 
-    // Cloak silhouette — solid (Pixi v8 doesn't trivially do gradients)
+    // ---- 0. Backlight halo behind the head (cold moonlight) ----
+    const halo = new Graphics();
+    for (let i = 6; i >= 1; i--) {
+      const t = i / 6;
+      halo.circle(deathCx, headCenterY, wheelR * (1.4 + t * 1.3));
+      halo.fill({ color: 0x6a8acc, alpha: 0.025 * t });
+    }
+    this.deathBack.addChild(halo);
+
+    // ---- 1. Scythe shaft + blade BEHIND the cloak (peeking past the right shoulder) ----
+    // Long diagonal pole with a curved blade up top — silhouette only.
+    const scythe = new Graphics();
+    const sx = deathCx + robeShoulderHalf * 0.35;
+    const sy0 = shoulderY - wheelR * 1.2;
+    const sx1 = deathCx + robeShoulderHalf * 1.35;
+    const sy1 = robeBottom * 0.65;
+    // Pole shadow + body
+    scythe.moveTo(sx + 2, sy0 + 2);
+    scythe.lineTo(sx1 + 2, sy1 + 2);
+    scythe.stroke({ color: 0x000000, alpha: 0.55, width: 6, cap: 'round' });
+    scythe.moveTo(sx, sy0);
+    scythe.lineTo(sx1, sy1);
+    scythe.stroke({ color: 0x4a3a28, width: 4.5, cap: 'round' });
+    // Pole highlight
+    scythe.moveTo(sx, sy0);
+    scythe.lineTo(sx1, sy1);
+    scythe.stroke({ color: 0xa08560, alpha: 0.6, width: 1.2, cap: 'round' });
+    // Blade — curved silver crescent at top
+    const bx = sx;
+    const by = sy0;
+    scythe.moveTo(bx, by);
+    scythe.bezierCurveTo(
+      bx - wheelR * 1.15, by - wheelR * 0.15,
+      bx - wheelR * 1.45, by + wheelR * 0.55,
+      bx - wheelR * 0.55, by + wheelR * 0.55
+    );
+    scythe.bezierCurveTo(
+      bx - wheelR * 1.05, by + wheelR * 0.35,
+      bx - wheelR * 0.85, by + wheelR * 0.05,
+      bx, by
+    );
+    scythe.closePath();
+    scythe.fill({ color: 0xc8ccd0 });
+    scythe.stroke({ color: 0x404448, width: 1.5 });
+    // Blade rim highlight
+    scythe.moveTo(bx, by);
+    scythe.bezierCurveTo(
+      bx - wheelR * 1.1, by - wheelR * 0.10,
+      bx - wheelR * 1.35, by + wheelR * 0.45,
+      bx - wheelR * 0.7, by + wheelR * 0.50
+    );
+    scythe.stroke({ color: 0xffffff, alpha: 0.65, width: 1.4 });
+    this.deathBack.addChild(scythe);
+
+    // ---- 2. Cloak — three depth layers for a painted look ----
+    // Outer (darkest) silhouette — slightly larger than the main shape.
+    const buildCloakPath = (g0: Graphics, expand: number) => {
+      g0.moveTo(deathCx, headTopY - expand);
+      g0.bezierCurveTo(
+        deathCx + wheelR * 0.95 + expand, headTopY + wheelR * 0.25,
+        deathCx + wheelR * 1.35 + expand, collarY - wheelR * 0.05,
+        deathCx + robeShoulderHalf + expand, shoulderY + wheelR * 0.1
+      );
+      g0.bezierCurveTo(
+        deathCx + robeMidHalf + expand, cy + wheelR * 0.4,
+        deathCx + robeBottomHalf + expand, cy + wheelR * 1.6,
+        deathCx + robeBottomHalf + expand, robeBottom
+      );
+      g0.lineTo(deathCx - robeBottomHalf - expand, robeBottom);
+      g0.bezierCurveTo(
+        deathCx - robeBottomHalf - expand, cy + wheelR * 1.6,
+        deathCx - robeMidHalf - expand, cy + wheelR * 0.4,
+        deathCx - robeShoulderHalf - expand, shoulderY + wheelR * 0.1
+      );
+      g0.bezierCurveTo(
+        deathCx - wheelR * 1.35 - expand, collarY - wheelR * 0.05,
+        deathCx - wheelR * 0.95 - expand, headTopY + wheelR * 0.25,
+        deathCx, headTopY - expand
+      );
+      g0.closePath();
+    };
+
+    // Outer dark shadow
+    const cloakShadow = new Graphics();
+    buildCloakPath(cloakShadow, 4);
+    cloakShadow.fill({ color: 0x080812 });
+    this.deathBack.addChild(cloakShadow);
+
+    // Mid-tone body
     const cloak = new Graphics();
-    cloak.moveTo(deathCx, headTopY);
-    cloak.bezierCurveTo(
-      deathCx + wheelR * 0.95, headTopY + wheelR * 0.25,
-      deathCx + wheelR * 1.35, collarY - wheelR * 0.05,
-      deathCx + robeShoulderHalf, shoulderY + wheelR * 0.1
-    );
-    cloak.bezierCurveTo(
-      deathCx + robeMidHalf, cy + wheelR * 0.4,
-      deathCx + robeBottomHalf, cy + wheelR * 1.6,
-      deathCx + robeBottomHalf, robeBottom
-    );
-    cloak.lineTo(deathCx - robeBottomHalf, robeBottom);
-    cloak.bezierCurveTo(
-      deathCx - robeBottomHalf, cy + wheelR * 1.6,
-      deathCx - robeMidHalf, cy + wheelR * 0.4,
-      deathCx - robeShoulderHalf, shoulderY + wheelR * 0.1
-    );
-    cloak.bezierCurveTo(
-      deathCx - wheelR * 1.35, collarY - wheelR * 0.05,
-      deathCx - wheelR * 0.95, headTopY + wheelR * 0.25,
-      deathCx, headTopY
-    );
-    cloak.closePath();
-    // Brighter silhouette so the body is visible against the dark wheels bg
-    // (was 0x0e0e16 — almost the same as bg 0x07070a, made the figure look invisible).
+    buildCloakPath(cloak, 0);
     cloak.fill({ color: 0x1c1c2a });
-    cloak.stroke({ color: 0x2a2a3a, width: 1.5 });
+    cloak.stroke({ color: 0x2e2e40, width: 1.5 });
     this.deathBack.addChild(cloak);
 
-    // Side rim light (cool moonlight on left edge) — overlay shape
-    const rim = new Graphics();
-    rim.moveTo(deathCx, headTopY);
-    rim.bezierCurveTo(
+    // Inner highlight strip — narrower silhouette in a slightly lighter hue,
+    // anchored down the centerline so the figure reads as 3D not flat.
+    const innerLight = new Graphics();
+    innerLight.moveTo(deathCx, headTopY + wheelR * 0.15);
+    innerLight.bezierCurveTo(
+      deathCx + wheelR * 0.45, collarY + wheelR * 0.05,
+      deathCx + wheelR * 1.0, cy + wheelR * 0.5,
+      deathCx + wheelR * 1.6, robeBottom
+    );
+    innerLight.lineTo(deathCx - wheelR * 1.6, robeBottom);
+    innerLight.bezierCurveTo(
+      deathCx - wheelR * 1.0, cy + wheelR * 0.5,
+      deathCx - wheelR * 0.45, collarY + wheelR * 0.05,
+      deathCx, headTopY + wheelR * 0.15
+    );
+    innerLight.closePath();
+    innerLight.fill({ color: 0x2a2a3c, alpha: 0.55 });
+    this.deathBack.addChild(innerLight);
+
+    // ---- 3. Side rim lights (cool left, warm right for dramatic contrast) ----
+    const rimL = new Graphics();
+    rimL.moveTo(deathCx, headTopY);
+    rimL.bezierCurveTo(
       deathCx - wheelR * 0.95, headTopY + wheelR * 0.25,
       deathCx - wheelR * 1.35, collarY - wheelR * 0.05,
       deathCx - robeShoulderHalf, shoulderY + wheelR * 0.1
     );
-    rim.bezierCurveTo(
+    rimL.bezierCurveTo(
       deathCx - robeMidHalf, cy + wheelR * 0.4,
       deathCx - robeBottomHalf, cy + wheelR * 1.6,
       deathCx - robeBottomHalf, robeBottom
     );
-    rim.lineTo(deathCx, robeBottom);
-    rim.lineTo(deathCx, headTopY);
-    rim.closePath();
-    rim.fill({ color: 0x8aa0d0, alpha: 0.18 });
-    this.deathBack.addChild(rim);
+    rimL.lineTo(deathCx - robeBottomHalf + 14, robeBottom);
+    rimL.bezierCurveTo(
+      deathCx - robeBottomHalf + 14, cy + wheelR * 1.6,
+      deathCx - robeMidHalf + 10, cy + wheelR * 0.4,
+      deathCx - robeShoulderHalf + 8, shoulderY + wheelR * 0.1
+    );
+    rimL.bezierCurveTo(
+      deathCx - wheelR * 1.27, collarY - wheelR * 0.05,
+      deathCx - wheelR * 0.88, headTopY + wheelR * 0.25,
+      deathCx, headTopY
+    );
+    rimL.closePath();
+    rimL.fill({ color: 0x9aaee0, alpha: 0.32 });
+    this.deathBack.addChild(rimL);
 
-    // Cloak fold lines
+    const rimR = new Graphics();
+    rimR.moveTo(deathCx, headTopY);
+    rimR.bezierCurveTo(
+      deathCx + wheelR * 0.95, headTopY + wheelR * 0.25,
+      deathCx + wheelR * 1.35, collarY - wheelR * 0.05,
+      deathCx + robeShoulderHalf, shoulderY + wheelR * 0.1
+    );
+    rimR.bezierCurveTo(
+      deathCx + robeMidHalf, cy + wheelR * 0.4,
+      deathCx + robeBottomHalf, cy + wheelR * 1.6,
+      deathCx + robeBottomHalf, robeBottom
+    );
+    rimR.lineTo(deathCx + robeBottomHalf - 12, robeBottom);
+    rimR.bezierCurveTo(
+      deathCx + robeBottomHalf - 12, cy + wheelR * 1.6,
+      deathCx + robeMidHalf - 8, cy + wheelR * 0.4,
+      deathCx + robeShoulderHalf - 6, shoulderY + wheelR * 0.1
+    );
+    rimR.bezierCurveTo(
+      deathCx + wheelR * 1.29, collarY - wheelR * 0.05,
+      deathCx + wheelR * 0.90, headTopY + wheelR * 0.25,
+      deathCx, headTopY
+    );
+    rimR.closePath();
+    rimR.fill({ color: 0xc88a48, alpha: 0.20 });
+    this.deathBack.addChild(rimR);
+
+    // ---- 4. Cloak fold lines — more of them, varied weight ----
     const folds = new Graphics();
-    for (let i = -3; i <= 3; i++) {
+    for (let i = -4; i <= 4; i++) {
       if (i === 0) continue;
-      const xT = deathCx + i * wheelR * 0.55;
+      const xT = deathCx + i * wheelR * 0.5;
       const xB = deathCx + i * wheelR * 0.95;
       folds.moveTo(xT, shoulderY + wheelR * 0.4);
       folds.bezierCurveTo(xT, cy + wheelR * 0.5, xB, cy + wheelR * 1.4, xB, robeBottom * 0.95);
     }
-    folds.stroke({ color: 0xffffff, alpha: 0.12, width: 1.4 });
+    folds.stroke({ color: 0xffffff, alpha: 0.10, width: 1.2 });
+    // Deeper shadow folds
+    const foldShadow = new Graphics();
+    for (let i = -4; i <= 4; i++) {
+      if (i === 0) continue;
+      const xT = deathCx + i * wheelR * 0.5 + 2;
+      const xB = deathCx + i * wheelR * 0.95 + 3;
+      foldShadow.moveTo(xT, shoulderY + wheelR * 0.4);
+      foldShadow.bezierCurveTo(xT, cy + wheelR * 0.5, xB, cy + wheelR * 1.4, xB, robeBottom * 0.95);
+    }
+    foldShadow.stroke({ color: 0x000000, alpha: 0.4, width: 2 });
+    this.deathBack.addChild(foldShadow);
     this.deathBack.addChild(folds);
 
-    // Hood rim highlight
+    // ---- 5. Gold-trimmed cloak hem at the bottom edge ----
+    const hem = new Graphics();
+    hem.moveTo(deathCx - robeBottomHalf, robeBottom - 6);
+    hem.bezierCurveTo(
+      deathCx - robeBottomHalf * 0.7, robeBottom - 14,
+      deathCx - robeBottomHalf * 0.35, robeBottom - 10,
+      deathCx, robeBottom - 8
+    );
+    hem.bezierCurveTo(
+      deathCx + robeBottomHalf * 0.35, robeBottom - 10,
+      deathCx + robeBottomHalf * 0.7, robeBottom - 14,
+      deathCx + robeBottomHalf, robeBottom - 6
+    );
+    hem.stroke({ color: 0xc9a227, alpha: 0.55, width: 2.2 });
+    this.deathBack.addChild(hem);
+
+    // ---- 6. Hood — sharper rim highlight + interior shadow ring ----
     const rimLine = new Graphics();
     rimLine.moveTo(deathCx - wheelR * 1.35, collarY - wheelR * 0.05);
     rimLine.bezierCurveTo(
@@ -279,58 +445,117 @@ export class WheelsGame {
       deathCx + wheelR * 0.95, headTopY + wheelR * 0.25,
       deathCx + wheelR * 1.35, collarY - wheelR * 0.05
     );
-    rimLine.stroke({ color: 0xdcdcdf, alpha: 0.28, width: 1.8 });
+    rimLine.stroke({ color: 0xeeeef2, alpha: 0.45, width: 2.2 });
     this.deathBack.addChild(rimLine);
 
-    // Hood opening (face void)
-    const hoodOpenW = wheelR * 0.55;
-    const hoodOpenH = wheelR * 0.8;
+    // Hood interior shadow band — gives the hood depth.
+    const hoodShadow = new Graphics();
+    hoodShadow.moveTo(deathCx - wheelR * 1.05, collarY - wheelR * 0.15);
+    hoodShadow.bezierCurveTo(
+      deathCx - wheelR * 0.75, headTopY + wheelR * 0.4,
+      deathCx - wheelR * 0.3,  headTopY + wheelR * 0.18,
+      deathCx, headTopY + wheelR * 0.18
+    );
+    hoodShadow.bezierCurveTo(
+      deathCx + wheelR * 0.3,  headTopY + wheelR * 0.18,
+      deathCx + wheelR * 0.75, headTopY + wheelR * 0.4,
+      deathCx + wheelR * 1.05, collarY - wheelR * 0.15
+    );
+    hoodShadow.stroke({ color: 0x000000, alpha: 0.55, width: 4 });
+    this.deathBack.addChild(hoodShadow);
+
+    // ---- 7. Hood opening (face void) ----
+    const hoodOpenW = wheelR * 0.6;
+    const hoodOpenH = wheelR * 0.85;
     const faceVoid = new Graphics();
     faceVoid.ellipse(deathCx, headCenterY, hoodOpenW, hoodOpenH);
     faceVoid.fill({ color: 0x000000 });
     this.deathBack.addChild(faceVoid);
 
-    // Warm interior glow inside hood
+    // ---- 8. Warm interior glow inside hood (candle from below) ----
     const hoodGlow = new Graphics();
-    for (let i = 0; i < 4; i++) {
-      const t = i / 3;
+    for (let i = 0; i < 5; i++) {
+      const t = i / 4;
       hoodGlow.ellipse(
         deathCx,
-        headCenterY,
-        hoodOpenW * (1.3 - t * 0.3),
-        hoodOpenH * (1.3 - t * 0.3)
+        headCenterY + hoodOpenH * 0.1,
+        hoodOpenW * (1.2 - t * 0.25),
+        hoodOpenH * (1.0 - t * 0.2)
       );
-      hoodGlow.fill({ color: 0x963c1e, alpha: 0.12 - t * 0.025 });
+      hoodGlow.fill({ color: 0xb04820, alpha: 0.16 - t * 0.025 });
     }
     this.deathBack.addChild(hoodGlow);
 
-    // Faint skull silhouette inside hood
+    // ---- 9. Detailed skull — cranium, eye sockets, nose, jawline, teeth ----
     const skull = new Graphics();
+    const skullColor = 0xd8cfba;
+    const shadowColor = 0x4e463a;
+
+    // Cranium — bone-colored ellipse.
     skull.ellipse(
       deathCx,
-      headCenterY - hoodOpenH * 0.05,
+      headCenterY - hoodOpenH * 0.18,
       hoodOpenW * 0.55,
       hoodOpenH * 0.5
     );
-    skull.stroke({ color: 0xbeb4a0, alpha: 0.32, width: 1.1 });
-    skull.moveTo(deathCx - hoodOpenW * 0.40, headCenterY + hoodOpenH * 0.15);
-    skull.bezierCurveTo(
-      deathCx - hoodOpenW * 0.32, headCenterY + hoodOpenH * 0.45,
-      deathCx + hoodOpenW * 0.32, headCenterY + hoodOpenH * 0.45,
-      deathCx + hoodOpenW * 0.40, headCenterY + hoodOpenH * 0.15
-    );
-    skull.stroke({ color: 0xbeb4a0, alpha: 0.32, width: 1.1 });
-    skull.moveTo(deathCx, headCenterY + hoodOpenH * 0.10);
-    skull.lineTo(deathCx - hoodOpenW * 0.06, headCenterY + hoodOpenH * 0.22);
-    skull.lineTo(deathCx + hoodOpenW * 0.06, headCenterY + hoodOpenH * 0.22);
+    skull.fill({ color: skullColor, alpha: 0.25 });
+    skull.stroke({ color: shadowColor, alpha: 0.55, width: 1.4 });
+
+    // Eye sockets — deep dark voids (the glowing eyes go inside).
+    const eyeSocketDx = hoodOpenW * 0.27;
+    const eyeSocketY = headCenterY - hoodOpenH * 0.1;
+    const eyeSocketR = hoodOpenW * 0.18;
+    skull.circle(deathCx - eyeSocketDx, eyeSocketY, eyeSocketR);
+    skull.fill({ color: 0x000000, alpha: 0.95 });
+    skull.circle(deathCx + eyeSocketDx, eyeSocketY, eyeSocketR);
+    skull.fill({ color: 0x000000, alpha: 0.95 });
+    // Eye socket rims for definition.
+    skull.circle(deathCx - eyeSocketDx, eyeSocketY, eyeSocketR);
+    skull.stroke({ color: shadowColor, alpha: 0.7, width: 1.0 });
+    skull.circle(deathCx + eyeSocketDx, eyeSocketY, eyeSocketR);
+    skull.stroke({ color: shadowColor, alpha: 0.7, width: 1.0 });
+
+    // Nose cavity — inverted triangle.
+    const noseY = headCenterY + hoodOpenH * 0.05;
+    skull.moveTo(deathCx - hoodOpenW * 0.06, noseY);
+    skull.lineTo(deathCx + hoodOpenW * 0.06, noseY);
+    skull.lineTo(deathCx, noseY + hoodOpenH * 0.16);
     skull.closePath();
-    skull.fill({ color: 0x000000, alpha: 0.55 });
+    skull.fill({ color: 0x000000, alpha: 0.85 });
+    skull.stroke({ color: shadowColor, alpha: 0.6, width: 0.9 });
+
+    // Cheekbones — angled shadow lines under each socket.
+    skull.moveTo(deathCx - eyeSocketDx - hoodOpenW * 0.05, eyeSocketY + eyeSocketR);
+    skull.lineTo(deathCx - hoodOpenW * 0.10, headCenterY + hoodOpenH * 0.18);
+    skull.stroke({ color: shadowColor, alpha: 0.45, width: 1.2 });
+    skull.moveTo(deathCx + eyeSocketDx + hoodOpenW * 0.05, eyeSocketY + eyeSocketR);
+    skull.lineTo(deathCx + hoodOpenW * 0.10, headCenterY + hoodOpenH * 0.18);
+    skull.stroke({ color: shadowColor, alpha: 0.45, width: 1.2 });
+
+    // Jaw — curved bottom.
+    skull.moveTo(deathCx - hoodOpenW * 0.42, headCenterY + hoodOpenH * 0.20);
+    skull.bezierCurveTo(
+      deathCx - hoodOpenW * 0.35, headCenterY + hoodOpenH * 0.42,
+      deathCx + hoodOpenW * 0.35, headCenterY + hoodOpenH * 0.42,
+      deathCx + hoodOpenW * 0.42, headCenterY + hoodOpenH * 0.20
+    );
+    skull.stroke({ color: shadowColor, alpha: 0.65, width: 1.3 });
+
+    // Teeth — three short vertical lines on the jaw line.
+    const teethY = headCenterY + hoodOpenH * 0.30;
+    for (let t = -2; t <= 2; t++) {
+      const tx = deathCx + t * hoodOpenW * 0.10;
+      skull.moveTo(tx, teethY - hoodOpenH * 0.06);
+      skull.lineTo(tx, teethY + hoodOpenH * 0.05);
+      skull.stroke({ color: shadowColor, alpha: 0.55, width: 1 });
+    }
+
     this.deathBack.addChild(skull);
 
-    // Eyes — store reference for animated alpha pulse
+    // ---- 10. Eyes — store reference for animated alpha pulse ----
     this.eyeBlink = new Graphics();
     this.deathBack.addChild(this.eyeBlink);
-    this.drawEyes(deathCx, headCenterY - hoodOpenH * 0.08, hoodOpenW * 0.32, hoodOpenW * 0.10, 1);
+    this.drawEyes(deathCx, eyeSocketY, eyeSocketDx, eyeSocketR * 0.7, 1);
   }
 
   private drawEyes(cx: number, cy: number, dx: number, r: number, alpha: number): void {
@@ -356,12 +581,130 @@ export class WheelsGame {
     segments: WheelSegment[],
     kind: 'buff' | 'curse'
   ): WheelState {
+    if (this.mode === 'slot') return this.createSlotState(cx, cy, r, segments, kind);
+    return this.createPieWheelState(cx, cy, r, segments, kind);
+  }
+
+  /** Slot-machine reel — 12 vertical rows, scrolls past a center "win line". */
+  private createSlotState(
+    cx: number,
+    cy: number,
+    r: number,
+    segments: WheelSegment[],
+    kind: 'buff' | 'curse'
+  ): WheelState {
+    const rowH = r * 0.32;
+    const reelW = r * 1.6;
+    const reelHalfH = r * 1.05;        // visible window half-height
+    const accent = kind === 'buff' ? 0x69b070 : 0xe04848;
+
+    // Frame + window (drawn into wheelsLayer in stage coords, NOT scrolled).
+    const frame = new Graphics();
+    frame.roundRect(cx - reelW / 2 - 6, cy - reelHalfH - 6, reelW + 12, reelHalfH * 2 + 12, 10);
+    frame.fill({ color: 0x0a0a10 });
+    frame.roundRect(cx - reelW / 2 - 6, cy - reelHalfH - 6, reelW + 12, reelHalfH * 2 + 12, 10);
+    frame.stroke({ color: kind === 'buff' ? 0x3a5a3a : 0x5a2a2a, width: 4 });
+    this.wheelsLayer.addChild(frame);
+
+    // Container holds all 12 rows; we translate it up/down for the spin.
+    const container = new Container();
+    container.position.set(cx, cy);
+    // Repeat the segments twice so the reel can scroll continuously without
+    // visible gaps when wrapping during a long spin.
+    const REPEAT = 4;
+    for (let cycle = 0; cycle < REPEAT; cycle++) {
+      for (let i = 0; i < SEG_COUNT; i++) {
+        const seg = segments[i];
+        const y = (i + cycle * SEG_COUNT - (REPEAT * SEG_COUNT) / 2) * rowH + rowH / 2;
+        // Row background
+        const bg = new Graphics();
+        bg.roundRect(-reelW / 2, y - rowH / 2 + 2, reelW, rowH - 4, 4);
+        bg.fill({ color: parseInt(seg.color.replace('#', ''), 16) });
+        bg.stroke({ color: 0x0a0a0c, width: 1.5 });
+        container.addChild(bg);
+        // Label
+        const label = new Text({
+          text: seg.label,
+          style: new TextStyle({
+            fontFamily: 'Cinzel, Georgia, serif',
+            fontSize: Math.max(11, Math.round(r * 0.11)),
+            fill: 0x0a0a0c,
+            fontWeight: 'bold',
+            align: 'center',
+          }),
+        });
+        label.anchor.set(0.5);
+        label.position.set(0, y);
+        container.addChild(label);
+      }
+    }
+
+    // Mask the container to the visible window so off-screen rows clip cleanly.
+    const mask = new Graphics();
+    mask.rect(cx - reelW / 2, cy - reelHalfH, reelW, reelHalfH * 2);
+    mask.fill({ color: 0xffffff });
+    this.wheelsLayer.addChild(mask);
+    container.mask = mask;
+
+    this.wheelsLayer.addChild(container);
+
+    // Win line — horizontal accent stripe across the center of the window.
+    const winLine = new Graphics();
+    winLine.rect(cx - reelW / 2 - 4, cy - rowH / 2, reelW + 8, rowH);
+    winLine.stroke({ color: accent, width: 2.5, alpha: 0.85 });
+    this.wheelsLayer.addChild(winLine);
+
+    // Side ticker pointers (left + right arrows pointing inward at the win line)
+    const pointer = new Graphics();
+    const tipX = cx + reelW / 2 + 4;
+    const baseX = cx + reelW / 2 + 22;
+    pointer.moveTo(tipX, cy);
+    pointer.lineTo(baseX, cy - 10);
+    pointer.lineTo(baseX, cy + 10);
+    pointer.closePath();
+    pointer.fill({ color: accent });
+    pointer.stroke({ color: 0x0a0a0c, width: 2 });
+    // Mirror on the left
+    pointer.moveTo(cx - reelW / 2 - 4, cy);
+    pointer.lineTo(cx - reelW / 2 - 22, cy - 10);
+    pointer.lineTo(cx - reelW / 2 - 22, cy + 10);
+    pointer.closePath();
+    pointer.fill({ color: accent });
+    pointer.stroke({ color: 0x0a0a0c, width: 2 });
+    this.wheelsLayer.addChild(pointer);
+
+    return {
+      container,
+      pointer,
+      segments,
+      angle: 0,
+      spinning: false,
+      spun: false,
+      spinStart: 0,
+      spinTarget: 0,
+      t0: 0,
+      durMs: 0,
+      resultIdx: -1,
+      cx,
+      cy,
+      radius: r,
+      lastTickSegIdx: -1,
+    };
+  }
+
+  /** Original pie-wheel renderer (kept intact so 'wheel' mode is unchanged). */
+  private createPieWheelState(
+    cx: number,
+    cy: number,
+    r: number,
+    segments: WheelSegment[],
+    kind: 'buff' | 'curse'
+  ): WheelState {
     // Container that we rotate
     const container = new Container();
     container.position.set(cx, cy);
 
-    // Backplate / outer ring (drawn into container so it rotates with — actually
-    // we'll keep ring stationary by drawing into wheelsLayer above)
+    // Backplate / outer ring
     const ring = new Graphics();
     ring.circle(0, 0, r * 1.04);
     ring.fill({ color: 0x0a0a10 });
@@ -444,6 +787,10 @@ export class WheelsGame {
 
   // ============== Death front (skeletal finger fans) ==============
   private drawDeathFront(g: Geometry): void {
+    // In slot mode the reels are rectangles, not circles, so the curved
+    // finger-grip-around-wheel composition doesn't work — skip the fingers
+    // and let Death simply stand behind the slot frames.
+    if (this.mode === 'slot') return;
     this.drawFingers(g, -1, this.buff.cx, this.buff.cy, this.buff.radius);
     this.drawFingers(g, +1, this.curse.cx, this.curse.cy, this.curse.radius);
   }
@@ -532,47 +879,58 @@ export class WheelsGame {
     const now = performance.now();
     this.eyePulseT += deltaMs / 1000;
 
-    // Eye pulse
+    // Eye pulse — must mirror the geometry from drawDeathBack().
     if (this.eyeBlink) {
-      // Re-derive the params we used originally; need to recompute geometry
       const g = this.geometry();
       const headCenterY = g.cy - g.wheelR * 1.65;
-      const hoodOpenW = g.wheelR * 0.55;
+      const hoodOpenW = g.wheelR * 0.6;
+      const hoodOpenH = g.wheelR * 0.85;
+      const eyeSocketDx = hoodOpenW * 0.27;
+      const eyeSocketY = headCenterY - hoodOpenH * 0.1;
+      const eyeSocketR = hoodOpenW * 0.18;
       const a = 0.7 + 0.3 * Math.sin(this.eyePulseT * 2.4);
-      this.drawEyes(
-        g.deathCx,
-        headCenterY - g.wheelR * 0.8 * 0.08,
-        hoodOpenW * 0.32,
-        hoodOpenW * 0.10,
-        a
-      );
+      this.drawEyes(g.deathCx, eyeSocketY, eyeSocketDx, eyeSocketR * 0.7, a);
     }
 
-    // Spin animation
+    // Spin animation — branches by mode (rotation for wheel, y-translate for slot)
     for (const w of [this.buff, this.curse]) {
       if (!w.spinning) continue;
       const t = Math.min(1, (now - w.t0) / w.durMs);
       const eased = 1 - Math.pow(1 - t, 3);
       w.angle = w.spinStart + (w.spinTarget - w.spinStart) * eased;
-      w.container.rotation = w.angle;
 
-      // Tick SFX whenever the segment under the top pointer changes.
-      // The wheel's segment 0 sits at angle 0; the pointer is at -PI/2.
-      // So the segment currently under the pointer is the index of the
-      // slice whose midpoint lines up with -PI/2 after rotation `w.angle`.
-      const pointerSegFloat = (-Math.PI / 2 - w.angle) / SEG_ANGLE;
-      const segIdx = ((Math.round(pointerSegFloat) % SEG_COUNT) + SEG_COUNT) % SEG_COUNT;
+      let segIdx: number;
+      if (this.mode === 'slot') {
+        // w.angle is the y-offset of the reel strip in px.
+        w.container.position.y = w.cy + w.angle;
+        const rowH = w.radius * 0.32;
+        // The row currently centered on the win line is at index = -w.angle / rowH
+        const rowFloat = -w.angle / rowH;
+        segIdx = ((Math.round(rowFloat) % SEG_COUNT) + SEG_COUNT) % SEG_COUNT;
+      } else {
+        w.container.rotation = w.angle;
+        const pointerSegFloat = (-Math.PI / 2 - w.angle) / SEG_ANGLE;
+        segIdx = ((Math.round(pointerSegFloat) % SEG_COUNT) + SEG_COUNT) % SEG_COUNT;
+      }
+
       if (segIdx !== w.lastTickSegIdx) {
         w.lastTickSegIdx = segIdx;
-        // 30ms cooldown in AudioManager naturally rate-limits early-spin spam.
         AudioManager.play('wheel_tick', { volume: 0.5 });
       }
 
       if (t >= 1) {
         w.spinning = false;
         w.spun = true;
-        w.angle = ((w.angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-        w.container.rotation = w.angle;
+        if (this.mode === 'slot') {
+          // Snap the y-offset to a clean row position so the result row
+          // sits perfectly on the win line.
+          const rowH = w.radius * 0.32;
+          w.angle = -w.resultIdx * rowH;
+          w.container.position.y = w.cy + w.angle;
+        } else {
+          w.angle = ((w.angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+          w.container.rotation = w.angle;
+        }
         AudioManager.play('wheel_stop', { volume: 0.7 });
         const side: 'buff' | 'curse' = w === this.buff ? 'buff' : 'curse';
         this.opts.onSpinComplete(side, w.resultIdx);
