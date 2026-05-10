@@ -31,7 +31,10 @@ export interface BuildDef {
   baseDef: number;
   baseLuck: number;
   look: Look;
+  /** Atmospheric one-liner shown as italic flavor under the mechanical hook (#178). */
   desc: string;
+  /** Concrete gameplay one-liner — what this build actually does (#178). */
+  mechanicalHook: string;
 }
 
 export type WeaponType = 'melee' | 'ranged' | 'magic';
@@ -184,6 +187,13 @@ export interface RunState {
   activeCurse: string | null;
   // One-shot consumables purchased in the shop, applied at next raid init.
   pendingPotions: number;     // each grants +50 starting HP at the next raid
+  // Post-death summary captured from the last completed raid / death (#180-#182).
+  lastRunSummary: {
+    lastDamageSource: string;
+    biggestHit: number;
+    favoriteKill: string;
+    timeAlive: number;
+  } | null;
 }
 
 // ----- Persistent (localStorage) -----

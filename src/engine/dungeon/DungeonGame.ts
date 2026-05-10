@@ -85,6 +85,8 @@ interface EnemyProjectile {
   dmg: number;
   life: number;
   graphics: Graphics;
+  /** Display name of the enemy that fired this — used for post-death attribution (#180). */
+  sourceName: string;
 }
 
 interface ProjectileEntity {
@@ -140,6 +142,13 @@ export interface DungeonRunSummary {
   kills: number;
   level: number;
   cash: number;
+  // Post-death summary (#180/#181/#182)
+  /** Display name of the enemy / source that landed the killing blow ('—' if won). */
+  lastDamageSource: string;
+  /** Largest single-hit damage the player dealt this run. */
+  biggestHit: number;
+  /** "{Enemy Name} (×N)" — the enemy type the player killed most this run. */
+  favoriteKill: string;
 }
 
 export interface DungeonGameOptions {
@@ -289,6 +298,10 @@ export class DungeonGame {
   private zones: Zone[] = [];
   private activeZoneIdx = -1;
   private allZonesCleared = false;
+  // Post-death summary tracking (#180/#181)
+  private lastDamageSource = '—';
+  private biggestHit = 0;
+  private killCounts: Record<string, number> = {};
   private hitStopT = 0;            // time-scale freeze remaining (real seconds)
   // Active spell — Frost Nova on Q. ~12s cooldown, damages + slows nearby enemies.
   private activeSpellLastCastMs = -Infinity;
@@ -563,12 +576,7 @@ export class DungeonGame {
       AudioManager.play('boss_defeat');
       this.spawnHit(this.player.x, this.player.y - 30, 'DEATH FALLS', 'heal');
       setTimeout(() => {
-        this.opts.onBossDefeated({
-          time: Math.floor(elapsedS),
-          kills: this.kills,
-          level: this.level,
-          cash: this.cashThisRun,
-        });
+        this.opts.onBossDefeated(this.buildSummary(elapsedS, true));
       }, 1400);
       return;
     }
@@ -579,12 +587,7 @@ export class DungeonGame {
       this.allZonesCleared = false; // prevent re-fire
       this.spawnHit(this.player.x, this.player.y - 30, 'RAID CLEAR', 'heal');
       setTimeout(() => {
-        this.opts.onRoundComplete({
-          time: Math.floor(elapsedS),
-          kills: this.kills,
-          level: this.level,
-          cash: this.cashThisRun,
-        });
+        this.opts.onRoundComplete(this.buildSummary(elapsedS, true));
       }, 900);
       return;
     }
@@ -594,12 +597,7 @@ export class DungeonGame {
       this.finished = true;
       this.spawnHit(this.player.x, this.player.y - 30, 'ROUND CLEAR', 'heal');
       setTimeout(() => {
-        this.opts.onRoundComplete({
-          time: Math.floor(elapsedS),
-          kills: this.kills,
-          level: this.level,
-          cash: this.cashThisRun,
-        });
+        this.opts.onRoundComplete(this.buildSummary(elapsedS, true));
       }, 900);
     }
   }
@@ -624,12 +622,8 @@ export class DungeonGame {
     // Fade in the screen overlay (handled by screenLayer alpha)
     if (this.deathT >= 1.8 && !this.gameOver) {
       this.gameOver = true;
-      this.opts.onGameOver({
-        time: Math.floor((performance.now() - this.startTime - this.totalPausedMs) / 1000),
-        kills: this.kills,
-        level: this.level,
-        cash: this.cashThisRun,
-      });
+      const elapsedS = (performance.now() - this.startTime - this.totalPausedMs) / 1000;
+      this.opts.onGameOver(this.buildSummary(elapsedS, false));
     }
   }
 
@@ -713,6 +707,7 @@ export class DungeonGame {
       if (facing === 1 && dx < -arcTol) continue;
       if (facing === -1 && dx > arcTol) continue;
       e.hp -= dmg;
+      if (dmg > this.biggestHit) this.biggestHit = dmg; // (#181)
       e.flashTimer = 0.12;
       e.sprite.tint = isCrit ? 0xffd070 : 0xffffff;
       this.spawnHit(e.x, e.y - 10, Math.round(dmg).toString(), isCrit ? 'crit' : 'damage');
@@ -1103,6 +1098,8 @@ export class DungeonGame {
         const taken = Math.max(1, e.dmg - this.stats.def) * dt;
         const wasHp = this.player.hp;
         this.player.hp -= taken;
+        // (#180) Track most recent damage source for the gameover screen.
+        this.lastDamageSource = e.isBoss ? 'Death Itself' : this.enemyDisplayName(e.proto.id);
         // Player damage juice — only spawn the popup on a meaningful hit chunk
         // (otherwise we'd spawn one every frame of contact)
         if (Math.floor(wasHp) !== Math.floor(this.player.hp) && (wasHp - this.player.hp) >= 1) {
@@ -1251,6 +1248,7 @@ export class DungeonGame {
     if (dx * dx + dy * dy < RADIUS * RADIUS) {
       const taken = Math.max(1, boss.dmg * 1.2 - this.stats.def);
       this.player.hp -= taken;
+      this.lastDamageSource = "Death's Shadow Pulse";
       this.player.flashTimer = 0.18;
       this.applyShake(10, 0.5);
       this.applyScreenFlash(0.7);
@@ -1258,6 +1256,47 @@ export class DungeonGame {
       AudioManager.play('player_hurt');
       this.spawnHit(this.player.x, this.player.y - 18, `-${Math.ceil(taken)}`, 'player-damage');
     }
+  }
+
+  /** Pretty-print an enemy id for the post-death summary (#182). */
+  private enemyDisplayName(id: string): string {
+    const map: Record<string, string> = {
+      zombie: 'Zombie',
+      bat: 'Bat',
+      skeleton: 'Skeleton',
+      ghoul: 'Ghoul',
+      wraith: 'Wraith',
+      tank: 'Bone Dragon',
+      imp: 'Imp',
+      reaper: 'Reaper',
+      archer: 'Skeleton Archer',
+      fireImp: 'Fire Imp',
+      lichAcolyte: 'Lich Acolyte',
+      boneKnight: 'Bone Knight',
+      death: 'Death Itself',
+    };
+    return map[id] ?? id;
+  }
+
+  /** Build the run-summary including post-death stats (#180/#181/#182). */
+  private buildSummary(elapsedS: number, killedByBoss = false): DungeonRunSummary {
+    let favName = '—';
+    let favCount = 0;
+    for (const [id, n] of Object.entries(this.killCounts)) {
+      if (n > favCount) {
+        favCount = n;
+        favName = this.enemyDisplayName(id);
+      }
+    }
+    return {
+      time: Math.floor(elapsedS),
+      kills: this.kills,
+      level: this.level,
+      cash: this.cashThisRun,
+      lastDamageSource: killedByBoss ? '—' : this.lastDamageSource,
+      biggestHit: Math.round(this.biggestHit),
+      favoriteKill: favCount > 0 ? `${favName} (×${favCount})` : '—',
+    };
   }
 
   /** Spawn an enemy → player projectile (Graphics circle). */
@@ -1287,6 +1326,7 @@ export class DungeonGame {
       dmg,
       life: 4,
       graphics: g,
+      sourceName: e.isBoss ? "Death's Shadowbolt" : `${this.enemyDisplayName(e.proto.id)}'s Shot`,
     });
   }
 
@@ -1306,6 +1346,7 @@ export class DungeonGame {
       if (dx * dx + dy * dy < hitR * hitR) {
         const taken = Math.max(1, p.dmg - this.stats.def);
         this.player.hp -= taken;
+        this.lastDamageSource = p.sourceName;
         this.player.flashTimer = 0.12;
         this.applyShake(4, 0.25);
         this.applyScreenFlash(0.55);
@@ -1344,6 +1385,7 @@ export class DungeonGame {
         const dy = e.y - pr.y;
         if (dx * dx + dy * dy < (e.r + 4) * (e.r + 4)) {
           e.hp -= pr.dmg;
+          if (pr.dmg > this.biggestHit) this.biggestHit = pr.dmg; // (#181)
           e.flashTimer = 0.12;
           e.sprite.tint = pr.crit ? 0xffd070 : 0xffffff;
           this.spawnHit(e.x, e.y - 10, Math.round(pr.dmg).toString(), pr.crit ? 'crit' : 'damage');
@@ -1402,6 +1444,9 @@ export class DungeonGame {
         continue;
       }
       this.kills++;
+      // (#181) Track per-enemy-type kill count for "favorite kill" stat.
+      const killKey = e.isBoss ? 'death' : e.proto.id;
+      this.killCounts[killKey] = (this.killCounts[killKey] ?? 0) + 1;
       const cashGain = Math.max(1, Math.round(e.cash * this.opts.cashMult));
       this.cashThisRun += cashGain;
       // Visible feedback for the cash drop — a small gold "+$N" floats up

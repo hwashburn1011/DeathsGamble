@@ -6,7 +6,7 @@ import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { useGameStore } from '../state/gameStore';
 import { useSettingsStore } from '../state/settingsStore';
 import { WheelsGame } from '../engine/wheels/WheelsGame';
-import { BUFF_SEGMENTS, CURSE_SEGMENTS } from '../data/wheels';
+import { BUFF_SEGMENTS, CURSE_SEGMENTS, formatGiftLabel, formatTollLabel } from '../data/wheels';
 import { SPELLS_BY_ID } from '../data/spells';
 import { AudioManager } from '../engine/audio/AudioManager';
 import type { PlayerStats } from '../types';
@@ -28,7 +28,9 @@ function formatResultLabel(r: SpinResult): string {
     const atkspd = (0.3 * m).toFixed(1);
     return `JACKPOT  +${dmg} DMG  +${hp} HP  +${atkspd} ATK`;
   }
-  return r.magnitude !== 1 ? `${r.label}  ${X}${r.magnitude.toFixed(1)}` : r.label;
+  // Apply thematic prefix per side, then add the magnitude multiplier suffix.
+  const themed = r.side === 'buff' ? formatGiftLabel(r.label) : formatTollLabel(r.label);
+  return r.magnitude !== 1 ? `${themed}  ${X}${r.magnitude.toFixed(1)}` : themed;
 }
 
 export function WheelsScene() {

@@ -43,6 +43,7 @@ export function DungeonScene() {
   const isBossRaidFn = useGameStore((s) => s.isBossRaid);
   const nextRound = useGameStore((s) => s.nextRound);
   const triggerWin = useGameStore((s) => s.triggerWin);
+  const setLastRunSummary = useGameStore((s) => s.setLastRunSummary);
   const paused = useGameStore((s) => s.paused);
   const motionIntensity = useSettingsStore((s) => s.motionIntensity);
   const renderQuality = useSettingsStore((s) => s.renderQuality);
@@ -183,6 +184,13 @@ export function DungeonScene() {
             addCashEarned(gs.cash);
             addKills(gs.kills);
             useStatsStore.getState().recordDeath(gs.kills, gs.cash);
+            // (#180-#182) capture post-death summary for the gameover screen.
+            setLastRunSummary({
+              lastDamageSource: gs.lastDamageSource,
+              biggestHit: gs.biggestHit,
+              favoriteKill: gs.favoriteKill,
+              timeAlive: gs.time,
+            });
             // No persistent cash — run-scoped only.
             showScene('gameover');
           },
@@ -195,6 +203,13 @@ export function DungeonScene() {
             if (run.mode === 'infinite') {
               useStatsStore.getState().recordEndlessRound((run.endlessRound ?? 0) + 1);
             }
+            // Refresh the last-run summary so it's available even if player wins.
+            setLastRunSummary({
+              lastDamageSource: gs.lastDamageSource,
+              biggestHit: gs.biggestHit,
+              favoriteKill: gs.favoriteKill,
+              timeAlive: gs.time,
+            });
             nextRound();
           },
           onBossDefeated: (gs) => {
@@ -202,6 +217,12 @@ export function DungeonScene() {
             addCashEarned(gs.cash);
             addKills(gs.kills);
             useStatsStore.getState().recordWin(gs.kills, gs.cash);
+            setLastRunSummary({
+              lastDamageSource: gs.lastDamageSource,
+              biggestHit: gs.biggestHit,
+              favoriteKill: gs.favoriteKill,
+              timeAlive: gs.time,
+            });
             triggerWin();
           },
         });
@@ -230,7 +251,7 @@ export function DungeonScene() {
       }
       while (container.firstChild) container.removeChild(container.firstChild);
     };
-  }, [run.build, run.weapon, run.raid, run.endlessRound, stats, isBossRaid, motionIntensity, renderQuality, cashMult, addCashEarned, addCashToRun, addKills, showScene, nextRound, triggerWin]);
+  }, [run.build, run.weapon, run.raid, run.endlessRound, run.mode, run.totalRaids, stats, isBossRaid, motionIntensity, renderQuality, cashMult, addCashEarned, addCashToRun, addKills, showScene, nextRound, triggerWin, setLastRunSummary]);
 
   const hpPct = Math.max(0, hud.hp / hud.hpMax) * 100;
   const xpPct = (hud.xp / hud.xpNext) * 100;

@@ -15,6 +15,7 @@ import { useStatsStore } from './statsStore';
 import { baseStats } from '../engine/stats';
 import { spinMagnitude } from '../engine/luck';
 import { beginDailyMode, endDailyMode } from '../engine/dailySeed';
+import { formatGiftLabel, formatTollLabel } from '../data/wheels';
 
 interface GameActions {
   showScene(name: SceneName): void;
@@ -34,6 +35,8 @@ interface GameActions {
   initStatsForRaid(): void;
   applyWheelSegment(side: 'buff' | 'curse', segment: WheelSegment): number;
   buyPotion(cost: number): boolean;
+  /** Record post-death summary fields from a DungeonRunSummary (#180-#182). */
+  setLastRunSummary(s: { lastDamageSource: string; biggestHit: number; favoriteKill: string; timeAlive: number }): void;
 
   // Round/raid progression
   isBossRaid(): boolean;
@@ -69,6 +72,7 @@ const blankRun = (): RunState => ({
   activeBuff: null,
   activeCurse: null,
   pendingPotions: 0,
+  lastRunSummary: null,
 });
 
 export const useGameStore = create<GameStoreState & GameActions>((set, get) => ({
@@ -177,6 +181,10 @@ export const useGameStore = create<GameStoreState & GameActions>((set, get) => (
     return true;
   },
 
+  setLastRunSummary(s) {
+    set({ run: { ...get().run, lastRunSummary: s } });
+  },
+
   applyWheelSegment(side, segment) {
     const { stats, run } = get();
     if (!stats) return 1;
@@ -186,7 +194,9 @@ export const useGameStore = create<GameStoreState & GameActions>((set, get) => (
     const next = { ...stats };
     segment.apply(next, m);
     // Track which segment landed for HUD display in the dungeon.
-    const label = m !== 1 ? `${segment.label} ×${m.toFixed(1)}` : segment.label;
+    // Apply thematic prefix per side (#174/#175 Death's Gift / Death's Toll).
+    const themed = side === 'buff' ? formatGiftLabel(segment.label) : formatTollLabel(segment.label);
+    const label = m !== 1 ? `${themed} ×${m.toFixed(1)}` : themed;
     const runPatch = side === 'buff'
       ? { ...run, activeBuff: label }
       : { ...run, activeCurse: label };

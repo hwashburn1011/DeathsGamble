@@ -902,7 +902,12 @@ export class WheelsGame {
 
       if (segIdx !== w.lastTickSegIdx) {
         w.lastTickSegIdx = segIdx;
-        AudioManager.play('wheel_tick', { volume: 0.5 });
+        // (#176) Slot-machine slowdown — pitch + volume ramp during last 30%
+        // of the spin so the player HEARS the wheel decelerating.
+        const slowdownT = Math.max(0, (t - 0.7) / 0.3); // 0 → 1 over last 30%
+        const pitch = 1.0 + slowdownT * 0.4;
+        const vol = 0.5 + slowdownT * 0.3;
+        AudioManager.play('wheel_tick', { volume: vol, pitch });
       }
 
       if (t >= 1) {
@@ -918,10 +923,58 @@ export class WheelsGame {
           w.angle = ((w.angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
           w.container.rotation = w.angle;
         }
-        AudioManager.play('wheel_stop', { volume: 0.7 });
+
+        // (#177) Near-miss tease — buff side only, when the result lands
+        // adjacent to JACKPOT (segment with luckScore=12 = the gold one).
+        // Plays a tense bell sting + flashes the JACKPOT slot gold so the
+        // player sees what they almost won.
         const side: 'buff' | 'curse' = w === this.buff ? 'buff' : 'curse';
+        const jackpotIdx = w.segments.findIndex((s) => s.label === 'JACKPOT');
+        const isNearMiss =
+          side === 'buff' &&
+          jackpotIdx >= 0 &&
+          w.resultIdx !== jackpotIdx &&
+          (Math.abs(w.resultIdx - jackpotIdx) === 1 ||
+            Math.abs(w.resultIdx - jackpotIdx) === SEG_COUNT - 1);
+        if (isNearMiss) {
+          AudioManager.play('boss_intro', { volume: 0.45, pitch: 0.7 });
+          this.flashJackpotSlot(w, jackpotIdx);
+        } else {
+          AudioManager.play('wheel_stop', { volume: 0.7 });
+        }
+
         this.opts.onSpinComplete(side, w.resultIdx);
       }
     }
+  }
+
+  /**
+   * Briefly flash the JACKPOT segment with a gold edge — used on a near-miss
+   * spin to signal "you almost won" (#177).
+   */
+  private flashJackpotSlot(w: WheelState, jackpotIdx: number): void {
+    if (this.mode === 'slot') return; // visual hard to localize in slot mode
+    const flash = new Graphics();
+    const start = jackpotIdx * SEG_ANGLE - SEG_ANGLE / 2;
+    const end = start + SEG_ANGLE;
+    flash.moveTo(0, 0);
+    flash.arc(0, 0, w.radius * 1.08, start, end);
+    flash.closePath();
+    flash.stroke({ color: 0xffe070, width: 6, alpha: 1 });
+    flash.position.set(0, 0); // local to container which is rotated
+    w.container.addChild(flash);
+    const t0 = performance.now();
+    const dur = 700;
+    const animate = () => {
+      const t = (performance.now() - t0) / dur;
+      if (t >= 1) {
+        flash.parent?.removeChild(flash);
+        flash.destroy();
+        return;
+      }
+      flash.alpha = 1 - t;
+      requestAnimationFrame(animate);
+    };
+    animate();
   }
 }

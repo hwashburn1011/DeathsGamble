@@ -53,13 +53,23 @@
   margin-bottom: 8px;
 }
 
+/* Mechanical hook — concrete gameplay one-liner shown prominently (#178). */
+.build-hook {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--ink);
+  margin-bottom: 6px;
+  line-height: 1.35;
+  min-height: 34px;
+}
+
 .build-desc {
   font-style: italic;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--ink-dim);
-  margin-bottom: 14px;
-  min-height: 36px;
-  line-height: 1.4;
+  margin-bottom: 12px;
+  min-height: 30px;
+  line-height: 1.35;
 }
 
 .build-stats {

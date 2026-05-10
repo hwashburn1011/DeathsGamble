@@ -33,6 +33,30 @@ export function GameoverScene() {
           <Stat label="Earned" value={`$${run.cashEarned}`} />
         </div>
 
+        {run.lastRunSummary && (
+          <div className="gameover-postmortem">
+            <div className="gameover-postmortem-row">
+              <span className="gameover-postmortem-label">Killed by</span>
+              <span className="gameover-postmortem-value">{run.lastRunSummary.lastDamageSource || '—'}</span>
+            </div>
+            <div className="gameover-postmortem-row">
+              <span className="gameover-postmortem-label">Biggest Hit</span>
+              <span className="gameover-postmortem-value">{run.lastRunSummary.biggestHit}</span>
+            </div>
+            <div className="gameover-postmortem-row">
+              <span className="gameover-postmortem-label">Most Slain</span>
+              <span className="gameover-postmortem-value">{run.lastRunSummary.favoriteKill}</span>
+            </div>
+            <div className="gameover-postmortem-row">
+              <span className="gameover-postmortem-label">Time Alive</span>
+              <span className="gameover-postmortem-value">
+                {Math.floor(run.lastRunSummary.timeAlive / 60)}:
+                {String(run.lastRunSummary.timeAlive % 60).padStart(2, '0')}
+              </span>
+            </div>
+          </div>
+        )}
+
         <div className="gameover-actions">
           {canRetry && (
             <GlassButton variant="gold" size="lg" onClick={retrySameBuild}>

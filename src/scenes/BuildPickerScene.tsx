@@ -60,6 +60,7 @@ function BuildCard({ build, onPick }: BuildCardProps) {
         <img src={portraitUrl} alt={build.name} className="build-portrait-img" />
       </div>
       <h3 className="build-name">{build.name}</h3>
+      <p className="build-hook">{build.mechanicalHook}</p>
       <p className="build-desc">{build.desc}</p>
       <div className="build-stats">
         <Stat label="HP" value={String(build.baseHp)} />

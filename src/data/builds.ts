@@ -1,5 +1,8 @@
 import type { BuildDef } from '../types';
 
+// `mechanicalHook` (#178): one-line gameplay description shown prominently.
+// `desc`: italic atmospheric flavor underneath.
+
 export const BUILDS: BuildDef[] = [
   {
     id: 'gambler',
@@ -12,6 +15,7 @@ export const BUILDS: BuildDef[] = [
     baseLuck: 1.5,
     look: { robe: '#3a2a10', accent: '#c9a227' },
     desc: 'Fortune favors the bold. Stupid favors the dead.',
+    mechanicalHook: 'Auto-fires pistol. Massive LUCK biases wheel rolls in your favor.',
   },
   {
     id: 'duelist',
@@ -24,6 +28,7 @@ export const BUILDS: BuildDef[] = [
     baseLuck: 0.2,
     look: { robe: '#4a1818', accent: '#e04848' },
     desc: 'Honor. Steel. A blade for every breath.',
+    mechanicalHook: 'Sword swings hit a forward arc. +25% crit chance on every strike.',
   },
   {
     id: 'brute',
@@ -39,6 +44,7 @@ export const BUILDS: BuildDef[] = [
     baseLuck: 0,
     look: { robe: '#3a3030', accent: '#a08080' },
     desc: 'Unmoving. Unkillable. Slow.',
+    mechanicalHook: 'Slow but tanky. Heavy melee swings + +60 max HP. Outlast everything.',
   },
   {
     id: 'arcanist',
@@ -51,6 +57,7 @@ export const BUILDS: BuildDef[] = [
     baseLuck: 0.4,
     look: { robe: '#1a2a4a', accent: '#5a8af0' },
     desc: 'Knowledge bends physics. Bones less so.',
+    mechanicalHook: 'Long-range arcane staff. Bolts pierce extra enemies on a kill streak.',
   },
   {
     id: 'rogue',
@@ -63,6 +70,7 @@ export const BUILDS: BuildDef[] = [
     baseLuck: 0.6,
     look: { robe: '#1a1a1a', accent: '#909090' },
     desc: 'Fast. Quiet. Never on the books.',
+    mechanicalHook: 'Fastest movement in the game. Throwing knives with sustained-fire ramp.',
   },
   {
     id: 'huntsman',
@@ -75,6 +83,7 @@ export const BUILDS: BuildDef[] = [
     baseLuck: 0.3,
     look: { robe: '#3a4030', accent: '#a0c080' },
     desc: 'A patient eye. A long arm.',
+    mechanicalHook: 'Long-bow with extended range; reach grows with each kill.',
   },
   {
     id: 'witch',
@@ -87,6 +96,7 @@ export const BUILDS: BuildDef[] = [
     baseLuck: 0.4,
     look: { robe: '#2a1030', accent: '#c060ff' },
     desc: 'Fingers crackle with the unkind kind of magic.',
+    mechanicalHook: 'Rapid-fire wand. Lifesteals on every hit — outsustain incoming damage.',
   },
   {
     id: 'soldier',
@@ -99,6 +109,7 @@ export const BUILDS: BuildDef[] = [
     baseLuck: 0,
     look: { robe: '#2a3a2a', accent: '#a0b0a0' },
     desc: 'Trained. Equipped. Tired.',
+    mechanicalHook: 'Steady rifle, +2 def. The reliable all-rounder.',
   },
 ];
 
