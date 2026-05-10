@@ -23,6 +23,7 @@ import {
   type ThemeKey,
 } from '../pixi/manifest';
 import { AudioManager } from '../audio/AudioManager';
+import { buildZones, isPlayerInZone, type Zone } from './zones';
 
 const ROUND_DURATION_S = 60;
 
@@ -72,6 +73,8 @@ interface EnemyEntity {
   isBoss: boolean;
   lastShotMs: number;       // for ranged enemies — time of last projectile fired
   slowUntilMs: number;      // 0 = not slowed
+  /** Zone index this enemy was spawned for (story-mode room layout, #145). */
+  spawnZoneIdx?: number;
 }
 
 interface EnemyProjectile {
@@ -147,6 +150,16 @@ export interface DungeonGameOptions {
   motionIntensity: SettingsState['motionIntensity'];
   cashMult: number;        // 1 + greedLevel*0.25
   theme: ThemeKey;
+  /**
+   * Story-mode room layout (#145). When true, the raid is a chain of zones
+   * the player walks through east-to-east; each zone triggers a fixed wave
+   * on entry, raid completes when all zones cleared. Replaces the 60s timer.
+   * Boss raids and infinite mode keep the open-arena flow.
+   */
+  useRoomLayout?: boolean;
+  /** Story raid number — used to size the room chain (raid 1 = 3 rooms, etc.). */
+  raidNumber?: number;
+  totalStoryRaids?: number;
   onPreloadProgress?: (loaded: number, total: number) => void;
   onStatsChange: (s: {
     hp: number;
@@ -160,6 +173,9 @@ export interface DungeonGameOptions {
     timeRemaining: number;
     bossHp: number | null;
     bossHpMax: number | null;
+    roomIdx: number;        // current zone index (0-based)
+    roomCount: number;      // total zones (0 = no room layout)
+    roomLabel: string;      // e.g. "Room 2" / "Mini-Boss" / "Final Room"
   }) => void;
   onGameOver: (stats: DungeonRunSummary) => void;
   onRoundComplete: (stats: DungeonRunSummary) => void; // round timer ran out (non-boss)
@@ -269,6 +285,10 @@ export class DungeonGame {
   private boss: EnemyEntity | null = null;
   private bossEnraged = false;
   private bossNextAoeMs = 0;
+  // Story-mode room layout (#145)
+  private zones: Zone[] = [];
+  private activeZoneIdx = -1;
+  private allZonesCleared = false;
   private hitStopT = 0;            // time-scale freeze remaining (real seconds)
   // Active spell — Frost Nova on Q. ~12s cooldown, damages + slows nearby enemies.
   private activeSpellLastCastMs = -Infinity;
@@ -327,6 +347,11 @@ export class DungeonGame {
   async start(): Promise<void> {
     await this.preload();
     this.buildBackground();
+    // Story-mode room chain (#145) — visible zone tints + state machine.
+    if (this.opts.useRoomLayout && !this.opts.isBossRaid) {
+      this.zones = buildZones(this.opts.raidNumber ?? 1, this.opts.totalStoryRaids ?? 3);
+      this.drawZoneOverlays();
+    }
     this.spawnPlayer();
     if (this.opts.isBossRaid) {
       this.spawnBoss();
@@ -494,6 +519,15 @@ export class DungeonGame {
     this.updateScreenFx(dt);
     this.updateCamera(dt);
 
+    // Story-mode (#145) HUD fields — current room index + label.
+    let roomIdx = -1;
+    let roomLabel = '';
+    if (this.zones.length > 0) {
+      // Show the active zone, or the next-uncleared zone if none active.
+      const activeIdx = this.activeZoneIdx >= 0 ? this.activeZoneIdx : this.zones.findIndex((z) => !z.cleared);
+      roomIdx = activeIdx >= 0 ? activeIdx : this.zones.length - 1;
+      roomLabel = this.zones[roomIdx]?.label ?? '';
+    }
     this.opts.onStatsChange({
       hp: this.player.hp,
       hpMax: this.player.hpMax,
@@ -503,9 +537,13 @@ export class DungeonGame {
       kills: this.kills,
       cashThisRun: this.cashThisRun,
       time: Math.floor(elapsedS),
-      timeRemaining: this.opts.isBossRaid ? -1 : Math.ceil(remaining),
+      // Hide the round timer when room layout is active OR boss raid.
+      timeRemaining: this.opts.isBossRaid || this.zones.length > 0 ? -1 : Math.ceil(remaining),
       bossHp: this.boss?.hp ?? null,
       bossHpMax: this.boss?.hpMax ?? null,
+      roomIdx,
+      roomCount: this.zones.length,
+      roomLabel,
     });
 
     // Player death takes priority
@@ -535,8 +573,24 @@ export class DungeonGame {
       return;
     }
 
-    // Non-boss round timer ran out
-    if (!this.opts.isBossRaid && elapsedS >= ROUND_DURATION_S) {
+    // Story-mode (#145): all zones cleared = raid complete (replaces timer).
+    if (this.zones.length > 0 && this.allZonesCleared) {
+      this.finished = true;
+      this.allZonesCleared = false; // prevent re-fire
+      this.spawnHit(this.player.x, this.player.y - 30, 'RAID CLEAR', 'heal');
+      setTimeout(() => {
+        this.opts.onRoundComplete({
+          time: Math.floor(elapsedS),
+          kills: this.kills,
+          level: this.level,
+          cash: this.cashThisRun,
+        });
+      }, 900);
+      return;
+    }
+
+    // Non-boss round timer ran out (only fires when room layout is OFF)
+    if (!this.opts.isBossRaid && this.zones.length === 0 && elapsedS >= ROUND_DURATION_S) {
       this.finished = true;
       this.spawnHit(this.player.x, this.player.y - 30, 'ROUND CLEAR', 'heal');
       setTimeout(() => {
@@ -811,6 +865,11 @@ export class DungeonGame {
 
   // ---------- Spawn ----------
   private maybeSpawn(now: number, elapsedS: number): void {
+    // Story-mode room layout (#145) overrides time-based spawning entirely.
+    if (this.zones.length > 0) {
+      this.tickZones(now, elapsedS);
+      return;
+    }
     if (now - this.lastSpawnMs < this.spawnIntervalMs) return;
     this.spawnEnemy(elapsedS);
     this.lastSpawnMs = now;
@@ -822,29 +881,99 @@ export class DungeonGame {
     );
   }
 
-  private spawnEnemy(elapsedS: number): void {
+  /**
+   * Story-mode tick (#145). Detects player entering a zone, triggers that
+   * zone's wave, and stages spawn over a brief interval so the player isn't
+   * dumped into 14 enemies at once.
+   */
+  private tickZones(now: number, elapsedS: number): void {
+    const px = this.player.x;
+    const py = this.player.y;
+    // Activate the first zone the player is currently inside (if any).
+    for (let i = 0; i < this.zones.length; i++) {
+      const z = this.zones[i];
+      if (z.cleared || z.triggered) continue;
+      if (isPlayerInZone(px, py, z)) {
+        z.triggered = true;
+        z.aliveCount = 0;
+        this.activeZoneIdx = i;
+        break;
+      }
+    }
+    // For the active zone, drip-spawn its wave at a fixed cadence.
+    if (this.activeZoneIdx >= 0) {
+      const z = this.zones[this.activeZoneIdx];
+      if (!z.cleared) {
+        const totalSpawned = this.enemies.filter((e) => e.spawnZoneIdx === this.activeZoneIdx).length;
+        const remaining = z.spawnCount - totalSpawned;
+        if (remaining > 0 && now - this.lastSpawnMs > 350) {
+          this.spawnEnemy(elapsedS, this.activeZoneIdx);
+          this.lastSpawnMs = now;
+          z.aliveCount++;
+        }
+        // Clear check — wave fully spawned AND none alive in this zone.
+        if (totalSpawned >= z.spawnCount && this.enemies.every((e) => e.spawnZoneIdx !== this.activeZoneIdx)) {
+          z.cleared = true;
+          AudioManager.play('boss_defeat', { volume: 0.6 });
+          this.applyScreenFlash(0.3);
+          // Was that the final zone? Trigger raid complete.
+          if (this.zones.every((zz) => zz.cleared) && !this.allZonesCleared) {
+            this.allZonesCleared = true;
+          }
+          this.activeZoneIdx = -1;
+        }
+      }
+    }
+  }
+
+  private spawnEnemy(elapsedS: number, zoneIdx?: number): void {
     const w = this.app.screen.width;
     const h = this.app.screen.height;
-    const dist = Math.max(w, h) * 0.6 + Math.random() * 60;
-    const angle = Math.random() * Math.PI * 2;
-    const px = this.player.x + Math.cos(angle) * dist;
-    const py = this.player.y + Math.sin(angle) * dist;
-
-    let availTier = 1;
-    if (elapsedS > 12) availTier = 2;
-    if (elapsedS > 30) availTier = 3;
-    if (elapsedS > 45) availTier = 4;
-    // Elites (#116) only show up briefly, and only after the regular roster
-    // has cycled. They're rare even when available.
-    const eliteChance = elapsedS > 40 ? 0.06 : 0;
-
-    let proto: EnemyTypeDef;
-    if (Math.random() < eliteChance) {
-      const elites = ENEMY_TYPES.filter((e) => e.tier === 5);
-      proto = elites[Math.floor(Math.random() * elites.length)];
+    let px: number;
+    let py: number;
+    if (zoneIdx !== undefined && this.zones[zoneIdx]) {
+      // Story-mode (#145): spawn at the zone's perimeter so enemies emerge
+      // from the room's edges, not from off-screen.
+      const z = this.zones[zoneIdx];
+      const edge = Math.floor(Math.random() * 4);
+      const u = (Math.random() - 0.5) * 2;
+      if (edge === 0)      { px = z.cx + z.hw;      py = z.cy + u * z.hh; }
+      else if (edge === 1) { px = z.cx - z.hw;      py = z.cy + u * z.hh; }
+      else if (edge === 2) { px = z.cx + u * z.hw;  py = z.cy + z.hh; }
+      else                 { px = z.cx + u * z.hw;  py = z.cy - z.hh; }
     } else {
-      const choices = ENEMY_TYPES.filter((e) => e.tier <= availTier && e.tier !== 5);
-      proto = choices[Math.floor(Math.random() * choices.length)];
+      const dist = Math.max(w, h) * 0.6 + Math.random() * 60;
+      const angle = Math.random() * Math.PI * 2;
+      px = this.player.x + Math.cos(angle) * dist;
+      py = this.player.y + Math.sin(angle) * dist;
+    }
+
+    let availTier: number;
+    let proto: EnemyTypeDef;
+    if (zoneIdx !== undefined && this.zones[zoneIdx]) {
+      // Story-mode tier picked by zone, not elapsed time.
+      availTier = this.zones[zoneIdx].maxTier;
+      const eliteChance = availTier >= 4 ? 0.10 : 0;
+      if (Math.random() < eliteChance) {
+        const elites = ENEMY_TYPES.filter((e) => e.tier === 5);
+        proto = elites[Math.floor(Math.random() * elites.length)];
+      } else {
+        const choices = ENEMY_TYPES.filter((e) => e.tier <= availTier && e.tier !== 5);
+        proto = choices[Math.floor(Math.random() * choices.length)];
+      }
+    } else {
+      availTier = 1;
+      if (elapsedS > 12) availTier = 2;
+      if (elapsedS > 30) availTier = 3;
+      if (elapsedS > 45) availTier = 4;
+      const eliteChance = elapsedS > 40 ? 0.06 : 0;
+      if (Math.random() < eliteChance) {
+        const elites = ENEMY_TYPES.filter((e) => e.tier === 5);
+        proto = elites[Math.floor(Math.random() * elites.length)];
+      } else {
+        const choices = ENEMY_TYPES.filter((e) => e.tier <= availTier && e.tier !== 5);
+        proto = choices[Math.floor(Math.random() * choices.length)];
+      }
     }
 
     const url = ENEMY_SPRITE_BY_TYPE[proto.sprite];
@@ -876,6 +1005,7 @@ export class DungeonGame {
       isBoss: false,
       lastShotMs: 0,
       slowUntilMs: 0,
+      spawnZoneIdx: zoneIdx,
     });
   }
 
@@ -1569,6 +1699,42 @@ export class DungeonGame {
         patch.position.set(x, y);
         this.bgLayer.addChild(patch);
       }
+    }
+  }
+
+  /**
+   * Story-mode (#145): paint a tinted floor patch + decoration outline for
+   * each zone so the player can see the room boundaries. Drawn into bgLayer
+   * AFTER the base floor so it shows on top.
+   */
+  private drawZoneOverlays(): void {
+    for (let i = 0; i < this.zones.length; i++) {
+      const z = this.zones[i];
+      const patch = new Graphics();
+      patch.rect(z.cx - z.hw, z.cy - z.hh, z.hw * 2, z.hh * 2);
+      patch.fill({ color: z.tint, alpha: 0.18 });
+      patch.rect(z.cx - z.hw, z.cy - z.hh, z.hw * 2, z.hh * 2);
+      patch.stroke({ color: 0xc9a227, width: 4, alpha: 0.45 });
+      this.bgLayer.addChild(patch);
+
+      // Corner markers — small gold L-brackets at each corner so the room
+      // reads as a discrete space.
+      const corners = new Graphics();
+      const armLen = 36;
+      const corners3 = [
+        [z.cx - z.hw, z.cy - z.hh, 1, 1],
+        [z.cx + z.hw, z.cy - z.hh, -1, 1],
+        [z.cx - z.hw, z.cy + z.hh, 1, -1],
+        [z.cx + z.hw, z.cy + z.hh, -1, -1],
+      ];
+      for (const [x, y, dx, dy] of corners3) {
+        corners.moveTo(x, y);
+        corners.lineTo(x + dx * armLen, y);
+        corners.moveTo(x, y);
+        corners.lineTo(x, y + dy * armLen);
+      }
+      corners.stroke({ color: 0xc9a227, width: 5, alpha: 0.85 });
+      this.bgLayer.addChild(corners);
     }
   }
 

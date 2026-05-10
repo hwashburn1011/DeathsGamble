@@ -27,6 +27,9 @@ interface HudStats {
   timeRemaining: number;
   bossHp: number | null;
   bossHpMax: number | null;
+  roomIdx: number;
+  roomCount: number;
+  roomLabel: string;
 }
 
 export function DungeonScene() {
@@ -83,6 +86,9 @@ export function DungeonScene() {
     timeRemaining: 60,
     bossHp: null,
     bossHpMax: null,
+    roomIdx: -1,
+    roomCount: 0,
+    roomLabel: '',
   });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -152,6 +158,11 @@ export function DungeonScene() {
           isBossRaid,
           motionIntensity,
           cashMult,
+          // Story-mode room layout (#145) — only for story (not infinite/daily)
+          // and only for non-boss raids. Boss raid stays single-arena.
+          useRoomLayout: run.mode === 'story' && !isBossRaid,
+          raidNumber: run.raid,
+          totalStoryRaids: run.totalRaids,
           theme: themeFor({
             mode: run.mode,
             raid: run.raid,
@@ -275,6 +286,14 @@ export function DungeonScene() {
               : `${(run.endlessRound ?? 0) + 1}`}
           </span>
         </span>
+        {hud.roomCount > 0 && (
+          <span className="info-pair">
+            <span className="info-l">ROOM</span>
+            <span className="info-v">
+              {Math.min(hud.roomIdx + 1, hud.roomCount)} / {hud.roomCount} · {hud.roomLabel}
+            </span>
+          </span>
+        )}
         <span className="info-pair"><span className="info-l">$</span><span className="info-v">{hud.cashThisRun}</span></span>
       </div>
 
