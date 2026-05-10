@@ -596,13 +596,15 @@ export class WheelsGame {
     // Container holds all 12 rows; we translate it up/down for the spin.
     const container = new Container();
     container.position.set(cx, cy);
-    // Repeat the segments twice so the reel can scroll continuously without
-    // visible gaps when wrapping during a long spin.
+    // Repeat the segments so the reel always shows content within the
+    // visible window, even with the wrapped-angle scroll trick. Row centers
+    // sit at INTEGER multiples of rowH (no `+ rowH/2`) so the snap formula
+    // `angle = -resultIdx * rowH` lands a row exactly on the win line.
     const REPEAT = 4;
     for (let cycle = 0; cycle < REPEAT; cycle++) {
       for (let i = 0; i < SEG_COUNT; i++) {
         const seg = segments[i];
-        const y = (i + cycle * SEG_COUNT - (REPEAT * SEG_COUNT) / 2) * rowH + rowH / 2;
+        const y = (i + cycle * SEG_COUNT - (REPEAT * SEG_COUNT) / 2) * rowH;
         // Row background
         const bg = new Graphics();
         bg.roundRect(-reelW / 2, y - rowH / 2 + 2, reelW, rowH - 4, 4);
@@ -888,9 +890,14 @@ export class WheelsGame {
 
       let segIdx: number;
       if (this.mode === 'slot') {
-        // w.angle is the y-offset of the reel strip in px.
-        w.container.position.y = w.cy + w.angle;
+        // w.angle is the y-offset of the reel strip in px. After several
+        // long spins the raw value would scroll past the bottom of the
+        // 48-row strip and show black — wrap it to one strip-height for
+        // rendering so the visible window always sees content.
         const rowH = w.radius * 0.32;
+        const stripH = SEG_COUNT * rowH;
+        const wrapped = ((w.angle % stripH) + stripH) % stripH - stripH;
+        w.container.position.y = w.cy + wrapped;
         // The row currently centered on the win line is at index = -w.angle / rowH
         const rowFloat = -w.angle / rowH;
         segIdx = ((Math.round(rowFloat) % SEG_COUNT) + SEG_COUNT) % SEG_COUNT;
@@ -915,10 +922,13 @@ export class WheelsGame {
         w.spun = true;
         if (this.mode === 'slot') {
           // Snap the y-offset to a clean row position so the result row
-          // sits perfectly on the win line.
+          // sits perfectly on the win line. Use the wrapped value so the
+          // rendered position stays inside the strip's extent.
           const rowH = w.radius * 0.32;
           w.angle = -w.resultIdx * rowH;
-          w.container.position.y = w.cy + w.angle;
+          const stripH = SEG_COUNT * rowH;
+          const wrapped = ((w.angle % stripH) + stripH) % stripH - stripH;
+          w.container.position.y = w.cy + wrapped;
         } else {
           w.angle = ((w.angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
           w.container.rotation = w.angle;
