@@ -9,6 +9,15 @@ test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('dg_intro_seen', '1');
     localStorage.setItem('dg_dungeon_help_seen', '1');
+    // Pre-unlock every build so the balance tests' build indices stay
+    // stable. Without this the BuildPicker sorts unlocked builds first,
+    // shifting Soldier (idx 7) off its expected slot — and locked builds
+    // refuse the click outright.
+    localStorage.setItem('deathsgamble_souls_v1', JSON.stringify({
+      souls: 999,
+      unlocked: ['unlock_soldier', 'unlock_duelist', 'unlock_huntsman', 'unlock_arcanist', 'unlock_rogue'],
+      hasPlayed: true,
+    }));
   });
 });
 
