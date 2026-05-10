@@ -6,7 +6,19 @@ import { useSettingsStore } from '../state/settingsStore';
 import { useStatsStore } from '../state/statsStore';
 import { DungeonGame } from '../engine/dungeon/DungeonGame';
 import { themeFor } from '../engine/pixi/manifest';
+import { rollBargainChoices, type BargainDef } from '../data/bargains';
+import { GlassButton } from '../ui/GlassButton';
 import './dungeon.css';
+
+// Death dialogue lines (#163) — one per story raid, spoken in Death's voice.
+// Boss raid handled separately by the existing intro card.
+const DEATH_RAID_LINES: Record<number, string> = {
+  1: '"You came. Of course you did."',
+  2: '"Closer now. The dead grow restless."',
+  3: '"You will not leave the same."',
+  4: '"Show me what you have learned."',
+  5: '"One more door. Then me."',
+};
 
 const THEME_FLAVOR: Record<string, { name: string; line: string }> = {
   crypt:     { name: 'The Crypt',     line: 'Bones whisper here.' },
@@ -31,6 +43,7 @@ interface HudStats {
   roomCount: number;
   roomLabel: string;
   miniBossIntroActive: boolean;
+  bargainOffered: boolean;
 }
 
 export function DungeonScene() {
@@ -92,12 +105,18 @@ export function DungeonScene() {
     roomCount: 0,
     roomLabel: '',
     miniBossIntroActive: false,
+    bargainOffered: false,
   });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadProgress, setLoadProgress] = useState({ loaded: 0, total: 1 });
   const [showFirstHelp, setShowFirstHelp] = useState(false);
   const [showIntro, setShowIntro] = useState(false);
+  // Bargain modal state (#164/#167) — opens when the engine signals a
+  // bargain is owed after a non-final, non-mini-boss room clears.
+  const [bargainChoices, setBargainChoices] = useState<BargainDef[] | null>(null);
+  const setPaused = useGameStore((s) => s.setPaused);
+  const applyBargain = useGameStore((s) => s.applyBargain);
 
   // First-time dungeon visit: show prominent control overlay for ~5s.
   useEffect(() => {
@@ -120,6 +139,32 @@ export function DungeonScene() {
     const t = setTimeout(() => setShowIntro(false), dur);
     return () => clearTimeout(t);
   }, [loading, run.raid, run.endlessRound, isBossRaid]);
+
+  // Bargain modal trigger (#167) — when the engine raises bargainOffered,
+  // roll 3 random options the player hasn't taken this raid, pause the
+  // game, and consume the offer flag so the engine doesn't re-fire.
+  useEffect(() => {
+    if (!hud.bargainOffered || bargainChoices) return;
+    const taken = useGameStore.getState().run.bargainsTaken;
+    const choices = rollBargainChoices(taken);
+    if (choices.length === 0) {
+      gameRef.current?.consumeBargainOffer();
+      return;
+    }
+    setBargainChoices(choices);
+    setPaused(true);
+    gameRef.current?.consumeBargainOffer();
+  }, [hud.bargainOffered, bargainChoices, setPaused]);
+
+  function chooseBargain(b: BargainDef) {
+    applyBargain(b.id);
+    setBargainChoices(null);
+    setPaused(false);
+  }
+  function skipBargain() {
+    setBargainChoices(null);
+    setPaused(false);
+  }
 
   useEffect(() => {
     const container = containerRef.current;
@@ -418,10 +463,14 @@ export function DungeonScene() {
             ? `Raid ${run.raid} of ${run.totalRaids - 1}`
             : `Round ${(run.endlessRound ?? 0) + 1}`;
         const sub = isBossRaid ? 'You knew this was coming.' : `${flavor.name} · ${flavor.line}`;
+        // Death dialogue (#163) — adds a per-raid spoken line under the
+        // existing flavor. Boss raid keeps its own subtitle.
+        const deathLine = !isBossRaid ? DEATH_RAID_LINES[run.raid] : null;
         return (
           <div className={`dungeon-intro ${isBossRaid ? 'dungeon-intro--boss' : ''}`}>
             <div className="dungeon-intro-heading display">{heading}</div>
             <div className="dungeon-intro-sub">{sub}</div>
+            {deathLine && <div className="dungeon-intro-death">{deathLine}</div>}
           </div>
         );
       })()}
@@ -436,9 +485,38 @@ export function DungeonScene() {
         </div>
       )}
 
-      {paused && (
+      {paused && !bargainChoices && (
         <div className="dungeon-paused">
           <div className="dungeon-paused-text display">Paused</div>
+        </div>
+      )}
+
+      {bargainChoices && (
+        <div className="bargain-modal">
+          <div className="bargain-card">
+            {/* Death NPC sprite (#166) — uses the boss lich sprite as Death's
+                in-game representation. The wheels scene draws a procedural
+                Death; here a sprite is enough since the modal is brief. */}
+            <div className="bargain-death">
+              <img src={`${import.meta.env.BASE_URL}assets/tiles/dungeon-crawl/dc-mon/undead/lich.png`} alt="Death offers a bargain" />
+            </div>
+            <div className="bargain-body">
+              <div className="bargain-title display">A Bargain</div>
+              <div className="bargain-flavor">"Choose. I'm patient — but the dead grow restless."</div>
+              <div className="bargain-options">
+                {bargainChoices.map((b) => (
+                  <button key={b.id} className="bargain-option" onClick={() => chooseBargain(b)}>
+                    <div className="bargain-option-name">{b.name}</div>
+                    <div className="bargain-option-desc">{b.desc}</div>
+                    <div className="bargain-option-flavor">{b.flavor}</div>
+                  </button>
+                ))}
+              </div>
+              <div className="bargain-actions">
+                <GlassButton onClick={skipBargain} variant="ghost">Walk away</GlassButton>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

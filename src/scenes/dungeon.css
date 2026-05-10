@@ -429,6 +429,116 @@
     0 0 60px rgba(224, 72, 72, 0.4),
     0 2px 8px rgba(0, 0, 0, 0.85);
 }
+/* Death dialogue line (#163) — italicized quote under the raid intro flavor. */
+.dungeon-intro-death {
+  margin-top: 12px;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: clamp(14px, 1.6vw, 20px);
+  color: var(--gold-soft, #d8b664);
+  letter-spacing: 0.04em;
+  opacity: 0.92;
+}
+
+/* Bargain modal (#164/#166) — opens when a non-final room clears. */
+.bargain-modal {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(7, 6, 10, 0.78);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 100;
+  animation: bargainFade 220ms ease-out forwards;
+}
+.bargain-card {
+  display: flex;
+  gap: 28px;
+  align-items: stretch;
+  max-width: 920px;
+  padding: 28px 32px;
+  background: linear-gradient(180deg, rgba(20, 12, 26, 0.95), rgba(8, 4, 14, 0.95));
+  border: 1px solid rgba(201, 162, 39, 0.45);
+  border-radius: 14px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), inset 0 0 30px rgba(201, 162, 39, 0.08);
+}
+.bargain-death {
+  flex: 0 0 132px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bargain-death img {
+  width: 132px;
+  height: auto;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 0 12px rgba(192, 96, 255, 0.55));
+}
+.bargain-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.bargain-title {
+  font-size: clamp(28px, 3.5vw, 40px);
+  color: #ffd070;
+  letter-spacing: 0.08em;
+}
+.bargain-flavor {
+  font-family: var(--font-body);
+  font-style: italic;
+  color: #d8b664;
+  opacity: 0.85;
+}
+.bargain-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+.bargain-option {
+  background: rgba(35, 22, 50, 0.85);
+  border: 1px solid rgba(201, 162, 39, 0.3);
+  border-radius: 8px;
+  padding: 14px;
+  text-align: left;
+  color: #f0e6c0;
+  cursor: pointer;
+  transition: border-color 120ms ease, transform 120ms ease, background 120ms ease;
+  font-family: var(--font-body);
+}
+.bargain-option:hover {
+  border-color: rgba(201, 162, 39, 0.85);
+  background: rgba(50, 32, 70, 0.95);
+  transform: translateY(-2px);
+}
+.bargain-option-name {
+  font-family: var(--font-display, Cinzel, Georgia, serif);
+  font-size: 18px;
+  color: #ffd070;
+  margin-bottom: 4px;
+}
+.bargain-option-desc {
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+.bargain-option-flavor {
+  font-size: 12px;
+  font-style: italic;
+  opacity: 0.7;
+  color: #b0a880;
+}
+.bargain-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+@keyframes bargainFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 /* Mini-boss intro (#186) — smaller cinematic than the final boss card. */
 .dungeon-intro--miniboss {
   background: rgba(20, 6, 8, 0.40);

@@ -223,6 +223,9 @@ export interface RunState {
     favoriteKill: string;
     timeAlive: number;
   } | null;
+  /** Bargains taken this raid (#167) — IDs from BARGAINS. Reset per raid so
+   *  the player gets a fresh pool of options each time. */
+  bargainsTaken: string[];
 }
 
 // ----- Persistent (localStorage) -----

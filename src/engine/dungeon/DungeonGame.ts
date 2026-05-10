@@ -195,6 +195,10 @@ export interface DungeonGameOptions {
     /** Mini-boss intro card pulse (#186) — true for ~3s after entering the
      *  mini-boss zone, then false. The HUD reads this to show the cinematic. */
     miniBossIntroActive: boolean;
+    /** Bargain offer pulse (#167) — true when a non-final, non-mini-boss
+     *  zone has just cleared. React consumes it via consumeBargainOffer()
+     *  when the modal opens. */
+    bargainOffered: boolean;
   }) => void;
   onGameOver: (stats: DungeonRunSummary) => void;
   onRoundComplete: (stats: DungeonRunSummary) => void; // round timer ran out (non-boss)
@@ -315,6 +319,8 @@ export class DungeonGame {
   private allZonesCleared = false;
   /** Timestamp when the player entered the mini-boss zone (#186). 0 = never. */
   private miniBossIntroAt = 0;
+  /** True after a non-final/non-mini-boss zone clears, until React consumes it (#167). */
+  private bargainPending = false;
   // Post-death summary tracking (#180/#181)
   private lastDamageSource = '—';
   private biggestHit = 0;
@@ -609,6 +615,7 @@ export class DungeonGame {
       roomCount: this.zones.length,
       roomLabel,
       miniBossIntroActive: this.miniBossIntroAt > 0 && performance.now() - this.miniBossIntroAt < 3000,
+      bargainOffered: this.bargainPending,
     });
 
     // Player death takes priority
@@ -1057,6 +1064,13 @@ export class DungeonGame {
           z.cleared = true;
           AudioManager.play('boss_defeat', { volume: 0.6 });
           this.applyScreenFlash(0.3);
+          // Bargain offer (#167) — fires only on non-final, non-mini-boss
+          // rooms. The final room ends the raid, the mini-boss has its own
+          // payoff (cash drop), so neither offers a bargain.
+          const isLast = this.activeZoneIdx === this.zones.length - 1;
+          if (!isLast && !z.isMiniBoss) {
+            this.bargainPending = true;
+          }
           // Was that the final zone? Trigger raid complete.
           if (this.zones.every((zz) => zz.cleared) && !this.allZonesCleared) {
             this.allZonesCleared = true;
@@ -1458,6 +1472,11 @@ export class DungeonGame {
     const cd = this.opts.build.active.cooldownSec * 1000;
     const elapsed = performance.now() - this.activeSpellLastCastMs;
     return Math.min(1, elapsed / cd);
+  }
+
+  /** Called by React after the bargain modal opens — clears the pending flag (#167). */
+  public consumeBargainOffer(): void {
+    this.bargainPending = false;
   }
 
   // -------- Build-defined active spells (#154/#155) ----------

@@ -16,6 +16,7 @@ import { baseStats } from '../engine/stats';
 import { spinMagnitude } from '../engine/luck';
 import { beginDailyMode, endDailyMode } from '../engine/dailySeed';
 import { formatGiftLabel, formatTollLabel } from '../data/wheels';
+import { BARGAINS_BY_ID } from '../data/bargains';
 
 interface GameActions {
   showScene(name: SceneName): void;
@@ -34,6 +35,9 @@ interface GameActions {
   // Stats / wheel flow
   initStatsForRaid(): void;
   applyWheelSegment(side: 'buff' | 'curse', segment: WheelSegment): number;
+  /** Apply a bargain (#167) — mutates current PlayerStats + records the
+   *  bargain id so it won't be offered again this raid. */
+  applyBargain(bargainId: string): void;
   buyPotion(cost: number): boolean;
   /** Record post-death summary fields from a DungeonRunSummary (#180-#182). */
   setLastRunSummary(s: { lastDamageSource: string; biggestHit: number; favoriteKill: string; timeAlive: number }): void;
@@ -73,6 +77,7 @@ const blankRun = (): RunState => ({
   activeCurse: null,
   pendingPotions: 0,
   lastRunSummary: null,
+  bargainsTaken: [],
 });
 
 export const useGameStore = create<GameStoreState & GameActions>((set, get) => ({
@@ -171,7 +176,7 @@ export const useGameStore = create<GameStoreState & GameActions>((set, get) => (
       stats.hpMax += 60 * pendingPotions;
       stats.hp = stats.hpMax;
     }
-    set({ stats, run: { ...get().run, pendingPotions: 0 } });
+    set({ stats, run: { ...get().run, pendingPotions: 0, bargainsTaken: [] } });
   },
 
   buyPotion(cost) {
@@ -203,6 +208,19 @@ export const useGameStore = create<GameStoreState & GameActions>((set, get) => (
     set({ stats: next, run: runPatch });
     if (segment.label === 'JACKPOT') useStatsStore.getState().recordJackpot();
     return m;
+  },
+
+  applyBargain(bargainId) {
+    const { stats, run } = get();
+    if (!stats) return;
+    const bargain = BARGAINS_BY_ID[bargainId];
+    if (!bargain) return;
+    const next = { ...stats };
+    bargain.apply(next);
+    set({
+      stats: next,
+      run: { ...run, bargainsTaken: [...run.bargainsTaken, bargainId] },
+    });
   },
 
   isBossRaid() {
