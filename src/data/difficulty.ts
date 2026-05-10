@@ -24,8 +24,12 @@ export const DIFFICULTY: Record<Difficulty, DifficultyDef> = {
     curseMult: 1.4,
     enemyHpMult: 1.4,
     enemySpdMult: 1.15,
-    enemySpawnMult: 1.4,
-    enemyDmgMult: 1.3,
+    // Iter4 telemetry: Gambler/Soldier died at 16s standing still on Hard
+    // (only Brute survived). enemySpawnMult 1.4 + enemyDmgMult 1.3 stacked
+    // multiplicatively with enemyHpMult 1.4 made single-target ranged builds
+    // unable to keep pace. Eased to 1.25 spawn / 1.2 dmg.
+    enemySpawnMult: 1.25,
+    enemyDmgMult: 1.2,
     cashMult: 0.7,
   },
 };

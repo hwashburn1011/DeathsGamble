@@ -4,10 +4,13 @@
 
 import {
   Application,
+  Assets,
   Container,
   Graphics,
+  Sprite,
   Text,
   TextStyle,
+  Texture,
 } from 'pixi.js';
 import type { WheelSegment, WheelMode } from '../../types';
 import { SEG_ANGLE, SEG_COUNT } from '../../data/wheels';
@@ -90,7 +93,16 @@ export class WheelsGame {
     app.stage.addChild(this.deathFront);
   }
 
-  start(): void {
+  async start(): Promise<void> {
+    // Preload the scythe sprite (#42) so it's available when drawDeathBack
+    // creates the Sprite in layout(). Without this, Pixi returns an empty
+    // texture and the sprite renders invisibly.
+    const SCYTHE_URL = `${import.meta.env.BASE_URL}assets/tiles/dungeon-crawl/item/weapon/scythe2.png`;
+    try {
+      await Assets.load(SCYTHE_URL);
+    } catch {
+      /* missing asset — Death scythe will be invisible, not fatal */
+    }
     this.layout();
     this.tickerCb = () => this.tick(this.app.ticker.deltaMS);
     this.app.ticker.add(this.tickerCb);
@@ -233,50 +245,8 @@ export class WheelsGame {
     }
     this.deathBack.addChild(halo);
 
-    // ---- 1. Scythe shaft + blade BEHIND the cloak (peeking past the right shoulder) ----
-    // Long diagonal pole with a curved blade up top — silhouette only.
-    const scythe = new Graphics();
-    const sx = deathCx + robeShoulderHalf * 0.35;
-    const sy0 = shoulderY - wheelR * 1.2;
-    const sx1 = deathCx + robeShoulderHalf * 1.35;
-    const sy1 = robeBottom * 0.65;
-    // Pole shadow + body
-    scythe.moveTo(sx + 2, sy0 + 2);
-    scythe.lineTo(sx1 + 2, sy1 + 2);
-    scythe.stroke({ color: 0x000000, alpha: 0.55, width: 6, cap: 'round' });
-    scythe.moveTo(sx, sy0);
-    scythe.lineTo(sx1, sy1);
-    scythe.stroke({ color: 0x4a3a28, width: 4.5, cap: 'round' });
-    // Pole highlight
-    scythe.moveTo(sx, sy0);
-    scythe.lineTo(sx1, sy1);
-    scythe.stroke({ color: 0xa08560, alpha: 0.6, width: 1.2, cap: 'round' });
-    // Blade — curved silver crescent at top
-    const bx = sx;
-    const by = sy0;
-    scythe.moveTo(bx, by);
-    scythe.bezierCurveTo(
-      bx - wheelR * 1.15, by - wheelR * 0.15,
-      bx - wheelR * 1.45, by + wheelR * 0.55,
-      bx - wheelR * 0.55, by + wheelR * 0.55
-    );
-    scythe.bezierCurveTo(
-      bx - wheelR * 1.05, by + wheelR * 0.35,
-      bx - wheelR * 0.85, by + wheelR * 0.05,
-      bx, by
-    );
-    scythe.closePath();
-    scythe.fill({ color: 0xc8ccd0 });
-    scythe.stroke({ color: 0x404448, width: 1.5 });
-    // Blade rim highlight
-    scythe.moveTo(bx, by);
-    scythe.bezierCurveTo(
-      bx - wheelR * 1.1, by - wheelR * 0.10,
-      bx - wheelR * 1.35, by + wheelR * 0.45,
-      bx - wheelR * 0.7, by + wheelR * 0.50
-    );
-    scythe.stroke({ color: 0xffffff, alpha: 0.65, width: 1.4 });
-    this.deathBack.addChild(scythe);
+    // (Scythe sprite added AFTER the cloak below so it visibly overlaps the
+    // shoulder. See "Scythe overlay" block farther down.)
 
     // ---- 2. Cloak — three depth layers for a painted look ----
     // Outer (darkest) silhouette — slightly larger than the main shape.
@@ -556,6 +526,23 @@ export class WheelsGame {
     this.eyeBlink = new Graphics();
     this.deathBack.addChild(this.eyeBlink);
     this.drawEyes(deathCx, eyeSocketY, eyeSocketDx, eyeSocketR * 0.7, 1);
+
+    // ---- 11. Scythe overlay (#42) — real CC0 scythe2.png peeking past
+    // the right shoulder. Drawn LAST so it visibly overlaps the cloak.
+    // Source sprite is 32×32; use scale (not width/height) so it works
+    // regardless of texture-load timing.
+    const SCYTHE_URL = `${import.meta.env.BASE_URL}assets/tiles/dungeon-crawl/item/weapon/scythe2.png`;
+    const scytheSprite = new Sprite(Texture.from(SCYTHE_URL));
+    scytheSprite.anchor.set(0.1, 0.9); // handle-bottom-left
+    // Scale 32px source up to roughly head-height (wheelR * 3 / 32 = 0.094 * wheelR).
+    // For wheelR ≈ 100, scale ≈ 9.4 → ~300px sprite. Visible.
+    scytheSprite.scale.set(wheelR * 0.10);
+    // Position at upper-right of head/shoulder.
+    scytheSprite.position.set(deathCx + wheelR * 1.5, headCenterY + wheelR * 0.5);
+    // Tilt so blade points up-right
+    scytheSprite.rotation = -Math.PI * 0.30;
+    scytheSprite.tint = 0xeae6da;
+    this.deathBack.addChild(scytheSprite);
   }
 
   private drawEyes(cx: number, cy: number, dx: number, r: number, alpha: number): void {

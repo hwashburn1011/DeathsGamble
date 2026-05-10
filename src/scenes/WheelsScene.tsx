@@ -100,7 +100,11 @@ export function WheelsScene() {
           }
         },
       });
-      game.start();
+      await game.start();
+      if (cancelled) {
+        game.destroy();
+        return;
+      }
       wheelsRef.current = game;
     })();
 

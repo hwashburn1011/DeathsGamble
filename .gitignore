@@ -15,6 +15,7 @@ test-screenshots/
 
 # Loop-review tracker (session-local)
 .loop-review.md
+.balance-loop.md
 
 # Editor / OS
 .DS_Store

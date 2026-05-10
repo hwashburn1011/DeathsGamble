@@ -21,12 +21,13 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('Wheels — wheel mode (default) — new Death + curse wheel', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto('/?debug=1');
   await page.waitForFunction(() => Boolean((window as any).__DG?.gameStore));
   await page.getByRole('button', { name: 'Start Game' }).click();
   await page.locator('.mode-card').nth(0).click();
   await page.locator('.build-card').first().click();
-  await page.waitForTimeout(900);
+  await page.waitForTimeout(1500);
   await page.screenshot({ path: path.join(SHOT, 'nc-01-wheels-mode.png') });
 });
 

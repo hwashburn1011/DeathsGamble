@@ -42,6 +42,34 @@ export const ENEMY_SPRITE_BY_TYPE: Record<EnemySprite, string> = {
   boneKnight:  `${BASE}assets/tiles/dungeon-crawl/dc-mon/undead/vampire_knight.png`,
 };
 
+// ----- Per-weapon HUD/picker icon sprites (#45) -----
+// Real CC0 weapon sprites for the BuildPicker swap grid + loadout panel.
+// Modern firearms (pistol/rifle/etc.) have no fantasy sprite — render as
+// `null` and the UI falls back to the weapon's emoji icon.
+export const WEAPON_ICON_SPRITE: Record<string, string | null> = {
+  fists:    null,    // emoji ✊
+  club:     `${BASE}assets/tiles/dungeon-crawl/item/weapon/club.png`,
+  sword:    `${BASE}assets/tiles/dungeon-crawl/item/weapon/long_sword1.png`,
+  axe:      `${BASE}assets/tiles/dungeon-crawl/item/weapon/hand_axe1.png`,
+  spear:    `${BASE}assets/tiles/dungeon-crawl/item/weapon/spear2.png`,
+  scythe:   `${BASE}assets/tiles/dungeon-crawl/item/weapon/scythe1.png`,
+  knives:   `${BASE}assets/tiles/dungeon-crawl/item/weapon/knife.png`,
+  bow:      `${BASE}assets/tiles/dungeon-crawl/item/weapon/ranged/bow1.png`,
+  crossbow: `${BASE}assets/tiles/dungeon-crawl/item/weapon/ranged/crossbow1.png`,
+  staff:    `${BASE}assets/tiles/dungeon-crawl/item/staff/i-staff_conjuration.png`,
+  wand:     `${BASE}assets/tiles/dungeon-crawl/item/wand/gem_brass.png`,
+  orb:      `${BASE}assets/tiles/dungeon-crawl/item/wand/gem_glass.png`,
+  // Modern firearms — no fantasy equivalent, fall back to emoji.
+  pistol:   null,
+  shotgun:  null,
+  smg:      null,
+  sniper:   null,
+  rifle:    null,
+  flamer:   null,
+  minigun:  null,
+  rocket:   null,
+};
+
 // ----- Per-weapon projectile sprites -----
 // Map weapon.id → projectile sprite path. `null` = use the Graphics
 // fallback in DungeonGame.fireProjectile (small bullet for guns, slash

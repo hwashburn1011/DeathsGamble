@@ -28,7 +28,8 @@ export function baseStats(
   difficulty: Difficulty,
   upgrades: PersistentUpgrades = ZERO_UPGRADES
 ): PlayerStats {
-  const baseHp = build.baseHp + upgrades.hp * 20;
+  // Vigor: +25 HP per level (iter6 bumped from 20 to compete with Strength's value)
+  const baseHp = build.baseHp + upgrades.hp * 25;
   const s: PlayerStats = {
     hp: baseHp,
     hpMax: baseHp,

@@ -612,10 +612,90 @@ export class DungeonGame {
   private maybeShoot(now: number): void {
     const interval = 1000 / (this.stats.atkspd * this.stats.atkspdMult);
     if (now - this.lastShotMs < interval) return;
-    const target = this.findNearestEnemy(this.stats.range + this.stats.rangeBonus);
+    const range = this.stats.range + this.stats.rangeBonus;
+    const w = this.opts.weapon;
+
+    if (w.type === 'melee') {
+      // Melee swing — damage every enemy within `range` in a full circle
+      // around the player. Compensates for the contact tax and gives slow
+      // melee builds (Brute) actual crowd-clear capability. Telemetry
+      // showed Brute at 0.24 kills/sec vs ranged 0.84/sec because melee
+      // could only single-target enemies that arrived in 75-px range.
+      const hit = this.swingMelee(range);
+      if (hit) this.lastShotMs = now;
+      return;
+    }
+
+    const target = this.findNearestEnemy(range);
     if (!target) return;
     this.fireProjectile(target);
     this.lastShotMs = now;
+  }
+
+  /**
+   * Damage enemies in a forward 180° arc within `range` of the player.
+   * Iter4: was full 360° — too generous on Hard difficulty (1.4× spawns)
+   * where it trivialized crowd density. Now requires player to face threats.
+   * Behind-the-shoulder tolerance of 0.15× range so it doesn't feel mechanical.
+   */
+  private swingMelee(range: number): boolean {
+    const px = this.player.x;
+    const py = this.player.y;
+    const w = this.opts.weapon;
+    const baseColor = parseInt(w.color.replace('#', ''), 16);
+    const r2 = range * range;
+    const isCrit = Math.random() < this.stats.crit;
+    const dmg = (w.dmg + this.stats.dmg) * this.stats.dmgMult * (isCrit ? 2 : 1);
+    // Forward arc threshold — facing=1 (right): hit dx >= -tol, facing=-1: hit dx <= tol.
+    const facing = this.player.facing;
+    const arcTol = range * 0.15;
+
+    let anyHit = false;
+    for (const e of this.enemies) {
+      const dx = e.x - px;
+      const dy = e.y - py;
+      if (dx * dx + dy * dy > r2) continue;
+      // Forward-arc gate.
+      if (facing === 1 && dx < -arcTol) continue;
+      if (facing === -1 && dx > arcTol) continue;
+      e.hp -= dmg;
+      e.flashTimer = 0.12;
+      e.sprite.tint = isCrit ? 0xffd070 : 0xffffff;
+      this.spawnHit(e.x, e.y - 10, Math.round(dmg).toString(), isCrit ? 'crit' : 'damage');
+      this.spawnBloodSplash(e.x, e.y);
+      anyHit = true;
+    }
+    if (anyHit) {
+      AudioManager.play(isCrit ? 'hit_heavy' : dmg > 20 ? 'hit_med' : 'hit_light');
+      if (isCrit) {
+        this.applyShake(2.5, 0.18);
+        this.applyHitStop(0.04);
+      }
+    }
+
+    // Visual slash arc — half-circle facing the player's swing direction.
+    const slash = new Graphics();
+    const arcStart = facing === 1 ? -Math.PI / 2 : Math.PI / 2;
+    const arcEnd = arcStart + Math.PI;
+    slash.arc(0, 0, range, arcStart, arcEnd);
+    slash.stroke({ color: isCrit ? 0xffd070 : baseColor, width: isCrit ? 5 : 3, alpha: 0.85 });
+    slash.position.set(px, py);
+    this.projectileLayer.addChild(slash);
+    const start = performance.now();
+    const dur = 200;
+    const animate = () => {
+      const t = (performance.now() - start) / dur;
+      if (t >= 1) {
+        slash.parent?.removeChild(slash);
+        slash.destroy();
+        return;
+      }
+      slash.alpha = 0.85 * (1 - t);
+      slash.scale.set(1 + t * 0.15);
+      requestAnimationFrame(animate);
+    };
+    animate();
+    return anyHit || true; // tick cooldown even if no hit, so atkspd is consistent
   }
 
   private fireProjectile(target: EnemyEntity): void {
@@ -734,8 +814,10 @@ export class DungeonGame {
     if (now - this.lastSpawnMs < this.spawnIntervalMs) return;
     this.spawnEnemy(elapsedS);
     this.lastSpawnMs = now;
+    // Floor was 220ms (~4.5 enemies/sec by 60s). Bumped to 280ms (~3.6/sec)
+    // to relieve overwhelming late-round density on slower / lower-DPS builds.
     this.spawnIntervalMs = Math.max(
-      220,
+      280,
       (1100 / this.stats.enemySpawnMult) * Math.pow(0.97, elapsedS)
     );
   }

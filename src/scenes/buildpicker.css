@@ -178,6 +178,17 @@
 
 .weapon-chip-icon {
   font-size: 14px;
+  width: 18px;
+  text-align: center;
+}
+
+.weapon-chip-sprite {
+  width: 18px;
+  height: 18px;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5));
+  flex-shrink: 0;
 }
 
 .weapon-chip-name {

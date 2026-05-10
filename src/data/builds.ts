@@ -30,9 +30,12 @@ export const BUILDS: BuildDef[] = [
     name: 'The Brute',
     weapon: 'club',
     spells: ['tank'],
+    // Iter2 telemetry: Brute lost 71% HP in 25s standing still — "unkillable"
+    // identity wasn't matching the gameplay. Bumped baseDef 4→6 (cuts touch
+    // damage from zombies (6dmg) to 0/sec instead of 2/sec — true tank).
     baseHp: 180,
     baseSpd: 2.5,
-    baseDef: 4,
+    baseDef: 6,
     baseLuck: 0,
     look: { robe: '#3a3030', accent: '#a08080' },
     desc: 'Unmoving. Unkillable. Slow.',

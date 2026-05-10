@@ -5,7 +5,7 @@ import { useGameStore } from '../state/gameStore';
 import { BUILDS } from '../data/builds';
 import { WEAPONS, WEAPONS_BY_ID } from '../data/weapons';
 import { SPELLS_BY_ID } from '../data/spells';
-import { PLAYER_SPRITE_BY_BUILD } from '../engine/pixi/manifest';
+import { PLAYER_SPRITE_BY_BUILD, WEAPON_ICON_SPRITE } from '../engine/pixi/manifest';
 import type { BuildDef, WeaponDef } from '../types';
 import './buildpicker.css';
 
@@ -86,21 +86,28 @@ function BuildCard({ build, onPick }: BuildCardProps) {
 
       {picking && (
         <div className="weapon-grid" onClick={(e) => e.stopPropagation()}>
-          {WEAPONS.map((w) => (
-            <button
-              key={w.id}
-              type="button"
-              className={`weapon-chip ${w.id === selectedWeapon.id ? 'weapon-chip--active' : ''}`}
-              onClick={() => {
-                setSelectedWeapon(w);
-                setPicking(false);
-              }}
-              title={`${w.name} · ${w.dmg} DMG · ${w.atkspd.toFixed(1)} ATK · ${w.range} RNG`}
-            >
-              <span className="weapon-chip-icon">{w.icon}</span>
-              <span className="weapon-chip-name">{w.name}</span>
-            </button>
-          ))}
+          {WEAPONS.map((w) => {
+            const spriteUrl = WEAPON_ICON_SPRITE[w.id];
+            return (
+              <button
+                key={w.id}
+                type="button"
+                className={`weapon-chip ${w.id === selectedWeapon.id ? 'weapon-chip--active' : ''}`}
+                onClick={() => {
+                  setSelectedWeapon(w);
+                  setPicking(false);
+                }}
+                title={`${w.name} · ${w.dmg} DMG · ${w.atkspd.toFixed(1)} ATK · ${w.range} RNG`}
+              >
+                {spriteUrl ? (
+                  <img src={spriteUrl} alt="" className="weapon-chip-sprite" />
+                ) : (
+                  <span className="weapon-chip-icon">{w.icon}</span>
+                )}
+                <span className="weapon-chip-name">{w.name}</span>
+              </button>
+            );
+          })}
         </div>
       )}
     </GlassPanel>
