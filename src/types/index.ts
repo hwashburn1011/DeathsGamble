@@ -153,7 +153,12 @@ export interface ShopUpgradeDef {
 }
 
 export interface WheelSegment {
+  /** Display text shown on the wheel slice / slot row. */
   label: string;
+  /** Optional engine-dispatch key — set when the displayed label collides
+   *  with another segment (e.g. CURSE_JACKPOT shows "JACKPOT" but is a
+   *  distinct mechanic from the buff wheel's JACKPOT). Falls back to label. */
+  id?: string;
   color: string;
   luckScore: number;          // higher = player-favorable; biases spin RNG
   apply: (s: PlayerStats, mult?: number) => void;

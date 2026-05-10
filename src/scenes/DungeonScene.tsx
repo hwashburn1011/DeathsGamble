@@ -6,7 +6,7 @@ import { useSettingsStore } from '../state/settingsStore';
 import { useStatsStore } from '../state/statsStore';
 import { DungeonGame } from '../engine/dungeon/DungeonGame';
 import { themeFor } from '../engine/pixi/manifest';
-import { rollBargainChoices, type BargainDef } from '../data/bargains';
+import { rollBargainChoices, BARGAINS_BY_ID, type BargainDef } from '../data/bargains';
 import { calcSoulsForRun } from '../data/unlocks';
 import { useSoulsStore } from '../state/soulsStore';
 import { GlassButton } from '../ui/GlassButton';
@@ -159,6 +159,14 @@ export function DungeonScene() {
   }, [hud.bargainOffered, bargainChoices, setPaused]);
 
   function chooseBargain(b: BargainDef) {
+    // Apply directly to the live engine (#194) — bypasses the store so the
+    // dungeon effect doesn't see a stats-ref change and remount the engine.
+    const def = BARGAINS_BY_ID[b.id];
+    if (def && gameRef.current) {
+      gameRef.current.applyBargain(def.apply);
+    }
+    // Still record the bargain in the store so the same option isn't offered
+    // again this raid (rollBargainChoices reads run.bargainsTaken).
     applyBargain(b.id);
     setBargainChoices(null);
     setPaused(false);
@@ -321,7 +329,12 @@ export function DungeonScene() {
       }
       while (container.firstChild) container.removeChild(container.firstChild);
     };
-  }, [run.build, run.weapon, run.raid, run.endlessRound, run.mode, run.totalRaids, stats, isBossRaid, motionIntensity, renderQuality, cashMult, addCashEarned, addCashToRun, addKills, showScene, nextRound, triggerWin, setLastRunSummary]);
+  // Intentionally omit `stats` from deps (#194): the engine takes a copy at
+  // mount; subsequent store-side stats mutations (bargains, wheels) would
+  // otherwise remount the engine and reset kills/position. The early-return
+  // above still gates initial mount on `stats` being present.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run.build, run.weapon, run.raid, run.endlessRound, run.mode, run.totalRaids, isBossRaid, motionIntensity, renderQuality, cashMult, addCashEarned, addCashToRun, addKills, showScene, nextRound, triggerWin, setLastRunSummary]);
 
   const hpPct = Math.max(0, hud.hp / hud.hpMax) * 100;
   const xpPct = (hud.xp / hud.xpNext) * 100;

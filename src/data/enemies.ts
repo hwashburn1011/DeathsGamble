@@ -33,10 +33,11 @@ export const FINAL_BOSS = {
   name: 'Death Itself',
   hp: 1200,
   spd: 0.8,
-  // Iter5 telemetry: dmg 30 left zero margin for unbuffed Soldier (died 26s
-  // into boss fight). Players DO get wheel buffs but the floor was too thin.
-  // Phase-2 already adds AOE pulse + 3-bolt fan, so contact dmg can soften.
-  dmg: 24,
+  // Iter5 telemetry: dmg 30 was lethal in 26s; dropped to 24 in Iter6.
+  // Playtest #193: Gambler still died in 18s standing-still. Drop to 18
+  // (matches reaper) + telegraph the AOE pulse so it's dodgeable rather
+  // than instant. Phase-1 contact is now ~18 dps unbuffed.
+  dmg: 18,
   color: '#000000',
   // Was 55 — visually only ~33% larger than tier-4 reaper. Bumped so the
   // boss reads as 2× the largest regular enemy at scale.

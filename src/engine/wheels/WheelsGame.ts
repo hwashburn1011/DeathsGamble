@@ -177,10 +177,32 @@ export class WheelsGame {
     this.deathFront.removeChildren();
 
     this.drawBackground(g);
-    this.drawDeathBack(g);
+    // Static Death portrait (MrDeath.png) replaces the procedural cloak +
+    // outstretched hands + skull. User-supplied art, scaled to height.
+    this.drawDeathPortrait(g);
     this.buff = this.createWheelState(g.buffCx, g.cy, g.wheelR, this.buffSegments, 'buff');
     this.curse = this.createWheelState(g.curseCx, g.cy, g.wheelR, this.curseSegments, 'curse');
-    this.drawDeathFront(g);
+  }
+
+  /** Centered MrDeath.png sprite scaled to fill the canvas height. */
+  private drawDeathPortrait(g: Geometry): void {
+    const url = `${import.meta.env.BASE_URL}img/MrDeath.png`;
+    // Add the sprite immediately with a placeholder; rescale once the
+    // texture decodes. Using Assets.load avoids reading width on a
+    // not-yet-initialised Texture.
+    const sprite = new Sprite();
+    sprite.anchor.set(0.5);
+    sprite.position.set(g.deathCx, g.h / 2);
+    this.deathBack.addChild(sprite);
+    Assets.load<Texture>(url)
+      .then((tex) => {
+        if (sprite.destroyed) return;
+        sprite.texture = tex;
+        const th = tex.height || tex.source?.height || 1;
+        const targetH = g.h * 0.95;
+        sprite.scale.set(targetH / th);
+      })
+      .catch(() => { /* missing asset — keep blank placeholder */ });
   }
 
   private geometry(): Geometry {

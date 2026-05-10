@@ -42,9 +42,12 @@ export interface Zone {
 export function buildZones(raid: number, totalRaids: number): Zone[] {
   const isLateStory = raid >= totalRaids - 1;       // last non-boss raid
   const baseRoomCount = raid <= 1 ? 3 : raid === 2 ? 4 : 5;
-  const ZONE_HW = 380;                              // half-width in world px
-  const ZONE_HH = 280;                              // half-height
-  const CORRIDOR = 360;                             // gap between zones
+  // Larger rooms (#196) — old 760x560 felt cramped with sprites + walls eating
+  // perimeter. New 960x720 gives ~12-15 player widths of usable space inside
+  // a room, leaving room to kite around enemies + props.
+  const ZONE_HW = 480;                              // half-width in world px
+  const ZONE_HH = 360;                              // half-height
+  const CORRIDOR = 380;                             // gap between zones
   const SPACING = ZONE_HW * 2 + CORRIDOR;
 
   const zones: Zone[] = [];

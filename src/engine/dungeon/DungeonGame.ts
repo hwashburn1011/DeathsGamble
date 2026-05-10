@@ -321,6 +321,8 @@ export class DungeonGame {
   private miniBossIntroAt = 0;
   /** True after a non-final/non-mini-boss zone clears, until React consumes it (#167). */
   private bargainPending = false;
+  /** How many bargains have been offered this raid — feeds the soft cap (#191). */
+  private bargainOffersThisRaid = 0;
   // Post-death summary tracking (#180/#181)
   private lastDamageSource = '—';
   private biggestHit = 0;
@@ -494,9 +496,19 @@ export class DungeonGame {
     sprite.scale.set(2.0);
     this.worldLayer.addChild(sprite);
 
+    // Spawn in the pocket west of zone 0 so the player walks INTO room 1
+    // to trigger the first wave (#190). Without zones (boss/infinite),
+    // spawn at world origin as before.
+    let spawnX = 0;
+    let spawnY = 0;
+    if (this.zones.length > 0) {
+      const z0 = this.zones[0];
+      spawnX = z0.cx - z0.hw - 180;  // mid-pocket (POCKET_W=360 → -180 from west wall)
+      spawnY = z0.cy;
+    }
     this.player = {
-      x: 0,
-      y: 0,
+      x: spawnX,
+      y: spawnY,
       hp: this.stats.hp,
       hpMax: this.stats.hpMax,
       sprite,
@@ -1069,12 +1081,18 @@ export class DungeonGame {
           z.cleared = true;
           AudioManager.play('boss_defeat', { volume: 0.6 });
           this.applyScreenFlash(0.3);
-          // Bargain offer (#167) — fires only on non-final, non-mini-boss
-          // rooms. The final room ends the raid, the mini-boss has its own
-          // payoff (cash drop), so neither offers a bargain.
+          // Bargain offer (#167/#191) — fires only on non-final, non-mini-boss
+          // rooms. The first eligible clear always offers; subsequent ones
+          // diminish (1/(n+1) chance) so a 4-room raid averages ~1.5 bargains
+          // instead of 3 — gives the player a guaranteed reward without
+          // turning every room into a modal.
           const isLast = this.activeZoneIdx === this.zones.length - 1;
           if (!isLast && !z.isMiniBoss) {
-            this.bargainPending = true;
+            const chance = 1 / (this.bargainOffersThisRaid + 1);
+            if (Math.random() < chance) {
+              this.bargainPending = true;
+              this.bargainOffersThisRaid++;
+            }
           }
           // Was that the final zone? Trigger raid complete.
           if (this.zones.every((zz) => zz.cleared) && !this.allZonesCleared) {
@@ -1093,15 +1111,34 @@ export class DungeonGame {
     let px: number;
     let py: number;
     if (zoneIdx !== undefined && this.zones[zoneIdx]) {
-      // Story-mode (#145): spawn at the zone's perimeter so enemies emerge
-      // from the room's edges, not from off-screen.
+      // Story-mode (#145/#192): spawn at the zone's perimeter biased AWAY
+      // from the player. Pick 6 candidate perimeter points and choose the
+      // one furthest from the player so slow builds don't get surrounded
+      // on first entry.
       const z = this.zones[zoneIdx];
-      const edge = Math.floor(Math.random() * 4);
-      const u = (Math.random() - 0.5) * 2;
-      if (edge === 0)      { px = z.cx + z.hw;      py = z.cy + u * z.hh; }
-      else if (edge === 1) { px = z.cx - z.hw;      py = z.cy + u * z.hh; }
-      else if (edge === 2) { px = z.cx + u * z.hw;  py = z.cy + z.hh; }
-      else                 { px = z.cx + u * z.hw;  py = z.cy - z.hh; }
+      const candidates: Array<[number, number]> = [];
+      for (let n = 0; n < 6; n++) {
+        const edge = Math.floor(Math.random() * 4);
+        const u = (Math.random() - 0.5) * 2;
+        let cx: number;
+        let cy: number;
+        if (edge === 0)      { cx = z.cx + z.hw;      cy = z.cy + u * z.hh; }
+        else if (edge === 1) { cx = z.cx - z.hw;      cy = z.cy + u * z.hh; }
+        else if (edge === 2) { cx = z.cx + u * z.hw;  cy = z.cy + z.hh; }
+        else                 { cx = z.cx + u * z.hw;  cy = z.cy - z.hh; }
+        candidates.push([cx, cy]);
+      }
+      const playerX = this.player.x;
+      const playerY = this.player.y;
+      let bestD = -1;
+      px = candidates[0][0];
+      py = candidates[0][1];
+      for (const [cx, cy] of candidates) {
+        const dx = cx - playerX;
+        const dy = cy - playerY;
+        const d = dx * dx + dy * dy;
+        if (d > bestD) { bestD = d; px = cx; py = cy; }
+      }
     } else {
       const dist = Math.max(w, h) * 0.6 + Math.random() * 60;
       const angle = Math.random() * Math.PI * 2;
@@ -1487,6 +1524,22 @@ export class DungeonGame {
     this.bargainPending = false;
   }
 
+  /**
+   * Apply a bargain to the engine's mid-raid stats (#194). Bypasses the
+   * React store so the DungeonScene's effect doesn't see a stats change
+   * and remount the engine (which would reset kills, position, doors etc).
+   * If the bargain bumps hpMax, top up player.hp by the same delta.
+   */
+  public applyBargain(apply: (s: PlayerStats) => void): void {
+    const beforeHpMax = this.stats.hpMax;
+    apply(this.stats);
+    const hpDelta = this.stats.hpMax - beforeHpMax;
+    if (hpDelta > 0) {
+      this.player.hpMax = this.stats.hpMax;
+      this.player.hp = Math.min(this.stats.hpMax, this.player.hp + hpDelta);
+    }
+  }
+
   // -------- Build-defined active spells (#154/#155) ----------
 
   /** Gambler — Coin Flip: 50/50. Heads = +50% atkspd 8s; Tails = +50% range 8s. */
@@ -1731,43 +1784,65 @@ export class DungeonGame {
 
   private bossAoePulse(boss: EnemyEntity): void {
     const RADIUS = 180;
-    // Visual ring — quick expanding circle at boss position.
+    const TELEGRAPH_MS = 800;  // (#193) was instant — added warning window
+    // Telegraph ring — fills slowly so the player has time to step out.
     const ring = new Graphics();
-    ring.circle(0, 0, 20);
-    ring.stroke({ color: 0xc04080, width: 4, alpha: 0.85 });
     ring.position.set(boss.x, boss.y);
     this.particleLayer.addChild(ring);
     const ringStart = performance.now();
-    const ringDur = 600;
     const animate = () => {
       if (ring.destroyed) return; // (#187)
-      const t = (performance.now() - ringStart) / ringDur;
+      const t = (performance.now() - ringStart) / TELEGRAPH_MS;
       if (t >= 1) {
+        ring.clear();
         ring.parent?.removeChild(ring);
         ring.destroy();
         return;
       }
       ring.clear();
-      ring.circle(0, 0, 20 + (RADIUS - 20) * t);
-      ring.stroke({ color: 0xc04080, width: 4 * (1 - t * 0.6), alpha: 0.85 * (1 - t) });
+      ring.circle(0, 0, RADIUS);
+      ring.fill({ color: 0xc04080, alpha: 0.18 + t * 0.20 });
+      ring.circle(0, 0, RADIUS);
+      ring.stroke({ color: 0xff6080, width: 4, alpha: 0.85 });
       requestAnimationFrame(animate);
     };
     animate();
-    // Damage if player inside radius.
-    const dx = this.player.x - boss.x;
-    const dy = this.player.y - boss.y;
-    if (dx * dx + dy * dy < RADIUS * RADIUS) {
-      const taken = Math.max(1, boss.dmg * 1.2 - this.effectiveDef());
-      this.player.hp -= taken;
-      this.reachKillBonus = 0;
-      this.lastDamageSource = "Death's Shadow Pulse";
-      this.player.flashTimer = 0.18;
-      this.applyShake(10, 0.5);
-      this.applyScreenFlash(0.7);
-      this.applyHitStop(0.08);
-      AudioManager.play('player_hurt');
-      this.spawnHit(this.player.x, this.player.y - 18, `-${Math.ceil(taken)}`, 'player-damage');
-    }
+    // Resolve damage at the END of the telegraph — player can dodge by
+    // stepping out of the radius during the 800ms warning window.
+    setTimeout(() => {
+      if (boss.hp <= 0 || this.gameOver || this.deathPlaying) return;
+      const dx = this.player.x - boss.x;
+      const dy = this.player.y - boss.y;
+      if (dx * dx + dy * dy < RADIUS * RADIUS) {
+        // (#193) AOE multiplier was 1.2 (29 dmg unbuffed) — dropped to 1.0
+        // so it equals one contact-second rather than 1.5x of one.
+        const taken = Math.max(1, boss.dmg - this.effectiveDef());
+        this.player.hp -= taken;
+        this.reachKillBonus = 0;
+        this.lastDamageSource = "Death's Shadow Pulse";
+        this.player.flashTimer = 0.18;
+        this.applyShake(10, 0.5);
+        this.applyScreenFlash(0.7);
+        this.applyHitStop(0.08);
+        AudioManager.play('player_hurt');
+        this.spawnHit(this.player.x, this.player.y - 18, `-${Math.ceil(taken)}`, 'player-damage');
+      }
+      // Impact flash on actual detonation.
+      const impact = new Graphics();
+      impact.circle(0, 0, RADIUS);
+      impact.stroke({ color: 0xffffff, width: 5, alpha: 0.9 });
+      impact.position.set(boss.x, boss.y);
+      this.particleLayer.addChild(impact);
+      const t0 = performance.now();
+      const fade = () => {
+        if (impact.destroyed) return;
+        const t = (performance.now() - t0) / 250;
+        if (t >= 1) { impact.parent?.removeChild(impact); impact.destroy(); return; }
+        impact.alpha = 0.9 * (1 - t);
+        requestAnimationFrame(fade);
+      };
+      fade();
+    }, TELEGRAPH_MS);
   }
 
   /** Pretty-print an enemy id for the post-death summary (#182). */
@@ -2348,15 +2423,16 @@ export class DungeonGame {
       this.walls.push({ x: left, y: top - T, w: z.hw * 2, h: T, doorOpen: true, zoneIdx: i, isDoor: false });
       this.walls.push({ x: left, y: bottom, w: z.hw * 2, h: T, doorOpen: true, zoneIdx: i, isDoor: false });
       // West edge — wall above + below the door gap; door spans the gap.
-      const hasWest = i > 0;
+      // Zone 0 gets a west door opening into the spawn pocket (#190) so the
+      // player walks east into room 1 instead of spawning inside the trigger.
+      const hasWest = true; // every zone has a west door now (i=0 → spawn pocket)
       const doorY = z.cy - DOOR / 2;
       if (hasWest) {
         this.walls.push({ x: left - T, y: top - T, w: T, h: doorY - top + T, doorOpen: true, zoneIdx: i, isDoor: false });
         this.walls.push({ x: left - T, y: doorY + DOOR, w: T, h: bottom - (doorY + DOOR) + T, doorOpen: true, zoneIdx: i, isDoor: false });
         // West door segment — closed by default; opens after zone is cleared.
+        // Zone 0's west door stays OPEN at start so the spawn pocket is entered.
         this.walls.push({ x: left - T, y: doorY, w: T, h: DOOR, doorOpen: true, zoneIdx: i, isDoor: true });
-      } else {
-        this.walls.push({ x: left - T, y: top - T, w: T, h: z.hh * 2 + T * 2, doorOpen: true, zoneIdx: i, isDoor: false });
       }
       // East edge — same construction; door connects to next zone.
       const hasEast = i < this.zones.length - 1;
@@ -2368,6 +2444,40 @@ export class DungeonGame {
         this.walls.push({ x: right, y: top - T, w: T, h: z.hh * 2 + T * 2, doorOpen: true, zoneIdx: i, isDoor: false });
       }
     }
+
+    // Corridor walls (#196) — close off the north + south of every gap
+    // between adjacent zones so the player can't walk off into the void
+    // when traversing between rooms. Corridor extends east-of-zone-i to
+    // west-of-zone-(i+1); door gap height is DOOR centered on cy.
+    for (let i = 0; i < this.zones.length - 1; i++) {
+      const a = this.zones[i];
+      const b = this.zones[i + 1];
+      const corridorLeft = a.cx + a.hw + T;
+      const corridorRight = b.cx - b.hw - T;
+      const corridorW = corridorRight - corridorLeft;
+      if (corridorW <= 0) continue;
+      const doorY = a.cy - DOOR / 2;
+      // North wall of corridor.
+      this.walls.push({ x: corridorLeft, y: doorY - T, w: corridorW, h: T, doorOpen: true, zoneIdx: i, isDoor: false });
+      // South wall of corridor.
+      this.walls.push({ x: corridorLeft, y: doorY + DOOR, w: corridorW, h: T, doorOpen: true, zoneIdx: i, isDoor: false });
+    }
+
+    // Spawn pocket (#190) — small antechamber west of zone 0. Player spawns
+    // inside it; walks east through zone 0's west door to trigger room 1.
+    {
+      const z0 = this.zones[0];
+      const POCKET_W = 360;
+      const pocketRight = z0.cx - z0.hw - T;
+      const pocketLeft = pocketRight - POCKET_W;
+      const doorY = z0.cy - DOOR / 2;
+      // North + South walls (mirror corridor style).
+      this.walls.push({ x: pocketLeft, y: doorY - T, w: POCKET_W, h: T, doorOpen: true, zoneIdx: 0, isDoor: false });
+      this.walls.push({ x: pocketLeft, y: doorY + DOOR, w: POCKET_W, h: T, doorOpen: true, zoneIdx: 0, isDoor: false });
+      // Sealed west wall — closes off the pocket so the player can't escape west.
+      this.walls.push({ x: pocketLeft - T, y: doorY - T, w: T, h: DOOR + T * 2, doorOpen: true, zoneIdx: 0, isDoor: false });
+    }
+
     this.refreshDoorState();
   }
 

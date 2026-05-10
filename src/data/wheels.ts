@@ -57,8 +57,9 @@ export const CURSE_SEGMENTS: WheelSegment[] = [
   { label: 'Sharp Claws',   luckScore: 4, color: '#7a3030', apply: (s, m = 1) => { s.enemyDmgBonus += 2 * m; } },
   // CURSE_JACKPOT (#160) — opens a sub-wheel of 6-8 small stat curses.
   // The `apply` here is a no-op because the engine intercepts this segment
-  // via its label and triggers the sub-wheel flow instead of applying.
-  { label: 'CURSE_JACKPOT', luckScore: 6, color: '#a02060', apply: () => { /* handled by sub-wheel */ } },
+  // via its `id` and triggers the sub-wheel flow instead of applying.
+  // `label` is the display text shown on the wheel/slot row.
+  { id: 'CURSE_JACKPOT', label: 'JACKPOT', luckScore: 6, color: '#a02060', apply: () => { /* handled by sub-wheel */ } },
 ];
 
 /**
@@ -93,6 +94,5 @@ export function formatGiftLabel(label: string): string {
 
 /** Format a curse segment label for HUD chip / spin result ("Death's Toll: Frailty"). */
 export function formatTollLabel(label: string): string {
-  if (label === 'CURSE_JACKPOT') return "Death's Toll: JACKPOT";
   return `Death's Toll: ${label}`;
 }

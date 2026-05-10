@@ -1,6 +1,12 @@
 .title-scene {
   position: relative;
   overflow: hidden;
+  /* Custom background art — fills viewport, dimmed slightly so the gold/red
+   *  aura overlay still reads on top. */
+  background-image: url('/DeathsGamble/img/DeathsGambleBG.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 .title-aura {
@@ -8,7 +14,9 @@
   inset: 0;
   background:
     radial-gradient(ellipse 50% 35% at 50% 50%, rgba(201, 162, 39, 0.12), transparent 70%),
-    radial-gradient(ellipse 80% 50% at 50% 100%, rgba(176, 48, 48, 0.08), transparent 70%);
+    radial-gradient(ellipse 80% 50% at 50% 100%, rgba(176, 48, 48, 0.08), transparent 70%),
+    /* slight black wash over the BG so text + buttons stay readable */
+    rgba(7, 6, 10, 0.35);
   pointer-events: none;
   animation: titleAura 8s ease-in-out infinite;
 }

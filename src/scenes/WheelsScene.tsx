@@ -93,7 +93,7 @@ export function WheelsScene() {
           // CURSE_JACKPOT (#160) — instead of applying the no-op landing
           // segment, roll one of the mild sub-curses with the same luck
           // weighting. The player still feels chipped, never gutted.
-          if (seg.label === 'CURSE_JACKPOT') {
+          if (seg.id === 'CURSE_JACKPOT') {
             const luck = useGameStore.getState().stats?.luck ?? 0;
             const subIdx = pickSegmentWithLuck(CURSE_JACKPOT_SEGMENTS, luck);
             seg = CURSE_JACKPOT_SEGMENTS[subIdx];
