@@ -6,7 +6,8 @@ import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { useGameStore } from '../state/gameStore';
 import { useSettingsStore } from '../state/settingsStore';
 import { WheelsGame } from '../engine/wheels/WheelsGame';
-import { BUFF_SEGMENTS, CURSE_SEGMENTS, formatGiftLabel, formatTollLabel } from '../data/wheels';
+import { BUFF_SEGMENTS, CURSE_SEGMENTS, CURSE_JACKPOT_SEGMENTS, formatGiftLabel, formatTollLabel } from '../data/wheels';
+import { pickSegmentWithLuck } from '../engine/luck';
 import { SPELLS_BY_ID } from '../data/spells';
 import { AudioManager } from '../engine/audio/AudioManager';
 import type { PlayerStats } from '../types';
@@ -88,7 +89,16 @@ export function WheelsScene() {
         onSpinComplete: (side, segIdx) => {
           if (cancelled) return;
           const segs = side === 'buff' ? BUFF_SEGMENTS : CURSE_SEGMENTS;
-          const seg = segs[segIdx];
+          let seg = segs[segIdx];
+          // CURSE_JACKPOT (#160) — instead of applying the no-op landing
+          // segment, roll one of the mild sub-curses with the same luck
+          // weighting. The player still feels chipped, never gutted.
+          if (seg.label === 'CURSE_JACKPOT') {
+            const luck = useGameStore.getState().stats?.luck ?? 0;
+            const subIdx = pickSegmentWithLuck(CURSE_JACKPOT_SEGMENTS, luck);
+            seg = CURSE_JACKPOT_SEGMENTS[subIdx];
+            AudioManager.play('level_up', { volume: 0.7, pitch: 0.8 });
+          }
           const m = applyWheelSegment(side, seg);
           const result: SpinResult = { side, label: seg.label, magnitude: m };
           if (side === 'buff') setBuffResult(result);
