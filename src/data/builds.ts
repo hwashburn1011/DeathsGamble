@@ -89,7 +89,7 @@ export const BUILDS: BuildDef[] = [
     id: 'soldier',
     name: 'The Soldier',
     weapon: 'rifle',
-    spells: [],
+    spells: ['pierce'],
     baseHp: 120,
     baseSpd: 3.0,
     baseDef: 2,

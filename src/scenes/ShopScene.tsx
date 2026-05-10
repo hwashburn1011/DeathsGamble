@@ -12,9 +12,12 @@ export function ShopScene() {
   const upgrades = useGameStore((s) => s.run.upgrades);
   const spendRunCash = useGameStore((s) => s.spendRunCash);
   const buyRunUpgrade = useGameStore((s) => s.buyRunUpgrade);
+  const buyPotion = useGameStore((s) => s.buyPotion);
+  const pendingPotions = useGameStore((s) => s.run.pendingPotions);
+  const POTION_COST = 60;
 
   function nextLabel(): string {
-    if (run.mode === 'story') {
+    if (run.mode !== 'infinite') {
       return run.raid >= run.totalRaids ? 'Face the Boss' : `Continue to Raid ${run.raid}`;
     }
     return `Continue to Round ${(run.endlessRound ?? 0) + 1}`;
@@ -33,6 +36,22 @@ export function ShopScene() {
       </div>
 
       <div className="shop-grid">
+        <GlassPanel padding="md" className="shop-item">
+          <div className="shop-item-name">Healing Draught</div>
+          <div className="shop-item-desc">
+            Stack +60 max HP for the next raid only{pendingPotions > 0 ? ` (${pendingPotions} stacked)` : ''}.
+          </div>
+          <div className="shop-item-row">
+            <span className="shop-item-level">{pendingPotions > 0 ? `${pendingPotions} ready` : 'Single use'}</span>
+            <button
+              className={`shop-buy ${cash < POTION_COST ? 'shop-buy--locked' : ''}`}
+              disabled={cash < POTION_COST}
+              onClick={() => buyPotion(POTION_COST)}
+            >
+              $ {POTION_COST}
+            </button>
+          </div>
+        </GlassPanel>
         {SHOP_UPGRADES.map((u) => {
           const lvl = upgrades[u.id as keyof PersistentUpgrades] ?? 0;
           const cost = Math.round(u.cost * Math.pow(u.costMult, lvl));

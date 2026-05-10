@@ -7,12 +7,18 @@ import { DIFFICULTY } from '../data/difficulty';
  * Pick a segment index using weighted random selection.
  * `luck = 0` is uniform random; higher luck biases toward segments
  * with higher `luckScore` (player-favorable: bigger boons / milder curses).
- *   weight = 1 + luck * (luckScore / maxScore)
+ *   weight = baseWeight * (1 + luck * (luckScore / maxScore))
+ *
+ * JACKPOT gets a rarity penalty so it lands ~3% of the time at luck=0
+ * (down from ~8.3% with uniform 1/12) — players should feel the moment.
  */
 export function pickSegmentWithLuck(segments: WheelSegment[], luck: number): number {
   const scores = segments.map((s) => s.luckScore || 5);
   const maxScore = Math.max(...scores);
-  const weights = scores.map((s) => 1 + luck * (s / maxScore));
+  const weights = segments.map((seg, i) => {
+    const baseWeight = seg.label === 'JACKPOT' ? 0.35 : 1;
+    return baseWeight * (1 + luck * (scores[i] / maxScore));
+  });
   const total = weights.reduce((a, b) => a + b, 0);
   let r = Math.random() * total;
   for (let i = 0; i < segments.length; i++) {

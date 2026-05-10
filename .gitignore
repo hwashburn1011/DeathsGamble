@@ -13,6 +13,9 @@ playwright-report/
 test-results/
 test-screenshots/
 
+# Loop-review tracker (session-local)
+.loop-review.md
+
 # Editor / OS
 .DS_Store
 Thumbs.db

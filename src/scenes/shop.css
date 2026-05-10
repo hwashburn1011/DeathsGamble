@@ -16,10 +16,16 @@
 }
 
 .shop-header {
-  position: relative;
-  z-index: 1;
+  position: sticky;
+  top: -8px;
+  z-index: 5;
   text-align: center;
-  margin-bottom: 28px;
+  margin-bottom: 20px;
+  padding: 10px 0 14px;
+  /* Frosted bg so the cash counter stays legible while content scrolls beneath. */
+  background: linear-gradient(to bottom, rgba(7, 7, 10, 0.85) 60%, rgba(7, 7, 10, 0));
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
 
 .shop-heading {

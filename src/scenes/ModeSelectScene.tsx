@@ -3,6 +3,7 @@ import { GlassButton } from '../ui/GlassButton';
 import { useGameStore } from '../state/gameStore';
 import { useSettingsStore } from '../state/settingsStore';
 import { DIFFICULTY } from '../data/difficulty';
+import { dailyLabel } from '../engine/dailySeed';
 import './modeselect.css';
 
 export function ModeSelectScene() {
@@ -45,6 +46,21 @@ export function ModeSelectScene() {
             Endless rounds. Spin again between each — the wheels grow more extreme. No final boss,
             no escape.
           </p>
+        </GlassPanel>
+
+        <GlassPanel
+          padding="lg"
+          hoverable
+          onClick={() => selectMode('daily')}
+          className="mode-card"
+        >
+          <div className="mode-emblem mode-emblem--daily">☀</div>
+          <h3 className="mode-title">Daily</h3>
+          <p className="mode-desc">
+            One seed for everyone today. Same builds, same wheel rolls, same enemies.
+            Resets at midnight local.
+          </p>
+          <p className="mode-daily-tag">{dailyLabel()}</p>
         </GlassPanel>
       </div>
 

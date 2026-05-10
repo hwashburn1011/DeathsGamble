@@ -2,10 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { Application } from 'pixi.js';
 import { GlassPanel } from '../ui/GlassPanel';
 import { GlassButton } from '../ui/GlassButton';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { useGameStore } from '../state/gameStore';
+import { useSettingsStore } from '../state/settingsStore';
 import { WheelsGame } from '../engine/wheels/WheelsGame';
 import { BUFF_SEGMENTS, CURSE_SEGMENTS } from '../data/wheels';
 import { SPELLS_BY_ID } from '../data/spells';
+import { AudioManager } from '../engine/audio/AudioManager';
 import type { PlayerStats } from '../types';
 import './wheels.css';
 
@@ -36,10 +39,13 @@ export function WheelsScene() {
   const stats = useGameStore((s) => s.stats);
   const showScene = useGameStore((s) => s.showScene);
   const applyWheelSegment = useGameStore((s) => s.applyWheelSegment);
+  const renderQuality = useSettingsStore((s) => s.renderQuality);
 
   const [buffResult, setBuffResult] = useState<SpinResult | null>(null);
   const [curseResult, setCurseResult] = useState<SpinResult | null>(null);
   const [spinningSide, setSpinningSide] = useState<'buff' | 'curse' | null>(null);
+  const [confirmForfeit, setConfirmForfeit] = useState(false);
+  const [jackpotFlash, setJackpotFlash] = useState(false);
 
   // Mount Pixi app + WheelsGame
   useEffect(() => {
@@ -51,18 +57,25 @@ export function WheelsScene() {
     let cancelled = false;
 
     (async () => {
+      const dpr = window.devicePixelRatio || 1;
+      const qualityCap = renderQuality === 'low' ? 1 : renderQuality === 'medium' ? 1.5 : 4;
       app = new Application();
       await app.init({
         background: 0x07070a,
         resizeTo: window,
         antialias: true,
-        resolution: window.devicePixelRatio || 1,
+        resolution: Math.min(dpr, qualityCap),
         autoDensity: true,
       });
       if (cancelled) {
         app.destroy(true);
         return;
       }
+      app.canvas.setAttribute('role', 'img');
+      app.canvas.setAttribute(
+        'aria-label',
+        'Two spinning wheels operated by Death — a green Boon wheel on the left and a red Curse wheel on the right. Use the Spin buttons below each wheel.'
+      );
       container.appendChild(app.canvas);
 
       game = new WheelsGame(app, BUFF_SEGMENTS, CURSE_SEGMENTS, {
@@ -76,6 +89,12 @@ export function WheelsScene() {
           if (side === 'buff') setBuffResult(result);
           else setCurseResult(result);
           setSpinningSide(null);
+          // JACKPOT celebration — gold screen flash + chime sting.
+          if (seg.label === 'JACKPOT') {
+            setJackpotFlash(true);
+            AudioManager.play('level_up', { volume: 1, pitch: 1.2 });
+            setTimeout(() => setJackpotFlash(false), 1400);
+          }
         },
       });
       game.start();
@@ -97,7 +116,7 @@ export function WheelsScene() {
       }
       while (container.firstChild) container.removeChild(container.firstChild);
     };
-  }, [applyWheelSegment]);
+  }, [applyWheelSegment, renderQuality]);
 
   function spin(side: 'buff' | 'curse') {
     const game = wheelsRef.current;
@@ -114,6 +133,12 @@ export function WheelsScene() {
   return (
     <div className="wheels-scene">
       <div ref={containerRef} className="wheels-canvas-wrap" />
+
+      {jackpotFlash && (
+        <div className="wheels-jackpot-flash">
+          <div className="wheels-jackpot-banner">JACKPOT</div>
+        </div>
+      )}
 
       {/* Top header */}
       <div className="wheels-header">Make Your Bargain</div>
@@ -141,9 +166,9 @@ export function WheelsScene() {
         </div>
         <div className="wheels-load-divider" />
         <div className="wheels-load-row">
-          <span className="lbl">{run.mode === 'story' ? 'Raid' : 'Round'}</span>
+          <span className="lbl">{run.mode !== 'infinite' ? 'Raid' : 'Round'}</span>
           <span className="val">
-            {run.mode === 'story'
+            {run.mode !== 'infinite'
               ? `${run.raid} of ${run.totalRaids}`
               : `${(run.endlessRound ?? 0) + 1}`}
           </span>
@@ -156,10 +181,10 @@ export function WheelsScene() {
           <h3 className="wheels-h3">Stats</h3>
           <StatRow icon="♥" iconColor="var(--blood-bright)" label="HP" value={Math.round(stats.hp)} />
           <StatRow icon="⚔" iconColor="var(--gold)" label="DMG" value={Math.round(stats.dmg + (run.weapon?.dmg ?? 0))} />
-          <StatRow icon="\u{1F6E1}" iconColor="var(--moss-bright)" label="DEF" value={stats.def} />
-          <StatRow icon="\u{1F45F}" iconColor="var(--ink)" label="SPD" value={stats.spd.toFixed(1)} />
+          <StatRow icon="🛡" iconColor="var(--moss-bright)" label="DEF" value={stats.def} />
+          <StatRow icon="👟" iconColor="var(--ink)" label="SPD" value={stats.spd.toFixed(1)} />
           <StatRow icon="⚡" iconColor="var(--candle)" label="ATK SPD" value={(stats.atkspd * stats.atkspdMult).toFixed(1)} />
-          <StatRow icon="\u{1F3AF}" iconColor="var(--arcane-bright)" label="RANGE" value={Math.round(stats.range + stats.rangeBonus)} />
+          <StatRow icon="🎯" iconColor="var(--arcane-bright)" label="RANGE" value={Math.round(stats.range + stats.rangeBonus)} />
           <StatRow icon="✦" iconColor="var(--candle)" label="CRIT" value={`${Math.round(stats.crit * 100)}%`} />
           <StatRow icon="☘" iconColor="var(--gold-bright)" label="LUCK" value={stats.luck.toFixed(1)} highlight />
         </GlassPanel>
@@ -216,10 +241,25 @@ export function WheelsScene() {
 
       {/* Title-screen escape */}
       <div className="wheels-back">
-        <GlassButton variant="ghost" size="sm" onClick={() => showScene('title')}>
+        <GlassButton variant="ghost" size="sm" onClick={() => setConfirmForfeit(true)}>
           Forfeit
         </GlassButton>
       </div>
+
+      {confirmForfeit && (
+        <ConfirmDialog
+          title="Forfeit this run?"
+          body="You'll lose all progress, cash, and upgrades from this run. Death keeps the wager."
+          confirmLabel="Forfeit"
+          cancelLabel="Stay"
+          variant="danger"
+          onConfirm={() => {
+            setConfirmForfeit(false);
+            showScene('title');
+          }}
+          onCancel={() => setConfirmForfeit(false)}
+        />
+      )}
     </div>
   );
 }

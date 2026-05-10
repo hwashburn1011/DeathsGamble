@@ -4,6 +4,7 @@ import { useSettingsStore } from './state/settingsStore';
 import { AudioManager } from './engine/audio/AudioManager';
 import { MUSIC_BY_SCENE, BOSS_MUSIC } from './engine/audio/musicMap';
 import { TitleScene } from './scenes/TitleScene';
+import { IntroScene } from './scenes/IntroScene';
 import { ModeSelectScene } from './scenes/ModeSelectScene';
 import { BuildPickerScene } from './scenes/BuildPickerScene';
 import { WheelsScene } from './scenes/WheelsScene';
@@ -13,11 +14,15 @@ import { WinScene } from './scenes/WinScene';
 import { ShopScene } from './scenes/ShopScene';
 import { CreditsScene } from './scenes/CreditsScene';
 import { SettingsButton } from './ui/SettingsButton';
+import { PerfOverlay } from './ui/PerfOverlay';
+import { AchievementToast } from './ui/AchievementToast';
+import './state/achievementsStore'; // side-effect: subscribe to stats
 import type { SceneName } from './types';
 import './app.css';
 
 const SCENES: Record<SceneName, () => JSX.Element> = {
   title: TitleScene,
+  intro: IntroScene,
   modeselect: ModeSelectScene,
   buildpicker: BuildPickerScene,
   wheels: WheelsScene,
@@ -103,6 +108,8 @@ export function App() {
         <Scene />
       </div>
       <SettingsButton />
+      <PerfOverlay />
+      <AchievementToast />
     </>
   );
 }

@@ -1,0 +1,63 @@
+.achievement-toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 180;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 22px;
+  background: var(--glass-dark);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
+  border: 1px solid var(--gold);
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.6), 0 0 24px rgba(240, 200, 74, 0.4);
+  animation: toastSlide 3.5s ease-in-out forwards;
+  pointer-events: none;
+  max-width: 480px;
+}
+
+.achievement-badge {
+  font-size: 28px;
+  color: var(--gold-bright);
+  text-shadow: 0 0 10px rgba(240, 200, 74, 0.7);
+}
+
+.achievement-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.achievement-tag {
+  font-family: var(--font-display);
+  font-size: 9px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.achievement-name {
+  font-family: var(--font-display);
+  font-size: 16px;
+  letter-spacing: 0.14em;
+  color: var(--gold-bright);
+  text-transform: uppercase;
+}
+
+.achievement-desc {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--ink);
+  opacity: 0.85;
+}
+
+@keyframes toastSlide {
+  0%   { opacity: 0; transform: translate(-50%, -16px); }
+  10%  { opacity: 1; transform: translate(-50%, 0); }
+  85%  { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -10px); }
+}

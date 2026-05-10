@@ -17,7 +17,9 @@ export type SfxId =
   | 'boss_intro'
   | 'boss_defeat'
   | 'wheel_tick'
-  | 'wheel_stop';
+  | 'wheel_stop'
+  | 'ui_hover'
+  | 'ui_click';
 
 /** All variant URLs for a given SfxId. */
 const SFX_VARIANTS: Record<SfxId, string[]> = {
@@ -31,6 +33,11 @@ const SFX_VARIANTS: Record<SfxId, string[]> = {
   boss_defeat:  range5('impactMining_'),
   wheel_tick:   range5('impactPlank_medium_'),
   wheel_stop:   range5('impactBell_heavy_'),
+  // Reuse light/wood impact variants for UI — keeps download size low and
+  // sounds thematically consistent. Pitch is bumped for the click to read
+  // as a tap rather than a hit.
+  ui_hover:     range5('impactGeneric_light_'),
+  ui_click:     range5('impactWood_light_'),
 };
 
 function range5(prefix: string): string[] {
@@ -46,6 +53,8 @@ class AudioManagerImpl {
   // Cache audio elements per URL so we don't re-fetch
   private cache = new Map<string, HTMLAudioElement>();
   private lastPlayMs = new Map<SfxId, number>();
+  private wasPlayingBeforeBlur = false;
+  private visibilityListenerAttached = false;
   private cooldownMs: Record<SfxId, number> = {
     hit_light: 25,
     hit_med: 35,
@@ -57,6 +66,8 @@ class AudioManagerImpl {
     boss_defeat: 0,
     wheel_tick: 30,
     wheel_stop: 200,
+    ui_hover: 60,    // prevents mouse-jitter spam
+    ui_click: 50,
   };
 
   // Volume state — readers update via setVolumes when settings change.
@@ -75,6 +86,25 @@ class AudioManagerImpl {
     this.volSfx = sfx;
     this.volMusic = music;
     if (this.music) this.music.volume = this.musicTargetVol();
+    this.attachVisibilityListener();
+  }
+
+  /** Pause music when the tab is hidden, resume when it returns. */
+  private attachVisibilityListener(): void {
+    if (this.visibilityListenerAttached) return;
+    if (typeof document === 'undefined') return;
+    this.visibilityListenerAttached = true;
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        if (this.music && !this.music.paused) {
+          this.wasPlayingBeforeBlur = true;
+          this.music.pause();
+        }
+      } else if (this.wasPlayingBeforeBlur && this.music) {
+        this.music.play().catch(() => { /* autoplay rejected */ });
+        this.wasPlayingBeforeBlur = false;
+      }
+    });
   }
 
   private musicTargetVol(): number {

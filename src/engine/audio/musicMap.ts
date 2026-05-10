@@ -9,6 +9,7 @@ const M = (file: string) => `${BASE}assets/audio/music/${file}`;
 
 export const MUSIC_BY_SCENE: Record<SceneName, string | null> = {
   title:       M('dark-fantasy-open.mp3'),
+  intro:       M('dark-fantasy-open.mp3'),     // shares title music for continuity
   modeselect:  M('castle-lost.mp3'),
   buildpicker: M('secret-spells.mp3'),
   wheels:      M('chilly-whispers.mp3'),

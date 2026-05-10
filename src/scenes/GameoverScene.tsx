@@ -13,11 +13,13 @@ const EPITAPHS = [
 
 export function GameoverScene() {
   const startNewRun = useGameStore((s) => s.startNewRun);
+  const retrySameBuild = useGameStore((s) => s.retrySameBuild);
   const showScene = useGameStore((s) => s.showScene);
   const run = useGameStore((s) => s.run);
 
   // Pick once per render — stable until scene changes
   const epitaph = EPITAPHS[Math.floor(Math.random() * EPITAPHS.length)];
+  const canRetry = !!run.build && !!run.weapon;
 
   return (
     <div className="scene gameover-scene">
@@ -32,8 +34,13 @@ export function GameoverScene() {
         </div>
 
         <div className="gameover-actions">
-          <GlassButton variant="gold" size="lg" onClick={startNewRun}>
-            Gamble Again
+          {canRetry && (
+            <GlassButton variant="gold" size="lg" onClick={retrySameBuild}>
+              Quick Retry
+            </GlassButton>
+          )}
+          <GlassButton variant={canRetry ? 'ghost' : 'gold'} size="md" onClick={startNewRun}>
+            New Run
           </GlassButton>
           <GlassButton variant="ghost" size="md" onClick={() => showScene('title')}>
             Title Screen

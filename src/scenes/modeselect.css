@@ -24,11 +24,14 @@
   gap: 24px;
   flex-wrap: wrap;
   justify-content: center;
-  max-width: 700px;
+  max-width: clamp(700px, 60vw, 1200px);
+  width: 100%;
+  padding: 0 16px;
 }
 
 .mode-card {
-  width: 280px;
+  flex: 1 1 280px;
+  max-width: 420px;
   text-align: center;
 }
 
@@ -41,6 +44,17 @@
 
 .mode-emblem--story    { color: var(--gold-bright); }
 .mode-emblem--infinite { color: var(--arcane-bright); }
+.mode-emblem--daily    { color: var(--candle); }
+
+.mode-daily-tag {
+  margin-top: 10px;
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--candle);
+  opacity: 0.85;
+}
 
 .mode-title {
   font-family: var(--font-display);

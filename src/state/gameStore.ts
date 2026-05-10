@@ -11,8 +11,10 @@ import type {
 } from '../types';
 import { DIFFICULTY } from '../data/difficulty';
 import { useSettingsStore } from './settingsStore';
+import { useStatsStore } from './statsStore';
 import { baseStats } from '../engine/stats';
 import { spinMagnitude } from '../engine/luck';
+import { beginDailyMode, endDailyMode } from '../engine/dailySeed';
 
 interface GameActions {
   showScene(name: SceneName): void;
@@ -31,18 +33,25 @@ interface GameActions {
   // Stats / wheel flow
   initStatsForRaid(): void;
   applyWheelSegment(side: 'buff' | 'curse', segment: WheelSegment): number;
+  buyPotion(cost: number): boolean;
 
   // Round/raid progression
   isBossRaid(): boolean;
   nextRound(): void;             // story: next raid OR boss; infinite: next round
   continueAfterShop(): void;     // shop "Continue" → wheels for the next round
   triggerWin(): void;
+  /** Quick retry: re-run the same build + weapon + mode from raid 1 / round 1. */
+  retrySameBuild(): void;
+
+  setPaused(p: boolean): void;
 }
 
 interface GameStoreState {
   scene: SceneName;
   run: RunState;
   stats: PlayerStats | null;
+  /** True while a modal (settings, pause, etc.) is open — DungeonGame uses this to pause its ticker. */
+  paused: boolean;
 }
 
 const blankRun = (): RunState => ({
@@ -56,24 +65,33 @@ const blankRun = (): RunState => ({
   cashEarned: 0,
   killsTotal: 0,
   cash: 0,
-  upgrades: { hp: 0, dmg: 0, spd: 0, def: 0, crit: 0, luck: 0, cash: 0 },
+  upgrades: { hp: 0, dmg: 0, atkspd: 0, spd: 0, def: 0, crit: 0, luck: 0, cash: 0 },
+  activeBuff: null,
+  activeCurse: null,
+  pendingPotions: 0,
 });
 
 export const useGameStore = create<GameStoreState & GameActions>((set, get) => ({
   scene: 'title',
   run: blankRun(),
   stats: null,
+  paused: false,
 
   showScene(name) {
     set({ scene: name });
   },
 
   startNewRun() {
+    endDailyMode(); // restore native RNG until the player picks a mode
     set({ scene: 'modeselect', run: blankRun(), stats: null });
   },
 
   selectMode(mode) {
     const diff = useSettingsStore.getState().difficulty;
+    // Daily mode locks the RNG so every player gets the same seed.
+    // Story / infinite use the native Math.random.
+    if (mode === 'daily') beginDailyMode();
+    else endDailyMode();
     set({
       scene: 'buildpicker',
       run: {
@@ -96,6 +114,8 @@ export const useGameStore = create<GameStoreState & GameActions>((set, get) => (
       },
     });
     get().initStatsForRaid();
+    // Lifetime stats — record one run per build pick.
+    useStatsStore.getState().recordRunStart(build.id);
   },
 
   setRaid(raid) {
@@ -138,10 +158,23 @@ export const useGameStore = create<GameStoreState & GameActions>((set, get) => (
   },
 
   initStatsForRaid() {
-    const { build, weapon, spells, upgrades } = get().run;
+    const { build, weapon, spells, upgrades, pendingPotions } = get().run;
     if (!build || !weapon) return;
     const diff = useSettingsStore.getState().difficulty;
-    set({ stats: baseStats(build, weapon, spells, diff, upgrades) });
+    const stats = baseStats(build, weapon, spells, diff, upgrades);
+    if (pendingPotions > 0) {
+      // Each potion grants +50 starting HP and +10 to max HP for the raid.
+      stats.hpMax += 60 * pendingPotions;
+      stats.hp = stats.hpMax;
+    }
+    set({ stats, run: { ...get().run, pendingPotions: 0 } });
+  },
+
+  buyPotion(cost) {
+    const r = get().run;
+    if (r.cash < cost) return false;
+    set({ run: { ...r, cash: r.cash - cost, pendingPotions: r.pendingPotions + 1 } });
+    return true;
   },
 
   applyWheelSegment(side, segment) {
@@ -152,18 +185,25 @@ export const useGameStore = create<GameStoreState & GameActions>((set, get) => (
     // Mutate a copy, then store
     const next = { ...stats };
     segment.apply(next, m);
-    set({ stats: next });
+    // Track which segment landed for HUD display in the dungeon.
+    const label = m !== 1 ? `${segment.label} ×${m.toFixed(1)}` : segment.label;
+    const runPatch = side === 'buff'
+      ? { ...run, activeBuff: label }
+      : { ...run, activeCurse: label };
+    set({ stats: next, run: runPatch });
+    if (segment.label === 'JACKPOT') useStatsStore.getState().recordJackpot();
     return m;
   },
 
   isBossRaid() {
     const r = get().run;
-    return r.mode === 'story' && r.raid >= r.totalRaids;
+    // Both story and daily modes culminate in a final boss raid.
+    return (r.mode === 'story' || r.mode === 'daily') && r.raid >= r.totalRaids;
   },
 
   nextRound() {
     const { run } = get();
-    if (run.mode === 'story') {
+    if (run.mode === 'story' || run.mode === 'daily') {
       const nextRaid = Math.min(run.totalRaids, run.raid + 1);
       set({ run: { ...run, raid: nextRaid } });
     } else {
@@ -182,5 +222,32 @@ export const useGameStore = create<GameStoreState & GameActions>((set, get) => (
 
   triggerWin() {
     set({ scene: 'win' });
+  },
+
+  retrySameBuild() {
+    const prev = get().run;
+    if (!prev.build || !prev.weapon) {
+      // No prior build — fall back to a normal new-run flow.
+      get().startNewRun();
+      return;
+    }
+    const diff = useSettingsStore.getState().difficulty;
+    set({
+      scene: 'wheels',
+      run: {
+        ...blankRun(),
+        mode: prev.mode,
+        totalRaids: DIFFICULTY[diff].storyRaids,
+        build: prev.build,
+        weapon: prev.weapon,
+        spells: [...prev.build.spells],
+      },
+      stats: null,
+    });
+    get().initStatsForRaid();
+  },
+
+  setPaused(p) {
+    set({ paused: p });
   },
 }));

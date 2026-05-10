@@ -9,8 +9,8 @@
 
   /* Ink */
   --ink: #e9e6df;
-  --ink-muted: #a09a8a;
-  --ink-dim: #6f6a5e;
+  --ink-muted: #b6b0a0;   /* was #a09a8a — bumped for AA contrast on glass */
+  --ink-dim: #948e80;     /* was #6f6a5e (3.4:1 fail) — now ~5:1 on hood bg */
 
   /* Accents */
   --gold: #c9a227;
@@ -137,11 +137,17 @@ input[type='range'] {
   position: relative;
   z-index: 1;
   width: 100vw;
-  height: 100vh;
+  min-height: 100vh;
+  /* Allow content to scroll on short viewports rather than clipping the
+     heading. Centered vertically when content fits, top-anchored when
+     it doesn't (avoids the mobile-portrait clip from #121). */
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: safe center;
+  padding-top: max(env(safe-area-inset-top, 18px), 18px);
+  padding-bottom: max(env(safe-area-inset-bottom, 24px), 24px);
+  overflow-y: auto;
 }
 
 /* prefers-reduced-motion */

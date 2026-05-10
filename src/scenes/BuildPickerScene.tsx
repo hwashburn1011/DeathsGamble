@@ -1,37 +1,30 @@
-import { useMemo, useEffect, useRef } from 'react';
+import { useMemo, useState } from 'react';
 import { GlassPanel } from '../ui/GlassPanel';
 import { GlassButton } from '../ui/GlassButton';
 import { useGameStore } from '../state/gameStore';
 import { BUILDS } from '../data/builds';
-import { WEAPONS_BY_ID } from '../data/weapons';
+import { WEAPONS, WEAPONS_BY_ID } from '../data/weapons';
 import { SPELLS_BY_ID } from '../data/spells';
-import type { BuildDef } from '../types';
-import { drawCharacter } from '../engine/charSprites';
+import { PLAYER_SPRITE_BY_BUILD } from '../engine/pixi/manifest';
+import type { BuildDef, WeaponDef } from '../types';
 import './buildpicker.css';
-
-function rollBuilds(): BuildDef[] {
-  const pool = [...BUILDS];
-  const picks: BuildDef[] = [];
-  for (let i = 0; i < 3 && pool.length; i++) {
-    const idx = Math.floor(Math.random() * pool.length);
-    picks.push(pool.splice(idx, 1)[0]);
-  }
-  return picks;
-}
 
 export function BuildPickerScene() {
   const pickBuild = useGameStore((s) => s.pickBuild);
   const showScene = useGameStore((s) => s.showScene);
-  const builds = useMemo(() => rollBuilds(), []);
+  // Show all 8 builds — players shouldn't have to roll runs to find their
+  // preferred build. The grid wraps; portrait + sprite art still keeps each
+  // option scannable.
+  const builds = useMemo(() => BUILDS, []);
 
   return (
     <div className="scene buildpicker-scene">
       <h2 className="display buildpicker-heading">Choose Your Build</h2>
-      <p className="subtitle buildpicker-sub">Death has dealt three. Pick one.</p>
+      <p className="subtitle buildpicker-sub">Pick a build. Each carries a unique weapon and spell.</p>
 
       <div className="build-options">
         {builds.map((b) => (
-          <BuildCard key={b.id} build={b} onPick={() => pickBuild(b, WEAPONS_BY_ID[b.weapon])} />
+          <BuildCard key={b.id} build={b} onPick={(weapon) => pickBuild(b, weapon)} />
         ))}
       </div>
 
@@ -46,35 +39,25 @@ export function BuildPickerScene() {
 
 interface BuildCardProps {
   build: BuildDef;
-  onPick: () => void;
+  onPick: (weapon: WeaponDef) => void;
 }
 
 function BuildCard({ build, onPick }: BuildCardProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const w = WEAPONS_BY_ID[build.weapon];
+  const defaultWeapon = WEAPONS_BY_ID[build.weapon];
+  const [selectedWeapon, setSelectedWeapon] = useState<WeaponDef>(defaultWeapon);
+  const [picking, setPicking] = useState(false);
   const spellList = build.spells.map((id) => SPELLS_BY_ID[id]?.name ?? id).join(', ') || 'None';
-
-  useEffect(() => {
-    const cv = canvasRef.current;
-    if (!cv) return;
-    const dpr = window.devicePixelRatio || 1;
-    const W = 100;
-    const H = 130;
-    cv.width = W * dpr;
-    cv.height = H * dpr;
-    cv.style.width = `${W}px`;
-    cv.style.height = `${H}px`;
-    const ctx = cv.getContext('2d');
-    if (!ctx) return;
-    ctx.scale(dpr, dpr);
-    ctx.clearRect(0, 0, W, H);
-    drawCharacter(ctx, W / 2, 80, 3.5, build);
-  }, [build]);
+  const portraitUrl = PLAYER_SPRITE_BY_BUILD[build.id] ?? PLAYER_SPRITE_BY_BUILD['gambler'];
 
   return (
-    <GlassPanel padding="md" hoverable onClick={onPick} className="build-card">
+    <GlassPanel
+      padding="md"
+      hoverable={!picking}
+      onClick={picking ? undefined : () => onPick(selectedWeapon)}
+      className="build-card"
+    >
       <div className="build-portrait">
-        <canvas ref={canvasRef} />
+        <img src={portraitUrl} alt={build.name} className="build-portrait-img" />
       </div>
       <h3 className="build-name">{build.name}</h3>
       <p className="build-desc">{build.desc}</p>
@@ -87,9 +70,39 @@ function BuildCard({ build, onPick }: BuildCardProps) {
         )}
       </div>
       <div className="build-loadout">
-        <span className="weapon-row">{w.icon} {w.name}</span>
+        <span className="weapon-row">{selectedWeapon.icon} {selectedWeapon.name}</span>
         <span className="spell-row">✦ {spellList}</span>
+        <button
+          type="button"
+          className="weapon-swap-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            setPicking((p) => !p);
+          }}
+        >
+          {picking ? 'Close ✕' : 'Swap weapon ⇄'}
+        </button>
       </div>
+
+      {picking && (
+        <div className="weapon-grid" onClick={(e) => e.stopPropagation()}>
+          {WEAPONS.map((w) => (
+            <button
+              key={w.id}
+              type="button"
+              className={`weapon-chip ${w.id === selectedWeapon.id ? 'weapon-chip--active' : ''}`}
+              onClick={() => {
+                setSelectedWeapon(w);
+                setPicking(false);
+              }}
+              title={`${w.name} · ${w.dmg} DMG · ${w.atkspd.toFixed(1)} ATK · ${w.range} RNG`}
+            >
+              <span className="weapon-chip-icon">{w.icon}</span>
+              <span className="weapon-chip-name">{w.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </GlassPanel>
   );
 }

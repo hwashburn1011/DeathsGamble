@@ -88,8 +88,10 @@
   text-align: center;
   margin-right: 6px;
   font-size: 11px;
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
+    'Noto Color Emoji', 'Cinzel', sans-serif;
   text-shadow: 0 0 6px currentColor;
-  opacity: 0.85;
+  opacity: 0.9;
   font-style: normal;
 }
 
@@ -179,11 +181,49 @@
   }
 }
 
-/* Enter Dungeon — bottom right */
+/* JACKPOT celebration — full-screen gold flash + bounding banner text */
+.wheels-jackpot-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 50%, rgba(240, 200, 74, 0.45), transparent 65%);
+  animation: jackpotFlash 1.4s ease-out forwards;
+}
+.wheels-jackpot-banner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: clamp(64px, 12vw, 160px);
+  letter-spacing: 0.18em;
+  color: var(--gold-bright);
+  text-shadow:
+    0 0 30px rgba(240, 200, 74, 0.9),
+    0 0 60px rgba(240, 200, 74, 0.6),
+    0 0 8px rgba(0, 0, 0, 0.7);
+  animation: jackpotBounce 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes jackpotFlash {
+  0%   { opacity: 0; }
+  20%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes jackpotBounce {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+  30%  { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+  60%  { opacity: 1; transform: translate(-50%, -50%) scale(1.0); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.95); }
+}
+
+/* Enter Dungeon — bottom center, clear of the side wheel-button-groups */
 .wheels-enter {
   position: absolute;
   bottom: 30px;
-  right: 30px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 10;
 }
 

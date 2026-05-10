@@ -19,6 +19,7 @@ export function WinScene() {
   return (
     <div className="scene win-scene">
       <div className="win-aura" />
+      <div className="win-flash" />
       <GlassPanel padding="lg" className="win-card">
         <h2 className="display win-heading">You Cheated Death</h2>
         <p className="win-line">{line}</p>

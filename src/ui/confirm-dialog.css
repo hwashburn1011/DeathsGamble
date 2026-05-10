@@ -1,0 +1,45 @@
+.confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  background: rgba(7, 7, 10, 0.75);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.confirm-card-wrap {
+  max-width: 420px;
+  width: 100%;
+}
+
+.confirm-card {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.confirm-title {
+  font-size: 20px;
+  letter-spacing: 0.2em;
+  color: var(--gold-bright);
+}
+
+.confirm-body {
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.55;
+  opacity: 0.9;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}

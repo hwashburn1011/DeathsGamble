@@ -16,8 +16,9 @@
 
 .gameover-epitaph {
   font-style: italic;
-  color: var(--ink-muted);
-  font-size: 16px;
+  color: var(--ink);
+  opacity: 0.85;
+  font-size: 17px;
   margin-bottom: 28px;
 }
 
@@ -37,10 +38,10 @@
 
 .gameover-stat-label {
   font-family: var(--font-display);
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--ink-dim);
+  color: var(--ink-muted);
 }
 
 .gameover-stat-value {

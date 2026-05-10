@@ -1,6 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { GlassPanel } from './GlassPanel';
 import { GlassButton } from './GlassButton';
+import { ConfirmDialog } from './ConfirmDialog';
 import { useSettingsStore } from '../state/settingsStore';
 import type { Difficulty, SettingsState, WheelMode } from '../types';
 import './settings-modal.css';
@@ -11,6 +12,7 @@ interface Props {
 
 export function SettingsModal({ onClose }: Props) {
   const settings = useSettingsStore();
+  const [confirmReset, setConfirmReset] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -98,6 +100,19 @@ export function SettingsModal({ onClose }: Props) {
           </div>
 
           <div className="settings-row">
+            <span className="settings-label">Render Quality</span>
+            <Segmented<SettingsState['renderQuality']>
+              value={settings.renderQuality}
+              options={[
+                { value: 'low', label: 'Low' },
+                { value: 'medium', label: 'Med' },
+                { value: 'high', label: 'High' },
+              ]}
+              onChange={(v) => settings.set('renderQuality', v)}
+            />
+          </div>
+
+          <div className="settings-row">
             <span className="settings-label">Master Vol</span>
             <div className="settings-control">
               <input
@@ -146,9 +161,7 @@ export function SettingsModal({ onClose }: Props) {
             <GlassButton
               variant="ghost"
               size="sm"
-              onClick={() => {
-                if (confirm('Reset all save data (cash, upgrades)?')) settings.resetSave();
-              }}
+              onClick={() => setConfirmReset(true)}
             >
               Reset Save
             </GlassButton>
@@ -158,6 +171,21 @@ export function SettingsModal({ onClose }: Props) {
           </div>
         </GlassPanel>
       </div>
+
+      {confirmReset && (
+        <ConfirmDialog
+          title="Reset all save data?"
+          body="This wipes settings, persistent cash, and any meta progress. Active runs aren't affected. This can't be undone."
+          confirmLabel="Reset"
+          cancelLabel="Keep"
+          variant="danger"
+          onConfirm={() => {
+            settings.resetSave();
+            setConfirmReset(false);
+          }}
+          onCancel={() => setConfirmReset(false)}
+        />
+      )}
     </div>
   );
 }

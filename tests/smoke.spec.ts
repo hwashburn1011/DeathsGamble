@@ -14,6 +14,15 @@ interface FailedRequest {
  * Hook console errors + 4xx/5xx responses on the page.
  * Returns getters that the test can assert against.
  */
+// Skip the first-launch intro card sequence — tests assume the title button
+// goes straight to mode select.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('dg_intro_seen', '1');
+    localStorage.setItem('dg_dungeon_help_seen', '1');
+  });
+});
+
 function watch(page: Page) {
   const failed: FailedRequest[] = [];
   const consoleErrors: string[] = [];

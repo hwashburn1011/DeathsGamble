@@ -3,9 +3,17 @@ import { Application } from 'pixi.js';
 import { GlassPanel } from '../ui/GlassPanel';
 import { useGameStore } from '../state/gameStore';
 import { useSettingsStore } from '../state/settingsStore';
+import { useStatsStore } from '../state/statsStore';
 import { DungeonGame } from '../engine/dungeon/DungeonGame';
 import { themeFor } from '../engine/pixi/manifest';
 import './dungeon.css';
+
+const THEME_FLAVOR: Record<string, { name: string; line: string }> = {
+  crypt:     { name: 'The Crypt',     line: 'Bones whisper here.' },
+  catacomb:  { name: 'The Catacomb',  line: 'Old idols watch from the dark.' },
+  hellscape: { name: 'The Hellscape', line: 'Ash and blood.' },
+  cavern:    { name: 'The Cavern',    line: 'Roots clutch the dead.' },
+};
 
 interface HudStats {
   hp: number;
@@ -23,6 +31,7 @@ interface HudStats {
 
 export function DungeonScene() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const gameRef = useRef<DungeonGame | null>(null);
   const run = useGameStore((s) => s.run);
   const stats = useGameStore((s) => s.stats);
   const showScene = useGameStore((s) => s.showScene);
@@ -31,18 +40,36 @@ export function DungeonScene() {
   const isBossRaidFn = useGameStore((s) => s.isBossRaid);
   const nextRound = useGameStore((s) => s.nextRound);
   const triggerWin = useGameStore((s) => s.triggerWin);
+  const paused = useGameStore((s) => s.paused);
   const motionIntensity = useSettingsStore((s) => s.motionIntensity);
+  const renderQuality = useSettingsStore((s) => s.renderQuality);
   const blood = useSettingsStore((s) => s.blood);
   const greedLevel = useGameStore((s) => s.run.upgrades.cash);
   const addCashToRun = useGameStore((s) => s.addCashToRun);
   const cashMult = 1 + greedLevel * 0.25;
   const isBossRaid = isBossRaidFn();
 
+  // Push pause state through to the engine whenever it flips.
+  useEffect(() => {
+    gameRef.current?.setPaused(paused);
+  }, [paused]);
+
+  // Poll the active-spell cooldown 5x/sec so the HUD pip refreshes.
+  useEffect(() => {
+    const id = setInterval(() => {
+      const g = gameRef.current;
+      if (g) setActiveReady(g.getActiveSpellReady());
+    }, 200);
+    return () => clearInterval(id);
+  }, []);
+
   // Engine reads blood toggle off a global (avoids dragging zustand into the
   // engine module). Keep it in sync with the store.
   useEffect(() => {
     (window as Window & { __DG_BLOOD_ON?: boolean }).__DG_BLOOD_ON = blood;
   }, [blood]);
+
+  const [activeReady, setActiveReady] = useState(1);
 
   const [hud, setHud] = useState<HudStats>({
     hp: stats?.hp ?? run.build?.baseHp ?? 100,
@@ -60,6 +87,30 @@ export function DungeonScene() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadProgress, setLoadProgress] = useState({ loaded: 0, total: 1 });
+  const [showFirstHelp, setShowFirstHelp] = useState(false);
+  const [showIntro, setShowIntro] = useState(false);
+
+  // First-time dungeon visit: show prominent control overlay for ~5s.
+  useEffect(() => {
+    if (loading) return;
+    if (localStorage.getItem('dg_dungeon_help_seen')) return;
+    setShowFirstHelp(true);
+    const t = setTimeout(() => {
+      setShowFirstHelp(false);
+      localStorage.setItem('dg_dungeon_help_seen', '1');
+    }, 5000);
+    return () => clearTimeout(t);
+  }, [loading]);
+
+  // Per-raid intro card — fades in/out. Boss raids get a longer, weightier
+  // hold so "DEATH ITSELF" lands cinematically.
+  useEffect(() => {
+    if (loading) return;
+    setShowIntro(true);
+    const dur = isBossRaid ? 4000 : 2500;
+    const t = setTimeout(() => setShowIntro(false), dur);
+    return () => clearTimeout(t);
+  }, [loading, run.raid, run.endlessRound, isBossRaid]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -71,18 +122,27 @@ export function DungeonScene() {
 
     (async () => {
       try {
+        const dpr = window.devicePixelRatio || 1;
+        const qualityCap = renderQuality === 'low' ? 1 : renderQuality === 'medium' ? 1.5 : 4;
         app = new Application();
         await app.init({
           background: 0x060609,
           resizeTo: window,
           antialias: true,
-          resolution: window.devicePixelRatio || 1,
+          resolution: Math.min(dpr, qualityCap),
           autoDensity: true,
         });
         if (cancelled) {
           app.destroy(true);
           return;
         }
+        // Accessibility — screen readers can at least announce the canvas
+        // as "Dungeon combat" with movement instructions.
+        app.canvas.setAttribute('role', 'application');
+        app.canvas.setAttribute(
+          'aria-label',
+          'Dungeon combat — use WASD or arrow keys to move. Your weapon fires automatically at the nearest enemy.'
+        );
         container.appendChild(app.canvas);
 
         game = new DungeonGame(app, {
@@ -111,6 +171,7 @@ export function DungeonScene() {
             if (cancelled) return;
             addCashEarned(gs.cash);
             addKills(gs.kills);
+            useStatsStore.getState().recordDeath(gs.kills, gs.cash);
             // No persistent cash — run-scoped only.
             showScene('gameover');
           },
@@ -119,12 +180,17 @@ export function DungeonScene() {
             addKills(gs.kills);
             // Cash earned this round becomes spendable cash in the shop
             addCashToRun(gs.cash);
+            // Track endless milestone if applicable.
+            if (run.mode === 'infinite') {
+              useStatsStore.getState().recordEndlessRound((run.endlessRound ?? 0) + 1);
+            }
             nextRound();
           },
           onBossDefeated: (gs) => {
             if (cancelled) return;
             addCashEarned(gs.cash);
             addKills(gs.kills);
+            useStatsStore.getState().recordWin(gs.kills, gs.cash);
             triggerWin();
           },
         });
@@ -134,6 +200,7 @@ export function DungeonScene() {
           app.destroy(true);
           return;
         }
+        gameRef.current = game;
         setLoading(false);
       } catch (err) {
         console.error('Dungeon init failed', err);
@@ -143,6 +210,7 @@ export function DungeonScene() {
 
     return () => {
       cancelled = true;
+      gameRef.current = null;
       game?.destroy();
       try {
         app?.destroy(true, { children: true });
@@ -151,7 +219,7 @@ export function DungeonScene() {
       }
       while (container.firstChild) container.removeChild(container.firstChild);
     };
-  }, [run.build, run.weapon, run.raid, run.endlessRound, stats, isBossRaid, motionIntensity, cashMult, addCashEarned, addCashToRun, addKills, showScene, nextRound, triggerWin]);
+  }, [run.build, run.weapon, run.raid, run.endlessRound, stats, isBossRaid, motionIntensity, renderQuality, cashMult, addCashEarned, addCashToRun, addKills, showScene, nextRound, triggerWin]);
 
   const hpPct = Math.max(0, hud.hp / hud.hpMax) * 100;
   const xpPct = (hud.xp / hud.xpNext) * 100;
@@ -198,9 +266,9 @@ export function DungeonScene() {
         <span className="info-pair"><span className="info-l">KILLS</span><span className="info-v">{hud.kills}</span></span>
         <span className="info-pair"><span className="info-l">LVL</span><span className="info-v">{hud.level}</span></span>
         <span className="info-pair">
-          <span className="info-l">{run.mode === 'story' ? 'RAID' : 'ROUND'}</span>
+          <span className="info-l">{run.mode !== 'infinite' ? 'RAID' : 'ROUND'}</span>
           <span className="info-v">
-            {run.mode === 'story'
+            {run.mode !== 'infinite'
               ? isBossRaid
                 ? 'Boss'
                 : `${run.raid} / ${run.totalRaids - 1}`
@@ -209,6 +277,18 @@ export function DungeonScene() {
         </span>
         <span className="info-pair"><span className="info-l">$</span><span className="info-v">{hud.cashThisRun}</span></span>
       </div>
+
+      {/* Active bargain chips — top-center under the round timer */}
+      {(run.activeBuff || run.activeCurse) && (
+        <div className="dungeon-bargain">
+          {run.activeBuff && (
+            <span className="bargain-chip bargain-chip--buff">{run.activeBuff}</span>
+          )}
+          {run.activeCurse && (
+            <span className="bargain-chip bargain-chip--curse">{run.activeCurse}</span>
+          )}
+        </div>
+      )}
 
       {/* Round timer (hidden during boss raids) */}
       {!isBossRaid && hud.timeRemaining >= 0 && (
@@ -255,7 +335,55 @@ export function DungeonScene() {
         </div>
       </GlassPanel>
 
-      <div className="dungeon-hint">WASD / Arrow keys — auto-attacks fire</div>
+      <div className="dungeon-hint">WASD / Arrow keys — auto-attacks fire · Q for Frost Nova</div>
+
+      {/* Active spell cooldown pip — bottom-right */}
+      <div className={`active-spell ${activeReady >= 1 ? 'active-spell--ready' : ''}`}>
+        <div className="active-spell-key">Q</div>
+        <div className="active-spell-name">Frost Nova</div>
+        <div className="active-spell-cd">
+          <div className="active-spell-cd-fill" style={{ width: `${activeReady * 100}%` }} />
+        </div>
+      </div>
+
+      {showIntro && (() => {
+        const themeKey = themeFor({
+          mode: run.mode,
+          raid: run.raid,
+          totalRaids: run.totalRaids,
+          endlessRound: run.endlessRound,
+          isBossRaid,
+        });
+        const flavor = THEME_FLAVOR[themeKey] ?? { name: 'Unknown', line: '' };
+        const heading = isBossRaid
+          ? 'DEATH ITSELF'
+          : run.mode !== 'infinite'
+            ? `Raid ${run.raid} of ${run.totalRaids - 1}`
+            : `Round ${(run.endlessRound ?? 0) + 1}`;
+        const sub = isBossRaid ? 'You knew this was coming.' : `${flavor.name} · ${flavor.line}`;
+        return (
+          <div className={`dungeon-intro ${isBossRaid ? 'dungeon-intro--boss' : ''}`}>
+            <div className="dungeon-intro-heading display">{heading}</div>
+            <div className="dungeon-intro-sub">{sub}</div>
+          </div>
+        );
+      })()}
+
+      {showFirstHelp && (
+        <div className="dungeon-first-help">
+          <div className="first-help-card">
+            <div className="first-help-row"><kbd>W A S D</kbd> <span>or arrow keys to move</span></div>
+            <div className="first-help-row"><span>Your weapon fires automatically at the nearest enemy</span></div>
+            <div className="first-help-row"><kbd>⚙</kbd> <span>top-right · settings &amp; pause</span></div>
+          </div>
+        </div>
+      )}
+
+      {paused && (
+        <div className="dungeon-paused">
+          <div className="dungeon-paused-text display">Paused</div>
+        </div>
+      )}
     </div>
   );
 }

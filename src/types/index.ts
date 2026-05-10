@@ -2,6 +2,7 @@
 
 export type SceneName =
   | 'title'
+  | 'intro'
   | 'modeselect'
   | 'buildpicker'
   | 'wheels'
@@ -11,7 +12,7 @@ export type SceneName =
   | 'win'
   | 'credits';
 
-export type GameMode = 'story' | 'infinite';
+export type GameMode = 'story' | 'infinite' | 'daily';
 export type Difficulty = 'easy' | 'normal' | 'hard';
 export type WheelMode = 'wheel' | 'slot';
 
@@ -59,6 +60,17 @@ export interface SpellEffect {
   pierce?: number;
 }
 
+export type ActiveSpellId = 'frostNova' | 'shadowstep';
+
+export interface ActiveSpellDef {
+  id: ActiveSpellId;
+  name: string;
+  desc: string;
+  cooldownSec: number;
+  /** Hotkey hint shown in HUD. */
+  key: string;
+}
+
 export interface SpellDef {
   id: string;
   name: string;
@@ -75,7 +87,11 @@ export type EnemySprite =
   | 'tank'
   | 'imp'
   | 'reaper'
-  | 'boss';
+  | 'boss'
+  | 'archer'
+  | 'fireImp'
+  | 'lichAcolyte'
+  | 'boneKnight';
 
 export interface EnemyTypeDef {
   id: string;
@@ -84,8 +100,15 @@ export interface EnemyTypeDef {
   dmg: number;
   color: string;
   size: number;
-  tier: number;       // 1 (early) to 4 (late)
+  tier: number;             // 1 (early) to 5 (elite)
   sprite: EnemySprite;
+  /** Optional ranged-attack profile. */
+  ranged?: {
+    range: number;          // px — fires when within this distance
+    cooldownMs: number;     // between shots
+    projectileSpd: number;  // px/sec
+    projectileColor: number; // hex
+  };
 }
 
 export interface ShopUpgradeDef {
@@ -156,12 +179,18 @@ export interface RunState {
   // exponentially per-level via SHOP_UPGRADES.costMult.
   cash: number;
   upgrades: PersistentUpgrades;
+  // Last spin labels for HUD display in the dungeon. Cleared between rounds.
+  activeBuff: string | null;
+  activeCurse: string | null;
+  // One-shot consumables purchased in the shop, applied at next raid init.
+  pendingPotions: number;     // each grants +50 starting HP at the next raid
 }
 
 // ----- Persistent (localStorage) -----
 export interface PersistentUpgrades {
   hp: number;
   dmg: number;
+  atkspd: number;
   spd: number;
   def: number;
   crit: number;
@@ -181,6 +210,8 @@ export interface SettingsState {
   wheelMode: WheelMode;
   blood: boolean;
   motionIntensity: 'off' | 'low' | 'normal' | 'high';
+  /** Render quality — caps the Pixi resolution multiplier on Hi-DPI screens. */
+  renderQuality: 'low' | 'medium' | 'high';
   volumeMaster: number;   // 0..1
   volumeSfx: number;      // 0..1
   volumeMusic: number;    // 0..1

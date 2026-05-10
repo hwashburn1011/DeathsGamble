@@ -65,6 +65,17 @@
   transform: translateY(0);
 }
 
+/* Keyboard focus ring — visible without overriding hover/active states */
+.gbtn:focus-visible {
+  outline: 2px solid var(--gold-bright);
+  outline-offset: 3px;
+  box-shadow: 0 0 16px rgba(240, 200, 74, 0.55);
+}
+.gbtn--good:focus-visible   { outline-color: var(--moss-bright);   box-shadow: 0 0 16px rgba(105, 176, 112, 0.55); }
+.gbtn--danger:focus-visible { outline-color: var(--blood-bright);  box-shadow: 0 0 16px rgba(224, 72, 72, 0.55); }
+.gbtn--magic:focus-visible  { outline-color: var(--arcane-bright); box-shadow: 0 0 16px rgba(128, 176, 255, 0.55); }
+.gbtn--ghost:focus-visible  { outline-color: var(--ink); }
+
 .gbtn:disabled {
   opacity: 0.35;
   cursor: not-allowed;

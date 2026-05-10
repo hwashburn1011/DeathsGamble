@@ -12,6 +12,7 @@ import {
 import type { WheelSegment } from '../../types';
 import { SEG_ANGLE, SEG_COUNT } from '../../data/wheels';
 import { pickSegmentWithLuck } from '../luck';
+import { AudioManager } from '../audio/AudioManager';
 
 interface WheelState {
   container: Container;        // rotates with `angle`
@@ -28,6 +29,7 @@ interface WheelState {
   cx: number;                  // wheel center x in stage coords
   cy: number;
   radius: number;
+  lastTickSegIdx: number;      // last segment index that was under the pointer (for tick SFX)
 }
 
 interface Geometry {
@@ -227,7 +229,10 @@ export class WheelsGame {
       deathCx, headTopY
     );
     cloak.closePath();
-    cloak.fill({ color: 0x0e0e16 });
+    // Brighter silhouette so the body is visible against the dark wheels bg
+    // (was 0x0e0e16 — almost the same as bg 0x07070a, made the figure look invisible).
+    cloak.fill({ color: 0x1c1c2a });
+    cloak.stroke({ color: 0x2a2a3a, width: 1.5 });
     this.deathBack.addChild(cloak);
 
     // Side rim light (cool moonlight on left edge) — overlay shape
@@ -246,7 +251,7 @@ export class WheelsGame {
     rim.lineTo(deathCx, robeBottom);
     rim.lineTo(deathCx, headTopY);
     rim.closePath();
-    rim.fill({ color: 0x8aa0d0, alpha: 0.06 });
+    rim.fill({ color: 0x8aa0d0, alpha: 0.18 });
     this.deathBack.addChild(rim);
 
     // Cloak fold lines
@@ -258,7 +263,7 @@ export class WheelsGame {
       folds.moveTo(xT, shoulderY + wheelR * 0.4);
       folds.bezierCurveTo(xT, cy + wheelR * 0.5, xB, cy + wheelR * 1.4, xB, robeBottom * 0.95);
     }
-    folds.stroke({ color: 0xffffff, alpha: 0.05, width: 1.2 });
+    folds.stroke({ color: 0xffffff, alpha: 0.12, width: 1.4 });
     this.deathBack.addChild(folds);
 
     // Hood rim highlight
@@ -274,7 +279,7 @@ export class WheelsGame {
       deathCx + wheelR * 0.95, headTopY + wheelR * 0.25,
       deathCx + wheelR * 1.35, collarY - wheelR * 0.05
     );
-    rimLine.stroke({ color: 0xdcdcdf, alpha: 0.1, width: 1.5 });
+    rimLine.stroke({ color: 0xdcdcdf, alpha: 0.28, width: 1.8 });
     this.deathBack.addChild(rimLine);
 
     // Hood opening (face void)
@@ -433,6 +438,7 @@ export class WheelsGame {
       cx,
       cy,
       radius: r,
+      lastTickSegIdx: -1,
     };
   }
 
@@ -506,6 +512,18 @@ export class WheelsGame {
     layer.circle(gripX, gripY, wheelR * 0.085);
     layer.stroke({ color: 0x6d6450, width: 1.4 });
 
+    // Sleeve cuff — draws a dark cloak-colored band behind the palm so the
+    // hand visibly emerges from a sleeve (and reads as "attached to body"
+    // even when the cloak silhouette is partially obscured).
+    const cuffOffset = wheelR * 0.18;
+    const cuffAngle = sign < 0 ? Math.PI * 1.0 : Math.PI * 0.0; // toward body center
+    const cuffX = gripX + Math.cos(cuffAngle) * cuffOffset;
+    const cuffY = gripY + Math.sin(cuffAngle) * cuffOffset;
+    layer.ellipse(cuffX, cuffY, wheelR * 0.22, wheelR * 0.13);
+    layer.fill({ color: 0x1c1c2a });
+    layer.ellipse(cuffX, cuffY, wheelR * 0.22, wheelR * 0.13);
+    layer.stroke({ color: 0x2a2a3a, width: 1.2 });
+
     this.deathFront.addChild(layer);
   }
 
@@ -537,11 +555,25 @@ export class WheelsGame {
       const eased = 1 - Math.pow(1 - t, 3);
       w.angle = w.spinStart + (w.spinTarget - w.spinStart) * eased;
       w.container.rotation = w.angle;
+
+      // Tick SFX whenever the segment under the top pointer changes.
+      // The wheel's segment 0 sits at angle 0; the pointer is at -PI/2.
+      // So the segment currently under the pointer is the index of the
+      // slice whose midpoint lines up with -PI/2 after rotation `w.angle`.
+      const pointerSegFloat = (-Math.PI / 2 - w.angle) / SEG_ANGLE;
+      const segIdx = ((Math.round(pointerSegFloat) % SEG_COUNT) + SEG_COUNT) % SEG_COUNT;
+      if (segIdx !== w.lastTickSegIdx) {
+        w.lastTickSegIdx = segIdx;
+        // 30ms cooldown in AudioManager naturally rate-limits early-spin spam.
+        AudioManager.play('wheel_tick', { volume: 0.5 });
+      }
+
       if (t >= 1) {
         w.spinning = false;
         w.spun = true;
         w.angle = ((w.angle % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
         w.container.rotation = w.angle;
+        AudioManager.play('wheel_stop', { volume: 0.7 });
         const side: 'buff' | 'curse' = w === this.buff ? 'buff' : 'curse';
         this.opts.onSpinComplete(side, w.resultIdx);
       }

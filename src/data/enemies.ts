@@ -9,6 +9,21 @@ export const ENEMY_TYPES: EnemyTypeDef[] = [
   { id: 'tank',     hp: 50, spd: 0.6, dmg: 14, color: '#5a3a8a', size: 22, tier: 3, sprite: 'tank' },
   { id: 'imp',      hp: 6,  spd: 3.0, dmg: 4,  color: '#e04848', size: 11, tier: 1, sprite: 'imp' },
   { id: 'reaper',   hp: 80, spd: 1.0, dmg: 18, color: '#1a1a1a', size: 24, tier: 4, sprite: 'reaper' },
+
+  // ----- Ranged enemies (#114) -----
+  // Skeleton archer — slow, fragile, shoots arrows from a distance.
+  { id: 'archer',   hp: 14, spd: 0.8, dmg: 9,  color: '#b8a880', size: 14, tier: 2, sprite: 'archer',
+    ranged: { range: 320, cooldownMs: 1800, projectileSpd: 280, projectileColor: 0xd4ccb2 } },
+  // Fire imp — fast, fragile, lobs slow fireballs.
+  { id: 'fireImp',  hp: 9,  spd: 2.4, dmg: 7,  color: '#ff7030', size: 12, tier: 2, sprite: 'fireImp',
+    ranged: { range: 260, cooldownMs: 1300, projectileSpd: 220, projectileColor: 0xff7030 } },
+
+  // ----- Elite tier (#116) — between reaper (80HP) and final boss (1200HP) -----
+  // Lich Acolyte — moderate hp, slow, casts arcane bolts.
+  { id: 'lichAcolyte', hp: 240, spd: 0.9, dmg: 14, color: '#5060c0', size: 26, tier: 5, sprite: 'lichAcolyte',
+    ranged: { range: 360, cooldownMs: 1500, projectileSpd: 240, projectileColor: 0x80b0ff } },
+  // Bone Knight — heavy melee bruiser, hits hard.
+  { id: 'boneKnight', hp: 320, spd: 1.0, dmg: 24, color: '#a09080', size: 28, tier: 5, sprite: 'boneKnight' },
 ];
 
 export const FINAL_BOSS = {
@@ -18,6 +33,8 @@ export const FINAL_BOSS = {
   spd: 0.8,
   dmg: 30,
   color: '#000000',
-  size: 55,
+  // Was 55 — visually only ~33% larger than tier-4 reaper. Bumped so the
+  // boss reads as 2× the largest regular enemy at scale.
+  size: 88,
   sprite: 'boss' as const,
 };

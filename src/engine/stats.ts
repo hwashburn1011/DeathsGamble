@@ -13,6 +13,7 @@ import { SPELLS_BY_ID } from '../data/spells';
 const ZERO_UPGRADES: PersistentUpgrades = {
   hp: 0,
   dmg: 0,
+  atkspd: 0,
   spd: 0,
   def: 0,
   crit: 0,
@@ -34,7 +35,7 @@ export function baseStats(
     dmg: upgrades.dmg * 5,                 // additive bonus on top of weapon.dmg
     def: build.baseDef + upgrades.def * 2,
     spd: build.baseSpd + upgrades.spd * 0.4,
-    atkspd: weapon.atkspd,
+    atkspd: weapon.atkspd + upgrades.atkspd * 0.2,
     range: weapon.range,
     crit: 0.05 + upgrades.crit * 0.05,
     luck: (build.baseLuck || 0) + upgrades.luck * 0.2,

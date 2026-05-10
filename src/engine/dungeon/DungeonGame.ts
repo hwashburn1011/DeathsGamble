@@ -62,6 +62,7 @@ interface EnemyEntity {
   hp: number;
   hpMax: number;
   spd: number;
+  baseSpd: number;          // pre-slow speed, used to restore from frost slow
   dmg: number;
   r: number;
   cash: number;
@@ -69,6 +70,18 @@ interface EnemyEntity {
   flashTimer: number;
   proto: EnemyTypeDef;
   isBoss: boolean;
+  lastShotMs: number;       // for ranged enemies — time of last projectile fired
+  slowUntilMs: number;      // 0 = not slowed
+}
+
+interface EnemyProjectile {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  dmg: number;
+  life: number;
+  graphics: Graphics;
 }
 
 interface ProjectileEntity {
@@ -92,7 +105,7 @@ interface GemEntity {
   graphics: Graphics;
 }
 
-type HitKind = 'damage' | 'crit' | 'heal' | 'player-damage';
+type HitKind = 'damage' | 'crit' | 'heal' | 'player-damage' | 'cash';
 
 interface HitText {
   x: number;
@@ -181,6 +194,13 @@ const HIT_STYLE_PLAYER_DMG = new TextStyle({
   fill: 0xff5050,
   stroke: { color: 0x2a0a0a, width: 3 },
 });
+const HIT_STYLE_CASH = new TextStyle({
+  fontFamily: 'Cinzel, Georgia, serif',
+  fontSize: 14,
+  fontWeight: 'bold',
+  fill: 0xf0c84a,
+  stroke: { color: 0x2a1f08, width: 3 },
+});
 
 export class DungeonGame {
   private app: Application;
@@ -216,6 +236,7 @@ export class DungeonGame {
   private player!: PlayerEntity;
   private enemies: EnemyEntity[] = [];
   private projectiles: ProjectileEntity[] = [];
+  private enemyProjectiles: EnemyProjectile[] = [];
   private gems: GemEntity[] = [];
   private hits: HitText[] = [];
   private particles: Particle[] = [];
@@ -246,8 +267,16 @@ export class DungeonGame {
   private deathPlaying = false;    // player death animation in progress
   private deathT = 0;
   private boss: EnemyEntity | null = null;
+  private bossEnraged = false;
+  private bossNextAoeMs = 0;
   private hitStopT = 0;            // time-scale freeze remaining (real seconds)
+  // Active spell — Frost Nova on Q. ~12s cooldown, damages + slows nearby enemies.
+  private activeSpellLastCastMs = -Infinity;
+  private readonly ACTIVE_CD_MS = 12_000;
   private motionMult = 1;          // multiplier from settings (0/0.5/1/1.5)
+  private paused = false;
+  private pauseStartedAt = 0;      // performance.now() when pause began
+  private totalPausedMs = 0;       // accumulated pause time, subtracted from elapsedS
 
   private tickerCb: (() => void) | null = null;
 
@@ -322,6 +351,7 @@ export class DungeonGame {
     this.screenLayer.destroy({ children: true });
     this.enemies.length = 0;
     this.projectiles.length = 0;
+    this.enemyProjectiles.length = 0;
     this.gems.length = 0;
     this.hits.length = 0;
     this.particles.length = 0;
@@ -382,6 +412,10 @@ export class DungeonGame {
       e.preventDefault();
       this.keys.add(k);
     }
+    if (k === 'q' && !this.paused && !this.gameOver && !this.finished) {
+      e.preventDefault();
+      this.tryCastFrostNova();
+    }
   };
   private keyup = (e: KeyboardEvent): void => {
     this.keys.delete(e.key.toLowerCase());
@@ -395,8 +429,25 @@ export class DungeonGame {
     window.removeEventListener('keyup', this.keyup);
   }
 
+  /**
+   * External pause toggle (e.g. when the SettingsModal opens). When paused,
+   * tick() short-circuits and we account for the pause duration so the round
+   * timer doesn't snap forward when the modal closes.
+   */
+  setPaused(p: boolean): void {
+    if (p === this.paused) return;
+    this.paused = p;
+    if (p) {
+      this.pauseStartedAt = performance.now();
+    } else {
+      this.totalPausedMs += performance.now() - this.pauseStartedAt;
+    }
+  }
+
   // ---------- Loop ----------
   private tick(realDt: number): void {
+    if (this.paused) return;
+
     if (this.gameOver || this.finished) {
       if (this.deathPlaying) this.tickDeathAnim(realDt);
       this.updateScreenFx(realDt);
@@ -412,7 +463,7 @@ export class DungeonGame {
     }
 
     const now = performance.now();
-    const elapsedS = (now - this.startTime) / 1000;
+    const elapsedS = (now - this.startTime - this.totalPausedMs) / 1000;
     const remaining = this.opts.isBossRaid ? Number.POSITIVE_INFINITY : Math.max(0, ROUND_DURATION_S - elapsedS);
 
     this.updatePlayer(dt);
@@ -423,7 +474,9 @@ export class DungeonGame {
     this.maybeAmbient(now);
     this.tickLightFlicker(realDt);
     this.updateEnemies(dt);
+    this.updateBoss(now);
     this.updateProjectiles(dt);
+    this.updateEnemyProjectiles(dt);
     this.cullDeadEnemies();
     this.updateGems(dt);
     this.updateHits(dt);
@@ -508,7 +561,7 @@ export class DungeonGame {
     if (this.deathT >= 1.8 && !this.gameOver) {
       this.gameOver = true;
       this.opts.onGameOver({
-        time: Math.floor((performance.now() - this.startTime) / 1000),
+        time: Math.floor((performance.now() - this.startTime - this.totalPausedMs) / 1000),
         kills: this.kills,
         level: this.level,
         cash: this.cashThisRun,
@@ -659,7 +712,10 @@ export class DungeonGame {
     const interval = 90; // ms between ambient spawns
     if (now - this.lastAmbientSpawnMs < interval) return;
     this.lastAmbientSpawnMs = now;
-    if (this.particles.length > 220) return; // soft cap to keep frame budget sane
+    // Skip ambient when we're already over the soft cap — leaves headroom
+    // for combat bursts (level-up, crit sparks, blood) without forcing
+    // them to drop. They have their own hard cap in pushParticle.
+    if (this.particles.length > 220) return;
     this.spawnAmbient();
   }
 
@@ -683,12 +739,21 @@ export class DungeonGame {
     const py = this.player.y + Math.sin(angle) * dist;
 
     let availTier = 1;
-    if (elapsedS > 15) availTier = 2;
-    if (elapsedS > 35) availTier = 3;
-    if (elapsedS > 50) availTier = 4;
+    if (elapsedS > 12) availTier = 2;
+    if (elapsedS > 30) availTier = 3;
+    if (elapsedS > 45) availTier = 4;
+    // Elites (#116) only show up briefly, and only after the regular roster
+    // has cycled. They're rare even when available.
+    const eliteChance = elapsedS > 40 ? 0.06 : 0;
 
-    const choices = ENEMY_TYPES.filter((e) => e.tier <= availTier);
-    const proto = choices[Math.floor(Math.random() * choices.length)];
+    let proto: EnemyTypeDef;
+    if (Math.random() < eliteChance) {
+      const elites = ENEMY_TYPES.filter((e) => e.tier === 5);
+      proto = elites[Math.floor(Math.random() * elites.length)];
+    } else {
+      const choices = ENEMY_TYPES.filter((e) => e.tier <= availTier && e.tier !== 5);
+      proto = choices[Math.floor(Math.random() * choices.length)];
+    }
 
     const url = ENEMY_SPRITE_BY_TYPE[proto.sprite];
     const tex = Texture.from(url);
@@ -702,12 +767,14 @@ export class DungeonGame {
     this.worldLayer.addChild(sprite);
 
     const hp = proto.hp * this.stats.enemyHpMult * (1 + elapsedS * 0.05);
+    const enemySpd = proto.spd * this.stats.enemySpdMult;
     this.enemies.push({
       x: px,
       y: py,
       hp,
       hpMax: hp,
-      spd: proto.spd * this.stats.enemySpdMult,
+      spd: enemySpd,
+      baseSpd: enemySpd,
       dmg: proto.dmg + this.stats.enemyDmgBonus,
       r: proto.size,
       cash: 1 + Math.floor(proto.tier * 1.5),
@@ -715,6 +782,8 @@ export class DungeonGame {
       flashTimer: 0,
       proto,
       isBoss: false,
+      lastShotMs: 0,
+      slowUntilMs: 0,
     });
   }
 
@@ -735,12 +804,14 @@ export class DungeonGame {
     this.worldLayer.addChild(sprite);
 
     const hp = FINAL_BOSS.hp * this.stats.enemyHpMult;
+    const bossSpd = FINAL_BOSS.spd * this.stats.enemySpdMult;
     const boss: EnemyEntity = {
       x: px,
       y: py,
       hp,
       hpMax: hp,
-      spd: FINAL_BOSS.spd * this.stats.enemySpdMult,
+      spd: bossSpd,
+      baseSpd: bossSpd,
       dmg: FINAL_BOSS.dmg + this.stats.enemyDmgBonus,
       r: FINAL_BOSS.size,
       cash: 200,
@@ -758,8 +829,12 @@ export class DungeonGame {
         sprite: 'boss',
       },
       isBoss: true,
+      lastShotMs: 0,
+      slowUntilMs: 0,
     };
     this.boss = boss;
+    this.bossEnraged = false;
+    this.bossNextAoeMs = 0;
     this.enemies.push(boss);
 
     // Cinematic intro flourish — bg pulse + camera shake
@@ -771,18 +846,34 @@ export class DungeonGame {
   private updateEnemies(dt: number): void {
     const px = this.player.x;
     const py = this.player.y;
+    const now = performance.now();
     for (const e of this.enemies) {
+      // Restore speed when frost slow expires.
+      if (e.slowUntilMs > 0 && now > e.slowUntilMs) {
+        e.spd = e.baseSpd;
+        e.slowUntilMs = 0;
+      }
       const dx = px - e.x;
       const dy = py - e.y;
       const d = Math.hypot(dx, dy) || 1;
-      e.x += (dx / d) * e.spd * dt * 60;
-      e.y += (dy / d) * e.spd * dt * 60;
+      // Ranged enemies brake when in firing range — keep their distance and shoot.
+      const ranged = e.proto.ranged;
+      const wantsToHold = ranged && d < ranged.range * 0.9 && d > e.r + 60;
+      const moveMult = wantsToHold ? 0.15 : 1.0;
+      e.x += (dx / d) * e.spd * dt * 60 * moveMult;
+      e.y += (dy / d) * e.spd * dt * 60 * moveMult;
       this.resolveObstacleCollision(e, e.r);
 
       e.sprite.scale.x = Math.abs(e.sprite.scale.x) * (dx > 0 ? 1 : -1);
 
       if (e.flashTimer > 0) {
         e.flashTimer -= dt;
+      }
+
+      // Ranged fire — when in range and cooldown elapsed, lob a projectile at player.
+      if (ranged && d < ranged.range && now - e.lastShotMs > ranged.cooldownMs) {
+        e.lastShotMs = now;
+        this.spawnEnemyProjectile(e, px, py, ranged.projectileSpd, ranged.projectileColor, e.dmg);
       }
 
       const r = e.r + 12;
@@ -803,6 +894,211 @@ export class DungeonGame {
             this.spawnHit(this.player.x, this.player.y - 18, `-${Math.ceil(wasHp - this.player.hp)}`, 'player-damage');
           }
         }
+      }
+    }
+  }
+
+  /** Player-cast Frost Nova — damages + slows nearby enemies if off cooldown. */
+  private tryCastFrostNova(): void {
+    const now = performance.now();
+    if (now - this.activeSpellLastCastMs < this.ACTIVE_CD_MS) return;
+    this.activeSpellLastCastMs = now;
+    const RADIUS = 200;
+    const dmg = 15 + this.stats.dmg * 0.5;
+    const slowDuration = 3000;
+    // Damage + slow every enemy in radius.
+    for (const e of this.enemies) {
+      const dx = e.x - this.player.x;
+      const dy = e.y - this.player.y;
+      if (dx * dx + dy * dy < RADIUS * RADIUS) {
+        e.hp -= dmg;
+        e.flashTimer = 0.18;
+        e.spd = e.baseSpd * 0.4;
+        e.slowUntilMs = now + slowDuration;
+        this.spawnHit(e.x, e.y - 10, Math.round(dmg).toString(), 'damage');
+      }
+    }
+    // Visual ring — expanding white-blue circle.
+    const ring = new Graphics();
+    ring.position.set(this.player.x, this.player.y);
+    this.particleLayer.addChild(ring);
+    const ringStart = now;
+    const ringDur = 500;
+    const animate = () => {
+      const t = (performance.now() - ringStart) / ringDur;
+      if (t >= 1) {
+        ring.parent?.removeChild(ring);
+        ring.destroy();
+        return;
+      }
+      ring.clear();
+      ring.circle(0, 0, 30 + (RADIUS - 30) * t);
+      ring.stroke({ color: 0x80c8ff, width: 5 * (1 - t * 0.5), alpha: 0.85 * (1 - t) });
+      requestAnimationFrame(animate);
+    };
+    animate();
+    this.applyShake(5, 0.25);
+    this.applyScreenFlash(0.3);
+    AudioManager.play('level_up', { volume: 0.7, pitch: 0.85 });
+  }
+
+  /** Cooldown progress 0..1 (1 = ready). Read by HUD. */
+  public getActiveSpellReady(): number {
+    const elapsed = performance.now() - this.activeSpellLastCastMs;
+    return Math.min(1, elapsed / this.ACTIVE_CD_MS);
+  }
+
+  /**
+   * Boss-specific behavior — phase transitions, periodic shadowbolts,
+   * AOE shadow pulse when enraged.
+   */
+  private updateBoss(now: number): void {
+    const boss = this.boss;
+    if (!boss || boss.hp <= 0) return;
+
+    // Phase transition at 50% HP — bigger, faster, scarier.
+    if (!this.bossEnraged && boss.hp / boss.hpMax <= 0.5) {
+      this.bossEnraged = true;
+      boss.spd *= 1.6;
+      boss.sprite.scale.set(boss.sprite.scale.x * 1.15);
+      // Telegraph the rage with a screen flash + shake.
+      this.applyShake(8, 0.5);
+      this.applyScreenFlash(0.6);
+      AudioManager.play('boss_intro', { volume: 1 });
+      this.bossNextAoeMs = now + 1000;
+    }
+
+    // Boss fires shadowbolts at the player every 2.5s (1.4s when enraged).
+    const shotCd = this.bossEnraged ? 1400 : 2500;
+    if (now - boss.lastShotMs > shotCd) {
+      boss.lastShotMs = now;
+      this.spawnEnemyProjectile(boss, this.player.x, this.player.y, 260, 0x803060, boss.dmg * 0.6);
+      // Phase-2 boss fans 3 bolts in a small spread.
+      if (this.bossEnraged) {
+        const spread = 0.3;
+        const dx = this.player.x - boss.x;
+        const dy = this.player.y - boss.y;
+        const a = Math.atan2(dy, dx);
+        const baseSpd = 260;
+        const cosA1 = Math.cos(a + spread), sinA1 = Math.sin(a + spread);
+        const cosA2 = Math.cos(a - spread), sinA2 = Math.sin(a - spread);
+        this.spawnEnemyProjectile(
+          boss, boss.x + cosA1 * 20, boss.y + sinA1 * 20,
+          baseSpd, 0x803060, boss.dmg * 0.5
+        );
+        this.spawnEnemyProjectile(
+          boss, boss.x + cosA2 * 20, boss.y + sinA2 * 20,
+          baseSpd, 0x803060, boss.dmg * 0.5
+        );
+      }
+    }
+
+    // Phase-2 AOE pulse — every 5s, deal damage in a radius around the boss.
+    if (this.bossEnraged && now >= this.bossNextAoeMs) {
+      this.bossNextAoeMs = now + 5000;
+      this.bossAoePulse(boss);
+    }
+  }
+
+  private bossAoePulse(boss: EnemyEntity): void {
+    const RADIUS = 180;
+    // Visual ring — quick expanding circle at boss position.
+    const ring = new Graphics();
+    ring.circle(0, 0, 20);
+    ring.stroke({ color: 0xc04080, width: 4, alpha: 0.85 });
+    ring.position.set(boss.x, boss.y);
+    this.particleLayer.addChild(ring);
+    const ringStart = performance.now();
+    const ringDur = 600;
+    const animate = () => {
+      const t = (performance.now() - ringStart) / ringDur;
+      if (t >= 1) {
+        ring.parent?.removeChild(ring);
+        ring.destroy();
+        return;
+      }
+      ring.clear();
+      ring.circle(0, 0, 20 + (RADIUS - 20) * t);
+      ring.stroke({ color: 0xc04080, width: 4 * (1 - t * 0.6), alpha: 0.85 * (1 - t) });
+      requestAnimationFrame(animate);
+    };
+    animate();
+    // Damage if player inside radius.
+    const dx = this.player.x - boss.x;
+    const dy = this.player.y - boss.y;
+    if (dx * dx + dy * dy < RADIUS * RADIUS) {
+      const taken = Math.max(1, boss.dmg * 1.2 - this.stats.def);
+      this.player.hp -= taken;
+      this.player.flashTimer = 0.18;
+      this.applyShake(10, 0.5);
+      this.applyScreenFlash(0.7);
+      this.applyHitStop(0.08);
+      AudioManager.play('player_hurt');
+      this.spawnHit(this.player.x, this.player.y - 18, `-${Math.ceil(taken)}`, 'player-damage');
+    }
+  }
+
+  /** Spawn an enemy → player projectile (Graphics circle). */
+  private spawnEnemyProjectile(
+    e: EnemyEntity,
+    targetX: number,
+    targetY: number,
+    speed: number,
+    color: number,
+    dmg: number
+  ): void {
+    const dx = targetX - e.x;
+    const dy = targetY - e.y;
+    const d = Math.hypot(dx, dy) || 1;
+    const g = new Graphics();
+    g.circle(0, 0, 5);
+    g.fill({ color });
+    g.circle(0, 0, 8);
+    g.stroke({ color, alpha: 0.4, width: 1.5 });
+    g.position.set(e.x, e.y);
+    this.projectileLayer.addChild(g);
+    this.enemyProjectiles.push({
+      x: e.x,
+      y: e.y,
+      vx: (dx / d) * speed,
+      vy: (dy / d) * speed,
+      dmg,
+      life: 4,
+      graphics: g,
+    });
+  }
+
+  private updateEnemyProjectiles(dt: number): void {
+    const px = this.player.x;
+    const py = this.player.y;
+    for (let i = this.enemyProjectiles.length - 1; i >= 0; i--) {
+      const p = this.enemyProjectiles[i];
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.life -= dt;
+      p.graphics.position.set(p.x, p.y);
+      // Hit player?
+      const dx = px - p.x;
+      const dy = py - p.y;
+      const hitR = 18;
+      if (dx * dx + dy * dy < hitR * hitR) {
+        const taken = Math.max(1, p.dmg - this.stats.def);
+        this.player.hp -= taken;
+        this.player.flashTimer = 0.12;
+        this.applyShake(4, 0.25);
+        this.applyScreenFlash(0.55);
+        this.applyHitStop(0.05);
+        AudioManager.play('player_hurt');
+        this.spawnHit(this.player.x, this.player.y - 18, `-${Math.ceil(taken)}`, 'player-damage');
+        this.projectileLayer.removeChild(p.graphics);
+        p.graphics.destroy();
+        this.enemyProjectiles.splice(i, 1);
+        continue;
+      }
+      if (p.life <= 0) {
+        this.projectileLayer.removeChild(p.graphics);
+        p.graphics.destroy();
+        this.enemyProjectiles.splice(i, 1);
       }
     }
   }
@@ -884,7 +1180,12 @@ export class DungeonGame {
         continue;
       }
       this.kills++;
-      this.cashThisRun += Math.max(1, Math.round(e.cash * this.opts.cashMult));
+      const cashGain = Math.max(1, Math.round(e.cash * this.opts.cashMult));
+      this.cashThisRun += cashGain;
+      // Visible feedback for the cash drop — a small gold "+$N" floats up
+      // from where the enemy died, paired with a soft pickup chime.
+      this.spawnHit(e.x, e.y - 14, `+$${cashGain}`, 'cash');
+      AudioManager.play('gem_pickup', { volume: 0.35, pitch: 1.3 });
       // Drop XP gem
       const gemG = new Graphics();
       gemG.poly([0, -6, 6, 0, 0, 6, -6, 0]);
@@ -1024,6 +1325,14 @@ export class DungeonGame {
     color: number,
     radius: number
   ): void {
+    // Hard cap — recycle the oldest particle when over budget. Better than
+    // dropping the new spawn (which would make bursts feel cut off) since
+    // the oldest is closest to expiring anyway.
+    const HARD_CAP = 500;
+    if (this.particles.length >= HARD_CAP) {
+      const oldest = this.particles.shift();
+      if (oldest) this.releaseParticle(oldest);
+    }
     const sprite = this.particlePool.pop() ?? new Sprite(this.particleTexture!);
     sprite.anchor.set(0.5);
     sprite.tint = color;
@@ -1217,6 +1526,7 @@ export class DungeonGame {
       case 'crit':         style = HIT_STYLE_CRIT;        break;
       case 'heal':         style = HIT_STYLE_HEAL;        break;
       case 'player-damage':style = HIT_STYLE_PLAYER_DMG;  break;
+      case 'cash':         style = HIT_STYLE_CASH;        break;
       default:             style = HIT_STYLE_NORMAL;
     }
     const t = new Text({ text: txt, style });

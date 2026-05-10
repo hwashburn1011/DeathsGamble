@@ -80,3 +80,37 @@
   text-transform: uppercase;
   color: var(--ink-dim);
 }
+
+/* Touch-device "play on desktop" notice */
+.touch-notice-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(7, 7, 10, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.touch-notice-card {
+  max-width: 420px;
+  background: var(--glass-dark);
+  border: 1px solid var(--glass-border-hi);
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.touch-notice-title {
+  font-size: 22px;
+  color: var(--gold-bright);
+}
+.touch-notice-body {
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.5;
+}

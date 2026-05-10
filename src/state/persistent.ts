@@ -4,7 +4,7 @@ const SAVE_KEY = 'deathsgamble_save_v6';
 
 export const defaultPersistent = (): PersistentState => ({
   cash: 0,
-  upgrades: { hp: 0, dmg: 0, spd: 0, def: 0, crit: 0, luck: 0, cash: 0 },
+  upgrades: { hp: 0, dmg: 0, atkspd: 0, spd: 0, def: 0, crit: 0, luck: 0, cash: 0 },
 });
 
 // Honor prefers-reduced-motion if the user has it set system-wide.
@@ -19,6 +19,7 @@ export const defaultSettings = (): SettingsState => ({
   wheelMode: 'wheel',
   blood: true,
   motionIntensity: reducedMotion ? 'low' : 'normal',
+  renderQuality: 'medium',
   volumeMaster: 0.7,
   volumeSfx: 0.7,
   volumeMusic: 0.5,
